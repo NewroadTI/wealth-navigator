@@ -22,12 +22,12 @@ export function AllocationChart() {
           </Pie>
           <Tooltip
             contentStyle={{
-              backgroundColor: 'hsl(222, 47%, 10%)',
-              border: '1px solid hsl(222, 30%, 18%)',
+              backgroundColor: 'hsl(222, 47%, 13%)',
+              border: '1px solid hsl(222, 35%, 22%)',
               borderRadius: '8px',
               padding: '8px 12px',
             }}
-            itemStyle={{ color: 'hsl(210, 40%, 98%)' }}
+            itemStyle={{ color: 'hsl(38, 30%, 95%)' }}
             formatter={(value: number) => [`${value}%`, '']}
           />
           <Legend

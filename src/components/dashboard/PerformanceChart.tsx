@@ -6,7 +6,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from 'recharts';
 import { performanceData } from '@/lib/mockData';
 
@@ -28,46 +27,46 @@ export function PerformanceChart() {
       </div>
       <ResponsiveContainer width="100%" height="85%">
         <LineChart data={performanceData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 30%, 15%)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 35%, 18%)" />
           <XAxis
             dataKey="month"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: 'hsl(215, 20%, 55%)' }}
+            tick={{ fontSize: 11, fill: 'hsl(38, 20%, 55%)' }}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: 'hsl(215, 20%, 55%)' }}
+            tick={{ fontSize: 11, fill: 'hsl(38, 20%, 55%)' }}
             tickFormatter={(value) => `${value}%`}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'hsl(222, 47%, 10%)',
-              border: '1px solid hsl(222, 30%, 18%)',
+              backgroundColor: 'hsl(222, 47%, 13%)',
+              border: '1px solid hsl(222, 35%, 22%)',
               borderRadius: '8px',
               padding: '8px 12px',
             }}
-            labelStyle={{ color: 'hsl(210, 40%, 98%)', marginBottom: '4px' }}
+            labelStyle={{ color: 'hsl(38, 30%, 95%)', marginBottom: '4px' }}
             itemStyle={{ padding: '2px 0' }}
             formatter={(value: number) => [`${value.toFixed(2)}%`, '']}
           />
           <Line
             type="monotone"
             dataKey="portfolio"
-            stroke="hsl(168, 76%, 42%)"
+            stroke="hsl(220, 82%, 44%)"
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 4, fill: 'hsl(168, 76%, 42%)' }}
+            activeDot={{ r: 4, fill: 'hsl(220, 82%, 44%)' }}
             name="Portfolio"
           />
           <Line
             type="monotone"
             dataKey="benchmark"
-            stroke="hsl(43, 96%, 56%)"
+            stroke="hsl(38, 70%, 55%)"
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 4, fill: 'hsl(43, 96%, 56%)' }}
+            activeDot={{ r: 4, fill: 'hsl(38, 70%, 55%)' }}
             name="Benchmark"
           />
         </LineChart>
