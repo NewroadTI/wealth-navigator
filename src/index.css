@@ -6,71 +6,71 @@
 
 @layer base {
   :root {
-    /* WealthRoad Dark Finance Theme */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    /* WealthRoad Theme - Blues and Golds */
+    --background: 222 47% 8%;
+    --foreground: 38 30% 95%;
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 38 30% 95%;
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 47% 13%;
+    --popover-foreground: 38 30% 95%;
 
-    --primary: 168 76% 42%;
-    --primary-foreground: 222 47% 6%;
+    --primary: 220 82% 44%;
+    --primary-foreground: 38 30% 98%;
 
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 222 35% 18%;
+    --secondary-foreground: 38 30% 95%;
 
-    --muted: 222 30% 12%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 222 35% 15%;
+    --muted-foreground: 38 20% 55%;
 
-    --accent: 43 96% 56%;
-    --accent-foreground: 222 47% 6%;
+    --accent: 38 70% 55%;
+    --accent-foreground: 222 47% 8%;
 
     --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 38 30% 98%;
 
     --success: 160 84% 39%;
-    --success-foreground: 222 47% 6%;
+    --success-foreground: 222 47% 8%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 6%;
+    --warning-foreground: 222 47% 8%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 18%;
-    --ring: 168 76% 42%;
+    --border: 222 35% 22%;
+    --input: 222 35% 22%;
+    --ring: 220 82% 44%;
 
     --radius: 0.5rem;
 
     /* Custom WealthRoad tokens */
     --gain: 160 84% 39%;
     --loss: 0 72% 51%;
-    --neutral: 215 20% 55%;
+    --neutral: 38 20% 55%;
     
-    --chart-1: 168 76% 42%;
-    --chart-2: 43 96% 56%;
-    --chart-3: 280 65% 60%;
-    --chart-4: 200 80% 50%;
-    --chart-5: 340 75% 55%;
+    --chart-1: 220 82% 44%;
+    --chart-2: 38 70% 55%;
+    --chart-3: 215 76% 56%;
+    --chart-4: 25 60% 60%;
+    --chart-5: 210 60% 50%;
 
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 168 76% 42%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 30% 15%;
-    --sidebar-ring: 168 76% 42%;
+    --sidebar-background: 222 47% 6%;
+    --sidebar-foreground: 38 30% 95%;
+    --sidebar-primary: 220 82% 50%;
+    --sidebar-primary-foreground: 38 30% 98%;
+    --sidebar-accent: 222 35% 15%;
+    --sidebar-accent-foreground: 38 30% 95%;
+    --sidebar-border: 222 35% 18%;
+    --sidebar-ring: 220 82% 44%;
 
     /* Glass effect */
-    --glass-bg: 222 47% 8% / 0.8;
-    --glass-border: 222 30% 20%;
+    --glass-bg: 222 47% 11% / 0.8;
+    --glass-border: 222 35% 25%;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    --background: 222 47% 8%;
+    --foreground: 38 30% 95%;
   }
 }
 

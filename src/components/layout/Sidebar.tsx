@@ -10,15 +10,16 @@ import {
   Settings,
   FileText,
   Building2,
+  Package,
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Portfolios', href: '/portfolios', icon: Briefcase },
-  { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
+  { name: 'Assets', href: '/assets', icon: Package },
   { name: 'Positions', href: '/positions', icon: TrendingUp },
+  { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
   { name: 'Cash & FX', href: '/cash', icon: Wallet },
-  { name: 'Investors', href: '/investors', icon: Users },
   { name: 'Advisors', href: '/advisors', icon: Building2 },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
