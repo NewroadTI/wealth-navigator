@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+
+__pycache__/
+*.pyc
+.env
+newroadvenv/
+node_modules/
+.DS_Store
+dist/
+postgres_data/
