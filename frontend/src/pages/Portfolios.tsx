@@ -8,11 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Filter, Download, User, Building2, Wallet } from 'lucide-react';
-import { formatCurrency } from '@/lib/formatters';
+import { Plus, Search, Filter, Download, User, Building2, Wallet, LayoutGrid, List } from 'lucide-react';
+import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { Badge } from '@/components/ui/badge';
+import { Link } from 'react-router-dom';
 
 const Portfolios = () => {
   const [isNewPortfolioOpen, setIsNewPortfolioOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   return (
     <AppLayout title="Portfolios" subtitle="Manage investor portfolios and accounts">
@@ -32,6 +35,25 @@ const Portfolios = () => {
           </Button>
         </div>
         <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="rounded-none h-9 w-9"
+              onClick={() => setViewMode('grid')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="rounded-none h-9 w-9"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
           <Button variant="outline" className="border-border">
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -309,38 +331,95 @@ const Portfolios = () => {
         </div>
       </div>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Total Portfolios</p>
-          <p className="text-2xl font-semibold text-foreground mt-1">{portfolios.length}</p>
+      {/* Portfolio Grid or List View */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {portfolios.map((portfolio) => (
+            <PortfolioCard key={portfolio.id} portfolio={portfolio} />
+          ))}
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Active</p>
-          <p className="text-2xl font-semibold text-success mt-1">
-            {portfolios.filter((p) => p.status === 'Active').length}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Pending</p>
-          <p className="text-2xl font-semibold text-warning mt-1">
-            {portfolios.filter((p) => p.status === 'Pending').length}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-sm text-muted-foreground">Full Processing</p>
-          <p className="text-2xl font-semibold text-foreground mt-1">
-            {portfolios.filter((p) => p.processingType === 'Full').length}
-          </p>
-        </div>
-      </div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          {/* List Header */}
+          <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-muted/30 border-b border-border text-sm font-medium text-muted-foreground">
+            <div className="col-span-3">Portfolio</div>
+            <div className="col-span-2">Investor</div>
+            <div className="col-span-2 text-right">Total Value</div>
+            <div className="col-span-2 text-right">Day Change</div>
+            <div className="col-span-1 text-right">YTD</div>
+            <div className="col-span-1 text-center">Status</div>
+            <div className="col-span-1 text-center">Type</div>
+          </div>
 
-      {/* Portfolio Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {portfolios.map((portfolio) => (
-          <PortfolioCard key={portfolio.id} portfolio={portfolio} />
-        ))}
-      </div>
+          {/* List Rows */}
+          {portfolios.map((portfolio) => (
+            <Link
+              key={portfolio.id}
+              to={`/portfolios/${portfolio.id}`}
+              className="grid grid-cols-12 gap-4 px-5 py-4 items-center border-b border-border hover:bg-muted/20 cursor-pointer transition-colors"
+            >
+              <div className="col-span-3">
+                <p className="font-medium text-foreground">{portfolio.name}</p>
+                <p className="text-xs text-muted-foreground">{portfolio.interfaceCode}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-foreground">{portfolio.investor.name}</p>
+                <p className="text-xs text-muted-foreground">{portfolio.type}</p>
+              </div>
+              <div className="col-span-2 text-right">
+                <p className="font-mono font-medium text-foreground">
+                  {formatCurrency(portfolio.totalValue)}
+                </p>
+              </div>
+              <div className="col-span-2 text-right">
+                <p
+                  className={`font-mono font-medium ${
+                    portfolio.dayChange >= 0 ? 'text-success' : 'text-destructive'
+                  }`}
+                >
+                  {portfolio.dayChange >= 0 ? '+' : ''}
+                  {formatCurrency(portfolio.dayChange)}
+                </p>
+                <p
+                  className={`text-xs ${
+                    portfolio.dayChangePercent >= 0 ? 'text-success' : 'text-destructive'
+                  }`}
+                >
+                  {formatPercent(portfolio.dayChangePercent)}
+                </p>
+              </div>
+              <div className="col-span-1 text-right">
+                <span
+                  className={`font-mono ${
+                    portfolio.ytdReturn >= 0 ? 'text-success' : 'text-destructive'
+                  }`}
+                >
+                  {formatPercent(portfolio.ytdReturn)}
+                </span>
+              </div>
+              <div className="col-span-1 text-center">
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${
+                    portfolio.status === 'Active'
+                      ? 'bg-success/20 text-success border-success/30'
+                      : portfolio.status === 'Pending'
+                      ? 'bg-warning/20 text-warning border-warning/30'
+                      : 'bg-muted/20 text-muted-foreground border-border'
+                  }`}
+                >
+                  {portfolio.status}
+                </Badge>
+              </div>
+              <div className="col-span-1 text-center">
+                <Badge variant="outline" className="text-xs">
+                  {portfolio.processingType}
+                </Badge>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </AppLayout>
   );
 };
