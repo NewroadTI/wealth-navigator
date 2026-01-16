@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { portfolios, assets, getPortfolioTransactions } from '@/lib/mockData';
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, Plus, Download, Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 
@@ -32,9 +34,11 @@ const mockPrices: Record<string, number> = {
 };
 
 const Assets = () => {
+  const location = useLocation();
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all');
   const [selectedAssetClass, setSelectedAssetClass] = useState<string>('all');
   const [selectedAssetSubclass, setSelectedAssetSubclass] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isNewAssetOpen, setIsNewAssetOpen] = useState(false);
   const [newAssetClass, setNewAssetClass] = useState<string>('Equity');
   
@@ -48,13 +52,38 @@ const Assets = () => {
   const portfolio = portfolios.find(p => p.id === selectedPortfolio);
 
   // Filter assets
-  const filteredAssets = assets.filter(a => {
-    if (selectedAssetClass !== 'all' && a.assetClass !== selectedAssetClass) return false;
-    if (selectedAssetSubclass !== 'all' && a.assetType !== selectedAssetSubclass) return false;
-    return true;
-  });
+  const filteredAssets = useMemo(() => {
+    return assets.filter(a => {
+      if (selectedAssetClass !== 'all' && a.assetClass !== selectedAssetClass) return false;
+      if (selectedAssetSubclass !== 'all' && a.assetType !== selectedAssetSubclass) return false;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return a.symbol.toLowerCase().includes(query) || 
+               a.name.toLowerCase().includes(query) ||
+               (a.isin && a.isin.toLowerCase().includes(query));
+      }
+      return true;
+    });
+  }, [selectedAssetClass, selectedAssetSubclass, searchQuery]);
 
   const availableSubclasses = selectedAssetClass !== 'all' ? assetSubclasses[selectedAssetClass] || [] : [];
+
+  // Build current filter string for saving
+  const currentFilters = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedPortfolio !== 'all') params.set('portfolio', selectedPortfolio);
+    if (selectedAssetClass !== 'all') params.set('class', selectedAssetClass);
+    if (selectedAssetSubclass !== 'all') params.set('subclass', selectedAssetSubclass);
+    if (searchQuery) params.set('q', searchQuery);
+    return params.toString();
+  }, [selectedPortfolio, selectedAssetClass, selectedAssetSubclass, searchQuery]);
+
+  const filterTitle = useMemo(() => {
+    const parts = ['Assets'];
+    if (selectedAssetClass !== 'all') parts.push(selectedAssetClass);
+    if (searchQuery) parts.push(`"${searchQuery}"`);
+    return parts.join(' - ');
+  }, [selectedAssetClass, searchQuery]);
 
   return (
     <AppLayout title="Assets" subtitle="Manage and filter assets by portfolio and type">
@@ -107,12 +136,19 @@ const Assets = () => {
               <Input
                 type="search"
                 placeholder="Search assets..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 bg-muted/50 border-border text-xs md:text-sm h-8 md:h-9"
               />
             </div>
           </div>
           
           <div className="flex items-center gap-2 md:gap-3">
+            <SaveFilterButton
+              currentPath={location.pathname}
+              currentFilters={currentFilters}
+              defaultTitle={filterTitle}
+            />
             <Button variant="outline" size="sm" className="border-border text-xs md:text-sm h-8 md:h-9">
               <Download className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
               <span className="hidden sm:inline">Export</span>
