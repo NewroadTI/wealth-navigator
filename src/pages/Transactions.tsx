@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { transactions, portfolios } from '@/lib/mockData';
@@ -8,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Search, Filter, Download, Calendar, Calculator } from 'lucide-react';
+import { SaveFilterButton } from '@/components/common/SaveFilterButton';
+import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
+import { toast } from 'sonner';
 
 const transactionTypes = ['Buy', 'Sell', 'Deposit', 'Withdrawal', 'Dividend', 'Interest', 'Fee', 'FX Trade'];
 
@@ -24,6 +27,7 @@ const assetSubclasses: Record<string, string[]> = {
 };
 
 const Transactions = () => {
+  const location = useLocation();
   const [selectedTypes, setSelectedTypes] = useState<string[]>(transactionTypes);
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all');
   const [selectedAssetClass, setSelectedAssetClass] = useState<string>('all');
@@ -49,26 +53,52 @@ const Transactions = () => {
     });
   }, [selectedTypes, selectedPortfolio, selectedAssetClass, startDate, endDate]);
 
-  // Calculate sum of dividends and taxes (using Interest as proxy for tax-related)
-  const dividendSum = useMemo(() => {
-    return filteredTransactions
-      .filter((t) => t.type === 'Dividend')
-      .reduce((acc, t) => acc + t.amount, 0);
+  // Build current filter string for saving
+  const currentFilters = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedPortfolio !== 'all') params.set('portfolio', selectedPortfolio);
+    if (selectedAssetClass !== 'all') params.set('class', selectedAssetClass);
+    if (selectedAssetSubclass !== 'all') params.set('subclass', selectedAssetSubclass);
+    if (startDate) params.set('from', startDate);
+    if (endDate) params.set('to', endDate);
+    if (selectedTypes.length !== transactionTypes.length) {
+      params.set('types', selectedTypes.join(','));
+    }
+    return params.toString();
+  }, [selectedPortfolio, selectedAssetClass, selectedAssetSubclass, startDate, endDate, selectedTypes]);
+
+  // Calculate sum of income
+  const { dividendSum, interestSum, feeSum } = useMemo(() => {
+    const txns = filteredTransactions;
+    return {
+      dividendSum: txns.filter((t) => t.type === 'Dividend').reduce((acc, t) => acc + t.amount, 0),
+      interestSum: txns.filter((t) => t.type === 'Interest').reduce((acc, t) => acc + t.amount, 0),
+      feeSum: txns.filter((t) => t.type === 'Fee').reduce((acc, t) => acc + t.amount, 0),
+    };
   }, [filteredTransactions]);
 
-  const interestSum = useMemo(() => {
-    return filteredTransactions
-      .filter((t) => t.type === 'Interest')
-      .reduce((acc, t) => acc + t.amount, 0);
-  }, [filteredTransactions]);
-
-  const feeSum = useMemo(() => {
-    return filteredTransactions
-      .filter((t) => t.type === 'Fee')
-      .reduce((acc, t) => acc + t.amount, 0);
-  }, [filteredTransactions]);
+  const handleSumIncome = () => {
+    if (!startDate || !endDate) {
+      toast.error('Please select a date range first', {
+        description: 'Both start and end dates are required to calculate income sum.',
+      });
+      return;
+    }
+    setShowSum(true);
+  };
 
   const availableSubclasses = selectedAssetClass !== 'all' ? assetSubclasses[selectedAssetClass] || [] : [];
+
+  // Build filter title for saving
+  const filterTitle = useMemo(() => {
+    const parts: string[] = ['Transactions'];
+    if (selectedPortfolio !== 'all') {
+      const pf = portfolios.find(p => p.id === selectedPortfolio);
+      if (pf) parts.push(pf.name);
+    }
+    if (startDate && endDate) parts.push(`${startDate} - ${endDate}`);
+    return parts.join(' - ');
+  }, [selectedPortfolio, startDate, endDate]);
 
   return (
     <AppLayout title="Transactions" subtitle="View and manage all financial transactions">
@@ -87,6 +117,11 @@ const Transactions = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
+            <SaveFilterButton
+              currentPath={location.pathname}
+              currentFilters={currentFilters}
+              defaultTitle={filterTitle}
+            />
             <Button variant="outline" size="sm" className="border-border text-xs md:text-sm">
               <Download className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
               <span className="hidden sm:inline">Export</span>
@@ -179,9 +214,15 @@ const Transactions = () => {
           {/* Date Range */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="border-border h-8 md:h-9 text-xs md:text-sm">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`border-border h-8 md:h-9 text-xs md:text-sm ${startDate && endDate ? 'border-primary text-primary' : ''}`}
+              >
                 <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                <span className="hidden sm:inline">Date Range</span>
+                <span className="hidden sm:inline">
+                  {startDate && endDate ? `${startDate} - ${endDate}` : 'Date Range'}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-72 p-3" align="start">
@@ -208,7 +249,7 @@ const Transactions = () => {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
-                  onClick={() => { setStartDate(''); setEndDate(''); }}
+                  onClick={() => { setStartDate(''); setEndDate(''); setShowSum(false); }}
                 >
                   Clear Dates
                 </Button>
@@ -216,41 +257,17 @@ const Transactions = () => {
             </PopoverContent>
           </Popover>
 
-          {/* Sum Dividends + Taxes Button */}
+          {/* Sum Income Button */}
           <Button
             variant={showSum ? "secondary" : "outline"}
             size="sm"
             className="border-border h-8 md:h-9 text-xs md:text-sm"
-            onClick={() => setShowSum(!showSum)}
+            onClick={handleSumIncome}
           >
             <Calculator className="h-3.5 w-3.5 mr-1.5" />
             <span className="hidden sm:inline">Sum Income</span>
           </Button>
         </div>
-
-        {/* Sum Display */}
-        {showSum && (
-          <div className="flex flex-wrap gap-3 md:gap-4 p-3 md:p-4 bg-card border border-border rounded-lg">
-            <div className="flex-1 min-w-[120px]">
-              <p className="text-xs text-muted-foreground">Dividends</p>
-              <p className="text-sm md:text-lg font-semibold mono text-gain">{formatCurrency(dividendSum)}</p>
-            </div>
-            <div className="flex-1 min-w-[120px]">
-              <p className="text-xs text-muted-foreground">Interest</p>
-              <p className="text-sm md:text-lg font-semibold mono text-gain">{formatCurrency(interestSum)}</p>
-            </div>
-            <div className="flex-1 min-w-[120px]">
-              <p className="text-xs text-muted-foreground">Fees / Taxes</p>
-              <p className="text-sm md:text-lg font-semibold mono text-loss">{formatCurrency(feeSum)}</p>
-            </div>
-            <div className="flex-1 min-w-[120px] border-l border-border pl-3 md:pl-4">
-              <p className="text-xs text-muted-foreground">Net Income</p>
-              <p className={`text-sm md:text-lg font-semibold mono ${(dividendSum + interestSum + feeSum) >= 0 ? 'text-gain' : 'text-loss'}`}>
-                {formatCurrency(dividendSum + interestSum + feeSum)}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Transactions Table */}
@@ -263,6 +280,44 @@ const Transactions = () => {
           </div>
         )}
       </div>
+
+      {/* Sum Display - Below Table */}
+      {showSum && (
+        <div className="mt-4 md:mt-6">
+          {(!startDate || !endDate) ? (
+            <div className="flex items-center gap-2 p-3 md:p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <p className="text-sm text-destructive">Please select a date range to calculate income sum.</p>
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-4 md:p-6">
+              <h3 className="text-sm font-medium text-muted-foreground mb-4">
+                Income Summary ({startDate} to {endDate})
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground">Dividends</p>
+                  <p className="text-lg md:text-2xl font-semibold mono text-gain">{formatCurrency(dividendSum)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Interest</p>
+                  <p className="text-lg md:text-2xl font-semibold mono text-gain">{formatCurrency(interestSum)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Fees / Taxes</p>
+                  <p className="text-lg md:text-2xl font-semibold mono text-loss">{formatCurrency(feeSum)}</p>
+                </div>
+                <div className="border-l border-border pl-4">
+                  <p className="text-xs text-muted-foreground">Net Income</p>
+                  <p className={`text-lg md:text-2xl font-semibold mono ${(dividendSum + interestSum + feeSum) >= 0 ? 'text-gain' : 'text-loss'}`}>
+                    {formatCurrency(dividendSum + interestSum + feeSum)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </AppLayout>
   );
 };

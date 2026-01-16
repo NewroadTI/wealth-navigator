@@ -7,10 +7,10 @@ import { NavigationHistoryProvider } from "@/contexts/NavigationHistoryContext";
 import Index from "./pages/Index";
 import Portfolios from "./pages/Portfolios";
 import PortfolioDetail from "./pages/PortfolioDetail";
+import PortfolioPerformance from "./pages/PortfolioPerformance";
 import Transactions from "./pages/Transactions";
 import Positions from "./pages/Positions";
 import Assets from "./pages/Assets";
-import Cash from "./pages/Cash";
 import Advisors from "./pages/Advisors";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -30,10 +30,10 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/portfolios" element={<Portfolios />} />
             <Route path="/portfolios/:id" element={<PortfolioDetail />} />
+            <Route path="/portfolios/:id/performance" element={<PortfolioPerformance />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/positions" element={<Positions />} />
             <Route path="/assets" element={<Assets />} />
-            <Route path="/cash" element={<Cash />} />
             <Route path="/advisors" element={<Advisors />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
