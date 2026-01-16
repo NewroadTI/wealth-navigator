@@ -64,7 +64,8 @@ export function NavigationHistoryProvider({ children }: { children: ReactNode })
 export function useNavigationHistory() {
   const context = useContext(NavigationHistoryContext);
   if (!context) {
-    throw new Error('useNavigationHistory must be used within NavigationHistoryProvider');
+    // Return a safe fallback instead of throwing
+    return { visitedPages: [], addPage: () => {} };
   }
   return context;
 }
