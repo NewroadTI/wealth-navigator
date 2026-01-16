@@ -10,7 +10,7 @@ import PortfolioDetail from "./pages/PortfolioDetail";
 import Transactions from "./pages/Transactions";
 import Positions from "./pages/Positions";
 import Assets from "./pages/Assets";
-import Cash from "./pages/Cash";
+import Performance from "./pages/Performance";
 import Advisors from "./pages/Advisors";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -33,7 +33,7 @@ const App = () => (
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/positions" element={<Positions />} />
             <Route path="/assets" element={<Assets />} />
-            <Route path="/cash" element={<Cash />} />
+            <Route path="/performance" element={<Performance />} />
             <Route path="/advisors" element={<Advisors />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
