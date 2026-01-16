@@ -10,9 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Plus, Search, Filter, Download, Calendar, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
-import { useToast } from '@/hooks/use-toast';
-import { useNavigationHistory } from '@/contexts/NavigationHistoryContext';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const transactionTypes = ['Buy', 'Sell', 'Deposit', 'Withdrawal', 'Dividend', 'Interest', 'Fee', 'FX Trade'];
 
@@ -34,22 +31,6 @@ const Transactions = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [showSum, setShowSum] = useState(false);
-  const { toast } = useToast();
-  const { addPageWithFilters } = useNavigationHistory();
-
-  const handleSumIncome = () => {
-    if (!startDate || !endDate) {
-      toast({
-        title: "Date Range Required",
-        description: "Please select a start and end date before calculating income.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setShowSum(true);
-    // Save this filter to history
-    addPageWithFilters('/transactions', 'Transactions', `Income ${startDate} to ${endDate}`);
-  };
 
   const toggleType = (type: string) => {
     setSelectedTypes((prev) =>
@@ -240,34 +221,16 @@ const Transactions = () => {
             variant={showSum ? "secondary" : "outline"}
             size="sm"
             className="border-border h-8 md:h-9 text-xs md:text-sm"
-            onClick={handleSumIncome}
+            onClick={() => setShowSum(!showSum)}
           >
             <Calculator className="h-3.5 w-3.5 mr-1.5" />
             <span className="hidden sm:inline">Sum Income</span>
           </Button>
         </div>
-      </div>
 
-      {/* Transactions Table with fixed height and scroll */}
-      <div className="flex flex-col flex-1 min-h-0 gap-4">
-        <div className="bg-card border border-border rounded-xl overflow-hidden flex-1 min-h-0">
-          <ScrollArea className="h-[calc(100vh-380px)] md:h-[calc(100vh-320px)]">
-            {filteredTransactions.length > 0 ? (
-              <TransactionsTable transactions={filteredTransactions} />
-            ) : (
-              <div className="p-8 text-center text-muted-foreground">
-                No transactions found for the selected filters
-              </div>
-            )}
-          </ScrollArea>
-        </div>
-
-        {/* Sum Display - Below the table */}
+        {/* Sum Display */}
         {showSum && (
           <div className="flex flex-wrap gap-3 md:gap-4 p-3 md:p-4 bg-card border border-border rounded-lg">
-            <div className="text-xs text-muted-foreground mb-2 w-full">
-              Income from {startDate} to {endDate}
-            </div>
             <div className="flex-1 min-w-[120px]">
               <p className="text-xs text-muted-foreground">Dividends</p>
               <p className="text-sm md:text-lg font-semibold mono text-gain">{formatCurrency(dividendSum)}</p>
@@ -290,6 +253,16 @@ const Transactions = () => {
         )}
       </div>
 
+      {/* Transactions Table */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        {filteredTransactions.length > 0 ? (
+          <TransactionsTable transactions={filteredTransactions} />
+        ) : (
+          <div className="p-8 text-center text-muted-foreground">
+            No transactions found for the selected filters
+          </div>
+        )}
+      </div>
     </AppLayout>
   );
 };

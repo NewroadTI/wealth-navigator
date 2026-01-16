@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useNavigationHistory } from '@/contexts/NavigationHistoryContext';
-import { Clock, X } from 'lucide-react';
+import { X, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function VisitedTabsFooter() {
@@ -16,19 +16,18 @@ export function VisitedTabsFooter() {
         <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0 hidden sm:block" />
         <span className="text-xs text-muted-foreground mr-2 hidden sm:block">Recent:</span>
         <div className="flex items-center gap-1 overflow-x-auto">
-          {visitedPages.slice(0, 10).map((page, idx) => (
+          {visitedPages.slice(0, 8).map((page) => (
             <Link
-              key={page.fullKey + '-' + idx}
-              to={page.path + page.search}
+              key={page.path + page.timestamp}
+              to={page.path}
               className={cn(
                 "flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors whitespace-nowrap flex-shrink-0",
-                location.pathname === page.path && location.search === page.search
+                location.pathname === page.path
                   ? "bg-primary/20 text-primary"
                   : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
-              title={page.title}
             >
-              {page.title.length > 20 ? page.title.substring(0, 20) + '...' : page.title}
+              {page.title}
             </Link>
           ))}
         </div>

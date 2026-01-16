@@ -3,15 +3,13 @@ import { useLocation } from 'react-router-dom';
 
 interface VisitedPage {
   path: string;
-  search: string;
   title: string;
   timestamp: number;
-  fullKey: string;
 }
 
 interface NavigationHistoryContextType {
   visitedPages: VisitedPage[];
-  addPageWithFilters: (path: string, title: string, filterLabel?: string) => void;
+  addPage: (path: string, title: string) => void;
 }
 
 const NavigationHistoryContext = createContext<NavigationHistoryContextType | undefined>(undefined);
@@ -23,7 +21,7 @@ const pageTitles: Record<string, string> = {
   '/assets': 'Assets',
   '/positions': 'Positions',
   '/transactions': 'Transactions',
-  '/performance': 'Performance',
+  '/cash': 'Cash & FX',
   '/reports': 'Reports',
   '/settings': 'Settings',
   '/basic-data': 'Basic Data',
@@ -33,18 +31,14 @@ export function NavigationHistoryProvider({ children }: { children: ReactNode })
   const [visitedPages, setVisitedPages] = useState<VisitedPage[]>([]);
   const location = useLocation();
 
-  const addPageWithFilters = (path: string, title: string, filterLabel?: string) => {
-    const search = location.search;
-    const fullKey = filterLabel ? `${path}?${filterLabel}` : `${path}${search}`;
-    const displayTitle = filterLabel ? `${title}: ${filterLabel}` : title;
-    
+  const addPage = (path: string, title: string) => {
     setVisitedPages((prev) => {
-      // Remove existing entry for this exact path+filter combination
-      const filtered = prev.filter((p) => p.fullKey !== fullKey);
+      // Remove existing entry for this path
+      const filtered = prev.filter((p) => p.path !== path);
       // Add to beginning
-      const newPages = [{ path, search, title: displayTitle, timestamp: Date.now(), fullKey }, ...filtered];
-      // Keep only last 15
-      return newPages.slice(0, 15);
+      const newPages = [{ path, title, timestamp: Date.now() }, ...filtered];
+      // Keep only last 10
+      return newPages.slice(0, 10);
     });
   };
 
@@ -57,12 +51,11 @@ export function NavigationHistoryProvider({ children }: { children: ReactNode })
       title = 'Portfolio Detail';
     }
 
-    // Only add basic page visit without filters on initial navigation
-    addPageWithFilters(path, title);
+    addPage(path, title);
   }, [location.pathname]);
 
   return (
-    <NavigationHistoryContext.Provider value={{ visitedPages, addPageWithFilters }}>
+    <NavigationHistoryContext.Provider value={{ visitedPages, addPage }}>
       {children}
     </NavigationHistoryContext.Provider>
   );
