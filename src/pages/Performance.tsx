@@ -12,11 +12,11 @@ const currencyIcons: Record<string, React.ReactNode> = {
   CHF: <span className="text-sm font-bold">₣</span>,
 };
 
-const Cash = () => {
+const Performance = () => {
   const totalUSD = cashBalances.reduce((sum, b) => sum + b.usdEquivalent, 0);
 
   return (
-    <AppLayout title="Cash & FX" subtitle="Manage cash balances and currency positions">
+    <AppLayout title="Performance" subtitle="Portfolio performance analysis and metrics">
       {/* Actions Bar */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
         <div className="relative w-full md:w-64">
@@ -118,4 +118,4 @@ const Cash = () => {
   );
 };
 
-export default Cash;
+export default Performance;

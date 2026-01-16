@@ -36,12 +36,12 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Portfolios', href: '/portfolios', icon: Briefcase },
       { name: 'Advisors', href: '/advisors', icon: Building2 },
+      { name: 'Performance', href: '/performance', icon: TrendingUp },
     ],
   },
   { name: 'Assets', href: '/assets', icon: Package },
   { name: 'Positions', href: '/positions', icon: TrendingUp },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
-  { name: 'Cash & FX', href: '/cash', icon: Wallet },
   { name: 'Basic Data', href: '/basic-data', icon: Database },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
