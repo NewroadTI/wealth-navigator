@@ -10,7 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 import {
   TrendingUp,
   TrendingDown,
@@ -18,7 +22,7 @@ import {
   Wallet,
   ArrowUpRight,
   ArrowDownRight,
-  Calendar,
+  Calendar as CalendarIcon,
   Filter,
   BarChart3,
 } from 'lucide-react';
@@ -47,7 +51,7 @@ const getImportantTransactions = () => {
   return transactions
     .filter(t => ['Dividend', 'Interest', 'Deposit'].includes(t.type) || Math.abs(t.amount) > 10000)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 10);
+    .slice(0, 20);
 };
 
 // Mock performance data for all accounts
@@ -71,11 +75,16 @@ const cashBalancesByAccount = [
   { account: 'IB-003', currency: 'USD', balance: 152345.67, portfolio: 'Tech Opportunities' },
 ];
 
+// Available transaction types for filtering
+const txnTypes = ['Dividend', 'Interest', 'Deposit', 'Withdrawal', 'Fee'];
+
 const Dashboard = () => {
   const location = useLocation();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('day');
-  const [txnTypeFilter, setTxnTypeFilter] = useState<string>('all');
-  const [minAmount, setMinAmount] = useState<string>('');
+  const [selectedTxnTypes, setSelectedTxnTypes] = useState<string[]>([]);
+  const [selectedInvestor, setSelectedInvestor] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   // Calculate totals
   const totalAUM = portfolios.reduce((sum, p) => sum + p.totalValue, 0);
@@ -92,29 +101,58 @@ const Dashboard = () => {
     [...portfolios].sort((a, b) => b.totalValue - a.totalValue),
   []);
 
+  // Get unique investors for filter
+  const investors = useMemo(() => {
+    const investorMap = new Map<string, string>();
+    portfolios.forEach(p => investorMap.set(p.id, p.investor.name));
+    return Array.from(investorMap.entries()).map(([id, name]) => ({ id, name }));
+  }, []);
+
   // Filter transactions
   const filteredTransactions = useMemo(() => {
     return importantTransactions.filter(t => {
-      if (txnTypeFilter !== 'all' && t.type !== txnTypeFilter) return false;
-      if (minAmount && Math.abs(t.amount) < parseFloat(minAmount)) return false;
+      // Filter by type
+      if (selectedTxnTypes.length > 0 && !selectedTxnTypes.includes(t.type)) return false;
+      
+      // Filter by investor (portfolio)
+      if (selectedInvestor !== 'all' && t.portfolioId !== selectedInvestor) return false;
+      
+      // Filter by date
+      const txnDate = new Date(t.date);
+      if (dateFrom && txnDate < dateFrom) return false;
+      if (dateTo && txnDate > dateTo) return false;
+      
       return true;
     });
-  }, [importantTransactions, txnTypeFilter, minAmount]);
+  }, [importantTransactions, selectedTxnTypes, selectedInvestor, dateFrom, dateTo]);
+
+  // Toggle transaction type
+  const toggleTxnType = (type: string) => {
+    setSelectedTxnTypes(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
 
   // Build filter string for saving
   const currentFilters = useMemo(() => {
     const params = new URLSearchParams();
-    if (txnTypeFilter !== 'all') params.set('txnType', txnTypeFilter);
-    if (minAmount) params.set('minAmount', minAmount);
+    if (selectedTxnTypes.length > 0) params.set('txnTypes', selectedTxnTypes.join(','));
+    if (selectedInvestor !== 'all') params.set('investor', selectedInvestor);
+    if (dateFrom) params.set('from', format(dateFrom, 'yyyy-MM-dd'));
+    if (dateTo) params.set('to', format(dateTo, 'yyyy-MM-dd'));
     return params.toString();
-  }, [txnTypeFilter, minAmount]);
+  }, [selectedTxnTypes, selectedInvestor, dateFrom, dateTo]);
 
   const filterTitle = useMemo(() => {
     const parts = ['Dashboard'];
-    if (txnTypeFilter !== 'all') parts.push(txnTypeFilter);
-    if (minAmount) parts.push(`>${minAmount}`);
+    if (selectedTxnTypes.length > 0) parts.push(selectedTxnTypes.join('+'));
+    if (selectedInvestor !== 'all') {
+      const inv = investors.find(i => i.id === selectedInvestor);
+      if (inv) parts.push(inv.name);
+    }
+    if (dateFrom || dateTo) parts.push('Date Range');
     return parts.join(' - ');
-  }, [txnTypeFilter, minAmount]);
+  }, [selectedTxnTypes, selectedInvestor, dateFrom, dateTo, investors]);
 
   return (
     <AppLayout title="Dashboard" subtitle="Overview of all portfolios and key metrics">
@@ -283,35 +321,105 @@ const Dashboard = () => {
 
           {/* Recent Important Transactions */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <h3 className="text-sm md:text-base font-semibold text-foreground">
-                Recent Important Transactions
-              </h3>
-              <div className="flex items-center gap-2">
-                <Select value={txnTypeFilter} onValueChange={setTxnTypeFilter}>
-                  <SelectTrigger className="h-7 text-xs w-28">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="Dividend">Dividend</SelectItem>
-                    <SelectItem value="Interest">Interest</SelectItem>
-                    <SelectItem value="Deposit">Deposit</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  placeholder="Min $"
-                  value={minAmount}
-                  onChange={(e) => setMinAmount(e.target.value)}
-                  className="h-7 w-20 text-xs"
-                />
-                <SaveFilterButton
-                  currentPath={location.pathname}
-                  currentFilters={currentFilters}
-                  defaultTitle={filterTitle}
-                  className="h-7"
-                />
+            <div className="p-3 md:p-4 border-b border-border">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm md:text-base font-semibold text-foreground">
+                    Recent Important Transactions
+                  </h3>
+                  <SaveFilterButton
+                    currentPath={location.pathname}
+                    currentFilters={currentFilters}
+                    defaultTitle={filterTitle}
+                    className="h-7"
+                  />
+                </div>
+                
+                {/* Filters Row */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Transaction Type Checkboxes */}
+                  <div className="flex flex-wrap items-center gap-2 mr-2">
+                    {txnTypes.map(type => (
+                      <div key={type} className="flex items-center gap-1.5">
+                        <Checkbox
+                          id={`txn-${type}`}
+                          checked={selectedTxnTypes.includes(type)}
+                          onCheckedChange={() => toggleTxnType(type)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <label htmlFor={`txn-${type}`} className="text-xs text-muted-foreground cursor-pointer">
+                          {type}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Investor Filter */}
+                  <Select value={selectedInvestor} onValueChange={setSelectedInvestor}>
+                    <SelectTrigger className="h-7 text-xs w-32">
+                      <SelectValue placeholder="Investor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Investors</SelectItem>
+                      {investors.map(inv => (
+                        <SelectItem key={inv.id} value={inv.id}>{inv.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Date From */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-28">
+                        <CalendarIcon className="h-3 w-3" />
+                        {dateFrom ? format(dateFrom, 'MM/dd/yy') : 'From'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={setDateFrom}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Date To */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-28">
+                        <CalendarIcon className="h-3 w-3" />
+                        {dateTo ? format(dateTo, 'MM/dd/yy') : 'To'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={setDateTo}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Clear Filters */}
+                  {(selectedTxnTypes.length > 0 || selectedInvestor !== 'all' || dateFrom || dateTo) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setSelectedTxnTypes([]);
+                        setSelectedInvestor('all');
+                        setDateFrom(undefined);
+                        setDateTo(undefined);
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             <div className="overflow-x-auto max-h-64">
@@ -320,27 +428,41 @@ const Dashboard = () => {
                   <tr>
                     <th className="text-xs">Date</th>
                     <th className="text-xs">Type</th>
-                    <th className="text-xs hidden sm:table-cell">Description</th>
+                    <th className="text-xs hidden sm:table-cell">Investor</th>
+                    <th className="text-xs hidden md:table-cell">Description</th>
                     <th className="text-xs text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((txn) => (
-                    <tr key={txn.id}>
-                      <td className="text-xs text-muted-foreground">{formatDate(txn.date)}</td>
-                      <td>
-                        <Badge variant="outline" className="text-[10px]">
-                          {txn.type}
-                        </Badge>
-                      </td>
-                      <td className="text-xs text-muted-foreground hidden sm:table-cell max-w-[200px] truncate">
-                        {txn.description}
-                      </td>
-                      <td className={cn('font-medium mono text-xs text-right', txn.amount >= 0 ? 'text-gain' : 'text-loss')}>
-                        {txn.amount >= 0 ? '+' : ''}{formatCurrency(txn.amount)}
+                  {filteredTransactions.map((txn) => {
+                    const portfolio = portfolios.find(p => p.id === txn.portfolioId);
+                    return (
+                      <tr key={txn.id}>
+                        <td className="text-xs text-muted-foreground">{formatDate(txn.date)}</td>
+                        <td>
+                          <Badge variant="outline" className="text-[10px]">
+                            {txn.type}
+                          </Badge>
+                        </td>
+                        <td className="text-xs text-muted-foreground hidden sm:table-cell">
+                          {portfolio?.investor.name || '-'}
+                        </td>
+                        <td className="text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
+                          {txn.description}
+                        </td>
+                        <td className={cn('font-medium mono text-xs text-right', txn.amount >= 0 ? 'text-gain' : 'text-loss')}>
+                          {txn.amount >= 0 ? '+' : ''}{formatCurrency(txn.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredTransactions.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center text-muted-foreground text-xs py-8">
+                        No transactions match the selected filters
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
