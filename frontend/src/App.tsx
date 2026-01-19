@@ -15,6 +15,8 @@ import Advisors from "./pages/Advisors";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import BasicData from "./pages/BasicData";
+import Admin from "./pages/Admin";
+import CRM from "./pages/CRM";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,8 @@ const App = () => (
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/basic-data" element={<BasicData />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/crm" element={<CRM />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </NavigationHistoryProvider>

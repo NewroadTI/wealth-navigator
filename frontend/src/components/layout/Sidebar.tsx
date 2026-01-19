@@ -28,6 +28,8 @@ interface NavItem {
   children?: { name: string; href: string; icon: React.ElementType }[];
 }
 
+import { Shield, Contact } from 'lucide-react';
+
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   {
@@ -41,8 +43,10 @@ const navigation: NavItem[] = [
   { name: 'Assets', href: '/assets', icon: Package },
   { name: 'Positions', href: '/positions', icon: TrendingUp },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
+  { name: 'CRM', href: '/crm', icon: Contact },
   { name: 'Basic Data', href: '/basic-data', icon: Database },
   { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
