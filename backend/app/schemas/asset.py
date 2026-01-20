@@ -222,6 +222,18 @@ class IndustryRead(BaseModel):
     class Config:
         from_attributes = True
 
+class IndustryBase(BaseModel):
+    industry_code: str
+    name: str
+    sector: Optional[str] = None
+
+class IndustryCreate(IndustryBase):
+    pass
+
+class IndustryUpdate(BaseModel):
+    name: Optional[str] = None
+    sector: Optional[str] = None
+
 
 from typing import List, Optional # Asegúrate de tener estos imports arriba
 

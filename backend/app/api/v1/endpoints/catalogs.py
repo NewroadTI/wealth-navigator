@@ -1,5 +1,5 @@
 from typing import List, Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.api import deps
 
@@ -64,7 +64,7 @@ def get_market_indices(
 
 # ... imports ...
 from app.models.asset import Industry # Importar
-from app.schemas.asset import IndustryRead # Importar
+from app.schemas.asset import IndustryRead, IndustryCreate, IndustryUpdate # Importar
 
 # ... endpoints existentes ...
 
@@ -78,6 +78,68 @@ def get_industries(
     Lista las industrias y sectores disponibles.
     """
     return db.query(Industry).order_by(Industry.name).offset(skip).limit(limit).all()
+
+
+@router.post("/industries", response_model=IndustryRead, status_code=status.HTTP_201_CREATED)
+def create_industry(
+    payload: IndustryCreate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Crea una industria nueva.
+    """
+    existing = db.query(Industry).filter(Industry.industry_code == payload.industry_code).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Industry ya existe.")
+
+    obj = Industry(
+        industry_code=payload.industry_code,
+        name=payload.name,
+        sector=payload.sector
+    )
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/industries/{industry_code}", response_model=IndustryRead)
+def update_industry(
+    industry_code: str,
+    payload: IndustryUpdate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Actualiza una industria existente.
+    """
+    obj = db.query(Industry).filter(Industry.industry_code == industry_code).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Industry no encontrada.")
+
+    if payload.name is not None:
+        obj.name = payload.name
+    if payload.sector is not None:
+        obj.sector = payload.sector
+
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/industries/{industry_code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_industry(
+    industry_code: str,
+    db: Session = Depends(deps.get_db)
+) -> None:
+    """
+    Elimina una industria por código.
+    """
+    obj = db.query(Industry).filter(Industry.industry_code == industry_code).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Industry no encontrada.")
+
+    db.delete(obj)
+    db.commit()
 
 
 # ... imports anteriores ...
