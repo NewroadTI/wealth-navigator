@@ -11,7 +11,6 @@ interface VisitedPage {
 
 interface NavigationHistoryContextType {
   visitedPages: VisitedPage[];
-  savedFilters: VisitedPage[];
   addPage: (path: string, title: string, filters?: string) => void;
   saveCurrentFilter: (title: string, path: string, filters: string) => void;
   removeSavedFilter: (timestamp: number) => void;
@@ -29,28 +28,47 @@ const pageTitles: Record<string, string> = {
   '/reports': 'Reports',
   '/settings': 'Settings',
   '/basic-data': 'Basic Data',
+  '/admin': 'Admin',
+  '/crm': 'CRM',
 };
 
 export function NavigationHistoryProvider({ children }: { children: ReactNode }) {
-  const [visitedPages, setVisitedPages] = useState<VisitedPage[]>([]);
-  const [savedFilters, setSavedFilters] = useState<VisitedPage[]>(() => {
+  // Load saved filters from localStorage and merge with visitedPages
+  const [visitedPages, setVisitedPages] = useState<VisitedPage[]>(() => {
     const saved = localStorage.getItem('wealthroad-saved-filters');
     return saved ? JSON.parse(saved) : [];
   });
   const location = useLocation();
 
+  // Persist saved filters to localStorage whenever visitedPages changes
+  useEffect(() => {
+    const savedFilters = visitedPages.filter(p => p.isSaved);
+    localStorage.setItem('wealthroad-saved-filters', JSON.stringify(savedFilters));
+  }, [visitedPages]);
+
   const addPage = (path: string, title: string, filters?: string) => {
     setVisitedPages((prev) => {
-      // Remove existing entry for this exact path+filters combination
+      // Don't add if it's a saved filter (they stay pinned)
       const key = filters ? `${path}?${filters}` : path;
-      const filtered = prev.filter((p) => {
+      
+      // Check if this exact path+filters already exists as non-saved
+      const existing = prev.find((p) => {
         const pKey = p.filters ? `${p.path}?${p.filters}` : p.path;
-        return pKey !== key;
+        return pKey === key && !p.isSaved;
       });
-      // Add to beginning
-      const newPages = [{ path, title, timestamp: Date.now(), filters }, ...filtered];
-      // Keep only last 15
-      return newPages.slice(0, 15);
+      
+      if (existing) {
+        // Move to front (after saved items)
+        const savedItems = prev.filter(p => p.isSaved);
+        const nonSavedItems = prev.filter(p => !p.isSaved && p !== existing);
+        return [...savedItems, { ...existing, timestamp: Date.now() }, ...nonSavedItems].slice(0, 20);
+      }
+      
+      // Add new page
+      const savedItems = prev.filter(p => p.isSaved);
+      const nonSavedItems = prev.filter(p => !p.isSaved);
+      const newPage = { path, title, timestamp: Date.now(), filters };
+      return [...savedItems, newPage, ...nonSavedItems].slice(0, 20);
     });
   };
 
@@ -62,19 +80,16 @@ export function NavigationHistoryProvider({ children }: { children: ReactNode })
       filters,
       isSaved: true,
     };
-    setSavedFilters((prev) => {
-      const updated = [newFilter, ...prev].slice(0, 20);
-      localStorage.setItem('wealthroad-saved-filters', JSON.stringify(updated));
-      return updated;
+    setVisitedPages((prev) => {
+      // Add to the beginning of saved items
+      const savedItems = prev.filter(p => p.isSaved);
+      const nonSavedItems = prev.filter(p => !p.isSaved);
+      return [newFilter, ...savedItems, ...nonSavedItems].slice(0, 20);
     });
   };
 
   const removeSavedFilter = (timestamp: number) => {
-    setSavedFilters((prev) => {
-      const updated = prev.filter((f) => f.timestamp !== timestamp);
-      localStorage.setItem('wealthroad-saved-filters', JSON.stringify(updated));
-      return updated;
-    });
+    setVisitedPages((prev) => prev.filter((f) => f.timestamp !== timestamp));
   };
 
   useEffect(() => {
@@ -82,7 +97,9 @@ export function NavigationHistoryProvider({ children }: { children: ReactNode })
     let title = pageTitles[path] || 'Page';
     
     // Handle dynamic routes
-    if (path.startsWith('/portfolios/')) {
+    if (path.startsWith('/portfolios/') && path.includes('/performance')) {
+      title = 'Portfolio Performance';
+    } else if (path.startsWith('/portfolios/')) {
       title = 'Portfolio Detail';
     }
 
@@ -92,7 +109,6 @@ export function NavigationHistoryProvider({ children }: { children: ReactNode })
   return (
     <NavigationHistoryContext.Provider value={{ 
       visitedPages, 
-      savedFilters, 
       addPage, 
       saveCurrentFilter, 
       removeSavedFilter 
@@ -108,7 +124,6 @@ export function useNavigationHistory() {
     // Return a safe fallback instead of throwing
     return { 
       visitedPages: [], 
-      savedFilters: [],
       addPage: () => {}, 
       saveCurrentFilter: () => {},
       removeSavedFilter: () => {},
