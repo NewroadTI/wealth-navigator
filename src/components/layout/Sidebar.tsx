@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Briefcase,
   ArrowLeftRight,
-  Wallet,
   TrendingUp,
   Settings,
   FileText,
@@ -17,6 +16,7 @@ import {
   Database,
   Menu,
   X,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -43,6 +43,7 @@ const navigation: NavItem[] = [
   { name: 'Assets', href: '/assets', icon: Package },
   { name: 'Positions', href: '/positions', icon: TrendingUp },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
+  { name: 'Structured Notes', href: '/structured-notes', icon: FileSpreadsheet },
   { name: 'CRM', href: '/crm', icon: Contact },
   { name: 'Basic Data', href: '/basic-data', icon: Database },
   { name: 'Reports', href: '/reports', icon: FileText },

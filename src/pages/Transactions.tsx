@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { transactions, portfolios } from '@/lib/mockData';
@@ -9,12 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
-const transactionTypes = ['Buy', 'Sell', 'Deposit', 'Withdrawal', 'Dividend', 'Interest', 'Fee', 'FX Trade'];
+const transactionTypes = ['Buy', 'Sell', 'Deposit', 'Withdrawal', 'Dividend', 'Interest', 'Fee', 'FX Trade', 'Structured Note'];
 
 const assetClasses = ['Equity', 'Fixed Income', 'Funds', 'Derivatives', 'Cash', 'Custom'];
 const assetSubclasses: Record<string, string[]> = {
@@ -32,9 +35,11 @@ const Transactions = () => {
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all');
   const [selectedAssetClass, setSelectedAssetClass] = useState<string>('all');
   const [selectedAssetSubclass, setSelectedAssetSubclass] = useState<string>('all');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [showSum, setShowSum] = useState(false);
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
 
   const toggleType = (type: string) => {
     setSelectedTypes((prev) =>
@@ -47,8 +52,8 @@ const Transactions = () => {
       if (!selectedTypes.includes(t.type)) return false;
       if (selectedPortfolio !== 'all' && t.portfolioId !== selectedPortfolio) return false;
       if (selectedAssetClass !== 'all' && t.assetClass !== selectedAssetClass) return false;
-      if (startDate && t.date < startDate) return false;
-      if (endDate && t.date > endDate) return false;
+      if (startDate && t.date < format(startDate, 'yyyy-MM-dd')) return false;
+      if (endDate && t.date > format(endDate, 'yyyy-MM-dd')) return false;
       return true;
     });
   }, [selectedTypes, selectedPortfolio, selectedAssetClass, startDate, endDate]);
@@ -59,8 +64,8 @@ const Transactions = () => {
     if (selectedPortfolio !== 'all') params.set('portfolio', selectedPortfolio);
     if (selectedAssetClass !== 'all') params.set('class', selectedAssetClass);
     if (selectedAssetSubclass !== 'all') params.set('subclass', selectedAssetSubclass);
-    if (startDate) params.set('from', startDate);
-    if (endDate) params.set('to', endDate);
+    if (startDate) params.set('from', format(startDate, 'yyyy-MM-dd'));
+    if (endDate) params.set('to', format(endDate, 'yyyy-MM-dd'));
     if (selectedTypes.length !== transactionTypes.length) {
       params.set('types', selectedTypes.join(','));
     }
@@ -96,7 +101,7 @@ const Transactions = () => {
       const pf = portfolios.find(p => p.id === selectedPortfolio);
       if (pf) parts.push(pf.name);
     }
-    if (startDate && endDate) parts.push(`${startDate} - ${endDate}`);
+    if (startDate && endDate) parts.push(`${format(startDate, 'yyyy-MM-dd')} - ${format(endDate, 'yyyy-MM-dd')}`);
     return parts.join(' - ');
   }, [selectedPortfolio, startDate, endDate]);
 
@@ -221,35 +226,77 @@ const Transactions = () => {
               >
                 <Calendar className="h-3.5 w-3.5 mr-1.5" />
                 <span className="hidden sm:inline">
-                  {startDate && endDate ? `${startDate} - ${endDate}` : 'Date Range'}
+                  {startDate && endDate 
+                    ? `${format(startDate, 'MMM dd, yyyy')} - ${format(endDate, 'MMM dd, yyyy')}` 
+                    : 'Date Range'}
                 </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-72 p-3" align="start">
+            <PopoverContent className="w-auto p-3" align="start">
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs">Start Date</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="mt-1 h-8 text-sm"
-                  />
+                  <Label className="text-xs mb-2 block">Start Date</Label>
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-9",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "PPP") : "Pick start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(date) => {
+                          setStartDate(date);
+                          setStartDateOpen(false);
+                        }}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
-                  <Label className="text-xs">End Date</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="mt-1 h-8 text-sm"
-                  />
+                  <Label className="text-xs mb-2 block">End Date</Label>
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-9",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, "PPP") : "Pick end date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={endDate}
+                        onSelect={(date) => {
+                          setEndDate(date);
+                          setEndDateOpen(false);
+                        }}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
-                  onClick={() => { setStartDate(''); setEndDate(''); setShowSum(false); }}
+                  onClick={() => { setStartDate(undefined); setEndDate(undefined); setShowSum(false); }}
                 >
                   Clear Dates
                 </Button>
@@ -292,7 +339,7 @@ const Transactions = () => {
           ) : (
             <div className="bg-card border border-border rounded-xl p-4 md:p-6">
               <h3 className="text-sm font-medium text-muted-foreground mb-4">
-                Income Summary ({startDate} to {endDate})
+                Income Summary ({format(startDate, 'yyyy-MM-dd')} to {format(endDate, 'yyyy-MM-dd')})
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                 <div>
