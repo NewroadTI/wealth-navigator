@@ -13,14 +13,12 @@ import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// Extended mock data for portfolio types and investor types
-const portfolioTypes = ['Long Period', 'Short Period', 'Options', 'Mixed'];
+// Extended mock data for investor types
 const investorTypes = ['Individual', 'Corporate', 'Trust', 'Fund'];
 
 // Add portfolio metadata for filtering
 const portfolioMeta = portfolios.map(p => ({
   ...p,
-  strategyType: ['Long Period', 'Short Period', 'Options', 'Mixed'][Math.floor(Math.random() * 4)],
   investorType: p.investor.type === 'Company' ? 'Corporate' : 'Individual',
 }));
 
@@ -51,19 +49,17 @@ const Positions = () => {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPortfolios, setSelectedPortfolios] = useState<string[]>([]);
-  const [selectedStrategyType, setSelectedStrategyType] = useState<string>('all');
   const [selectedInvestorType, setSelectedInvestorType] = useState<string>('all');
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Get filtered portfolios based on strategy and investor type
+  // Get filtered portfolios based on investor type
   const filteredPortfolios = useMemo(() => {
     return portfolioMeta.filter(p => {
-      if (selectedStrategyType !== 'all' && p.strategyType !== selectedStrategyType) return false;
       if (selectedInvestorType !== 'all' && p.investorType !== selectedInvestorType) return false;
       return true;
     });
-  }, [selectedStrategyType, selectedInvestorType]);
+  }, [selectedInvestorType]);
 
   // Get positions based on selected portfolios or all filtered portfolios
   const relevantPositions = useMemo(() => {
@@ -154,7 +150,6 @@ const Positions = () => {
   const buildFilterString = () => {
     const params = new URLSearchParams();
     if (selectedPortfolios.length > 0) params.set('portfolios', selectedPortfolios.join(','));
-    if (selectedStrategyType !== 'all') params.set('strategy', selectedStrategyType);
     if (selectedInvestorType !== 'all') params.set('investor', selectedInvestorType);
     if (searchQuery) params.set('q', searchQuery);
     return params.toString();
@@ -162,13 +157,12 @@ const Positions = () => {
 
   const clearFilters = () => {
     setSelectedPortfolios([]);
-    setSelectedStrategyType('all');
     setSelectedInvestorType('all');
     setSearchQuery('');
     setSelectedAsset(null);
   };
 
-  const hasActiveFilters = selectedPortfolios.length > 0 || selectedStrategyType !== 'all' || selectedInvestorType !== 'all' || searchQuery;
+  const hasActiveFilters = selectedPortfolios.length > 0 || selectedInvestorType !== 'all' || searchQuery;
 
   return (
     <AppLayout title="Positions" subtitle="Aggregated holdings across portfolios">
@@ -186,19 +180,6 @@ const Positions = () => {
               className="pl-9 bg-muted/50 border-border"
             />
           </div>
-
-          {/* Strategy Type Filter */}
-          <Select value={selectedStrategyType} onValueChange={setSelectedStrategyType}>
-            <SelectTrigger className="w-40 bg-muted/50 border-border">
-              <SelectValue placeholder="Strategy" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Strategies</SelectItem>
-              {portfolioTypes.map(type => (
-                <SelectItem key={type} value={type}>{type}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           {/* Investor Type Filter */}
           <Select value={selectedInvestorType} onValueChange={setSelectedInvestorType}>

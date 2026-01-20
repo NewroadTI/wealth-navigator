@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import BasicData from "./pages/BasicData";
 import Admin from "./pages/Admin";
 import CRM from "./pages/CRM";
+import StructuredNotes from "./pages/StructuredNotes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/portfolios/:id" element={<PortfolioDetail />} />
             <Route path="/portfolios/:id/performance" element={<PortfolioPerformance />} />
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/structured-notes" element={<StructuredNotes />} />
             <Route path="/positions" element={<Positions />} />
             <Route path="/assets" element={<Assets />} />
             <Route path="/advisors" element={<Advisors />} />
