@@ -35,6 +35,8 @@ SUBCLASSES_DATA = [
     {"name": "GovernmentIssue", "parent": "FIXED_INCOME", "code": "GOVT", "desc": "Treasuries, TIPS, Sovereign Bonds"},
     {"name": "CorporateIssue", "parent": "FIXED_INCOME", "code": "CORP", "desc": "Corporate Bonds"},
     {"name": "Fund", "parent": "FIXED_INCOME", "code": "FI_FUND", "desc": "Bond ETFs/Funds managed as Fixed Income"},
+    {"name": "Structured Notes", "parent": "FIXED_INCOME", "code": "STRUCTURED_NOTES", "desc": "Notas estructuradas"},
+
     
     # Funds
     {"name": "OpenEnd", "parent": "FUND", "code": "OPEN_END", "desc": "Open End Fund, not traded in exchanges"},
