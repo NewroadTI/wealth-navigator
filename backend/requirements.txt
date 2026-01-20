@@ -3,3 +3,7 @@ uvicorn[standard]
 sqlalchemy
 psycopg2-binary
 asyncpg
+bcrypt==4.0.1
+passlib==1.7.4
+python-jose[cryptography]
+email-validator

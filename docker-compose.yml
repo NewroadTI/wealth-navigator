@@ -9,8 +9,8 @@ services:
       POSTGRES_PASSWORD: securepassword123
       POSTGRES_DB: wealthroad
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data # Persistencia de datos
-      - ./database/init:/docker-entrypoint-initdb.d # Scripts de inicialización
+      - wealthroad_postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     networks:
@@ -45,6 +45,10 @@ services:
       - /app/node_modules # Evita sobrescribir librerías locales
     networks:
       - wealth-net
+
+
+volumes:
+  wealthroad_postgres_data:
 
 # --- Red Privada ---
 networks:
