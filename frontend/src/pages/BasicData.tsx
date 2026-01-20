@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3 } from 'lucide-react';
 
 // Mock data
-const mockExchanges = [
-  { id: '1', code: 'NYSE', name: 'New York Stock Exchange', country: 'United States', timezone: 'EST' },
-  { id: '2', code: 'NASDAQ', name: 'NASDAQ', country: 'United States', timezone: 'EST' },
-  { id: '3', code: 'LSE', name: 'London Stock Exchange', country: 'United Kingdom', timezone: 'GMT' },
-  { id: '4', code: 'TSE', name: 'Tokyo Stock Exchange', country: 'Japan', timezone: 'JST' },
-];
 
 const mockCountries = [
   { id: '1', code: 'US', name: 'United States', currency: 'USD', region: 'North America' },
@@ -39,8 +33,218 @@ const mockIndices = [
   { id: '5', code: 'DAX', name: 'DAX 40', exchange: 'XETRA', country: 'Germany' },
 ];
 
+type ExchangeApi = {
+  exchange_code: string;
+  name: string;
+  country_code?: string | null;
+};
+
+type CountryApi = {
+  iso_code: string;
+  name?: string | null;
+};
+
+type IndustryApi = {
+  industry_code: string;
+  name: string;
+  sector?: string | null;
+};
+
+type IndexApi = {
+  index_code: string;
+  name: string;
+  country_code?: string | null;
+  exchange_code?: string | null;
+};
+
 const BasicData = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [exchanges, setExchanges] = useState<ExchangeApi[]>([]);
+  const [exchangesLoading, setExchangesLoading] = useState(false);
+  const [exchangesError, setExchangesError] = useState<string | null>(null);
+  const [countries, setCountries] = useState<CountryApi[]>([]);
+  const [countriesLoading, setCountriesLoading] = useState(false);
+  const [countriesError, setCountriesError] = useState<string | null>(null);
+  const [industries, setIndustries] = useState<IndustryApi[]>([]);
+  const [industriesLoading, setIndustriesLoading] = useState(false);
+  const [industriesError, setIndustriesError] = useState<string | null>(null);
+  const [indices, setIndices] = useState<IndexApi[]>([]);
+  const [indicesLoading, setIndicesLoading] = useState(false);
+  const [indicesError, setIndicesError] = useState<string | null>(null);
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadExchanges = async () => {
+      try {
+        setExchangesLoading(true);
+        setExchangesError(null);
+        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/exchanges?skip=0&limit=1000`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as ExchangeApi[];
+        setExchanges(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setExchangesError('No se pudo cargar Exchanges.');
+        setExchanges([]);
+      } finally {
+        setExchangesLoading(false);
+      }
+    };
+
+    loadExchanges();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadCountries = async () => {
+      try {
+        setCountriesLoading(true);
+        setCountriesError(null);
+        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/countries?skip=0&limit=1000`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as CountryApi[];
+        setCountries(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setCountriesError('No se pudo cargar Countries.');
+        setCountries([]);
+      } finally {
+        setCountriesLoading(false);
+      }
+    };
+
+    loadCountries();
+    return () => controller.abort();
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadIndustries = async () => {
+      try {
+        setIndustriesLoading(true);
+        setIndustriesError(null);
+        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/industries?skip=0&limit=1000`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as IndustryApi[];
+        setIndustries(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setIndustriesError('No se pudo cargar Industries.');
+        setIndustries([]);
+      } finally {
+        setIndustriesLoading(false);
+      }
+    };
+
+    loadIndustries();
+    return () => controller.abort();
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadIndices = async () => {
+      try {
+        setIndicesLoading(true);
+        setIndicesError(null);
+        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/indices?skip=0&limit=1000`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as IndexApi[];
+        setIndices(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setIndicesError('No se pudo cargar Indices.');
+        setIndices([]);
+      } finally {
+        setIndicesLoading(false);
+      }
+    };
+
+    loadIndices();
+    return () => controller.abort();
+  }, [apiBaseUrl]);
+
+  const filteredExchanges = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return exchanges;
+    }
+    return exchanges.filter((exchange) => {
+      return (
+        exchange.exchange_code.toLowerCase().includes(query) ||
+        exchange.name.toLowerCase().includes(query) ||
+        (exchange.country_code ?? '').toLowerCase().includes(query)
+      );
+    });
+  }, [exchanges, searchQuery]);
+
+  const filteredCountries = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return countries;
+    }
+    return countries.filter((country) => {
+      return (
+        country.iso_code.toLowerCase().includes(query) ||
+        (country.name ?? '').toLowerCase().includes(query)
+      );
+    });
+  }, [countries, searchQuery]);
+
+  const filteredIndustries = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return industries;
+    }
+    return industries.filter((industry) => {
+      return (
+        industry.industry_code.toLowerCase().includes(query) ||
+        industry.name.toLowerCase().includes(query) ||
+        (industry.sector ?? '').toLowerCase().includes(query)
+      );
+    });
+  }, [industries, searchQuery]);
+
+  const filteredIndices = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return indices;
+    }
+    return indices.filter((index) => {
+      return (
+        index.index_code.toLowerCase().includes(query) ||
+        index.name.toLowerCase().includes(query) ||
+        (index.exchange_code ?? '').toLowerCase().includes(query) ||
+        (index.country_code ?? '').toLowerCase().includes(query)
+      );
+    });
+  }, [indices, searchQuery]);
 
   return (
     <AppLayout title="Basic Data" subtitle="Manage reference data for the system">
@@ -134,12 +338,35 @@ const BasicData = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockExchanges.map((exchange) => (
-                    <tr key={exchange.id}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{exchange.code}</td>
+                  {exchangesLoading && (
+                    <tr>
+                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        Cargando exchanges...
+                      </td>
+                    </tr>
+                  )}
+                  {!exchangesLoading && exchangesError && (
+                    <tr>
+                      <td colSpan={5} className="text-destructive text-xs md:text-sm text-center py-6">
+                        {exchangesError}
+                      </td>
+                    </tr>
+                  )}
+                  {!exchangesLoading && !exchangesError && filteredExchanges.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        No hay exchanges para mostrar.
+                      </td>
+                    </tr>
+                  )}
+                  {!exchangesLoading && !exchangesError && filteredExchanges.map((exchange) => (
+                    <tr key={exchange.exchange_code}>
+                      <td className="font-medium text-foreground text-xs md:text-sm">{exchange.exchange_code}</td>
                       <td className="text-foreground text-xs md:text-sm">{exchange.name}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">{exchange.country}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">{exchange.timezone}</td>
+                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">
+                        {exchange.country_code ?? '—'}
+                      </td>
+                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">—</td>
                       <td>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
@@ -213,12 +440,33 @@ const BasicData = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockCountries.map((country) => (
-                    <tr key={country.id}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{country.code}</td>
-                      <td className="text-foreground text-xs md:text-sm">{country.name}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">{country.currency}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">{country.region}</td>
+                  {countriesLoading && (
+                    <tr>
+                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        Cargando countries...
+                      </td>
+                    </tr>
+                  )}
+                  {!countriesLoading && countriesError && (
+                    <tr>
+                      <td colSpan={5} className="text-destructive text-xs md:text-sm text-center py-6">
+                        {countriesError}
+                      </td>
+                    </tr>
+                  )}
+                  {!countriesLoading && !countriesError && filteredCountries.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        No hay countries para mostrar.
+                      </td>
+                    </tr>
+                  )}
+                  {!countriesLoading && !countriesError && filteredCountries.map((country) => (
+                    <tr key={country.iso_code}>
+                      <td className="font-medium text-foreground text-xs md:text-sm">{country.iso_code}</td>
+                      <td className="text-foreground text-xs md:text-sm">{country.name ?? '—'}</td>
+                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">—</td>
+                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">—</td>
                       <td>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
@@ -285,11 +533,34 @@ const BasicData = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockIndustries.map((industry) => (
-                    <tr key={industry.id}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{industry.code}</td>
+                  {industriesLoading && (
+                    <tr>
+                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        Cargando industries...
+                      </td>
+                    </tr>
+                  )}
+                  {!industriesLoading && industriesError && (
+                    <tr>
+                      <td colSpan={4} className="text-destructive text-xs md:text-sm text-center py-6">
+                        {industriesError}
+                      </td>
+                    </tr>
+                  )}
+                  {!industriesLoading && !industriesError && filteredIndustries.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        No hay industries para mostrar.
+                      </td>
+                    </tr>
+                  )}
+                  {!industriesLoading && !industriesError && filteredIndustries.map((industry) => (
+                    <tr key={industry.industry_code}>
+                      <td className="font-medium text-foreground text-xs md:text-sm">{industry.industry_code}</td>
                       <td className="text-foreground text-xs md:text-sm">{industry.name}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">{industry.sector}</td>
+                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">
+                        {industry.sector ?? '—'}
+                      </td>
                       <td>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
@@ -363,12 +634,37 @@ const BasicData = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockIndices.map((index) => (
-                    <tr key={index.id}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{index.code}</td>
+                  {indicesLoading && (
+                    <tr>
+                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        Cargando indices...
+                      </td>
+                    </tr>
+                  )}
+                  {!indicesLoading && indicesError && (
+                    <tr>
+                      <td colSpan={5} className="text-destructive text-xs md:text-sm text-center py-6">
+                        {indicesError}
+                      </td>
+                    </tr>
+                  )}
+                  {!indicesLoading && !indicesError && filteredIndices.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        No hay indices para mostrar.
+                      </td>
+                    </tr>
+                  )}
+                  {!indicesLoading && !indicesError && filteredIndices.map((index) => (
+                    <tr key={index.index_code}>
+                      <td className="font-medium text-foreground text-xs md:text-sm">{index.index_code}</td>
                       <td className="text-foreground text-xs md:text-sm">{index.name}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">{index.exchange}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">{index.country}</td>
+                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">
+                        {index.exchange_code ?? '—'}
+                      </td>
+                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">
+                        {index.country_code ?? '—'}
+                      </td>
                       <td>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
