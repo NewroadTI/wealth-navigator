@@ -6,15 +6,12 @@ sys.path.append(".")
 
 from app.db.session import SessionLocal
 from app.models.asset import StockExchange, MarketIndex, Country
-from app.models.portfolio import Account, Portfolio # <--- ESTO SOLUCIONA EL ERROR
-from app.models.user import User  # <--- ¡ESTA LÍNEA FALTABA!
+from app.models.portfolio import Account, Portfolio
+from app.models.user import User
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- MAPAS DE CONVERSIÓN ---
-
-# Mapa CountryId (JSON) -> ISO Code (DB)
 ID_TO_ISO = {
     724: "ES", 826: "GB", 76: "BR", 840: "US", 372: "IE", 
     276: "DE", 442: "LU", 528: "NL", 56: "BE", 620: "PT", 
@@ -23,16 +20,16 @@ ID_TO_ISO = {
     40: "AT", 756: "CH", 158: "TW"
 }
 
-# Mapa Nombre País (Texto) -> ISO Code (DB)
 NAME_TO_ISO = {
     "United States": "US", "China": "CN", "Taiwan": "TW", 
     "Japan": "JP", "Peru": "PE", "Default": "XX", "0": "XX",
     "China": "CN"
 }
 
-# --- DATA RAW ---
-
+# --- DATA RAW (EXCHANGES) ---
+# He añadido XARC (NYSE Arca) que faltaba y es fundamental para ETFs.
 EXCHANGES_DATA = [
+    {"ExchangeCode": "XARC", "Description": "NYSE ARCA", "CountryId": 840}, # <--- NUEVO E IMPORTANTE
     {"ExchangeCode": "MARF", "Description": "ALTERNATIVE FIXED INCOME MARKET", "CountryId": 724},
     {"ExchangeCode": "MABX", "Description": "ALTERNATIVE STOCK EXCHANGE", "CountryId": 724},
     {"ExchangeCode": "BMTF", "Description": "BLOOMBERG TRADING FACILITY LIMITED", "CountryId": 826},
@@ -70,6 +67,33 @@ EXCHANGES_DATA = [
     {"ExchangeCode": "XVTX", "Description": "ZURICH STOCK EXCHANGE - BLUE CHIPS", "CountryId": 756}
 ]
 
+# --- NUEVA RELACIÓN CORREGIDA Y PROFESIONAL ---
+SYMBOL_TO_EXCHANGE = {
+    # -- Derivados Europeos (Indices Futures) --
+    # Se asignan a Eurex porque ahí cotizan sus futuros principales
+    "SX5E": "XEUR",         
+    "SXXR": "XEUR",
+    "MSCIEU.INDX": "XEUR",  
+
+    # -- USA Índices / Opciones --
+    # SPX se asigna a CBOE (Chicago Board Options Exchange) que es el dueño de la volatilidad del índice
+    "SPX": "XCBO",
+    "SPTR500N": None, # Indice puro de retorno total, no tiene exchange directo
+    "S&P500": "XCBO", # Mapeo de seguridad al CBOE
+
+    # -- USA ETFs (Corrección Importante: NYSE ARCA y NASDAQ) --
+    "SPY": "XARC",          # SPDR S&P 500 cotiza en NYSE Arca
+    "AOK": "XARC",          
+    "AOM": "XARC",
+    "BND": "XNAS",          # Vanguard Total Bond se mudó a NASDAQ
+    "BND_AGG": "XNAS",      
+    "LQD": "XARC",          # iShares Corporate Bond cotiza en NYSE Arca
+    "TLT": "XARC",          # iShares 20+ Year Treasury cotiza en NYSE Arca
+
+    # -- Asia --
+    "TPXDDVD": "XTKS",      # TOPIX -> Tokyo Stock Exchange
+}
+
 INDICES_DATA = [
     {"Description": "EURO STOXX 50 PRICE EUR", "Country": "0", "Symbol": "SX5E"},
     {"Description": "S&P 500 NET TOTAL RETURN INDEX", "Country": "0", "Symbol": "SPTR500N"},
@@ -97,7 +121,7 @@ INDICES_DATA = [
     {"Description": "S&P 500 INDEX", "Country": "United States", "Symbol": "SPX"},
     {"Description": "S&P 500", "Country": "United States", "Symbol": "S&P500"},
     {"Description": "iShares Core Conservative Allocation ETF", "Country": "United States", "Symbol": "AOK"},
-    {"Description": "iShares Core Aggressive Allocation ETF", "Country": "United States", "Symbol": "BND_AGG"}, # Fix duplicate BND
+    {"Description": "iShares Core Aggressive Allocation ETF", "Country": "United States", "Symbol": "BND_AGG"}, 
     {"Description": "iShares Core Moderate Allocation ETF", "Country": "United States", "Symbol": "AOM"},
     {"Description": "Vanguard Total Bond Market ETF", "Country": "United States", "Symbol": "BND"},
     {"Description": "iShares iBoxx USD Inv Grade Corp Bond", "Country": "United States", "Symbol": "LQD"},
@@ -144,8 +168,7 @@ def seed_market_data():
             code = item["ExchangeCode"]
             country_id = item["CountryId"]
             
-            # Convertir ID numérico a ISO
-            country_iso = ID_TO_ISO.get(country_id, "XX") # Fallback a XX si no encuentra
+            country_iso = ID_TO_ISO.get(country_id, "XX")
             
             obj = db.query(StockExchange).filter(StockExchange.exchange_code == code).first()
             if not obj:
@@ -171,8 +194,11 @@ def seed_market_data():
             symbol = item["Symbol"]
             country_name = item.get("Country", "Default").strip()
             
-            # Convertir Nombre a ISO
             country_iso = NAME_TO_ISO.get(country_name, "XX")
+            
+            # --- MODIFICACIÓN AQUÍ ---
+            # Buscamos si el símbolo tiene un exchange conocido en nuestro mapa
+            target_exchange_code = SYMBOL_TO_EXCHANGE.get(symbol, None)
             
             obj = db.query(MarketIndex).filter(MarketIndex.index_code == symbol).first()
             if not obj:
@@ -180,13 +206,16 @@ def seed_market_data():
                     index_code=symbol,
                     name=item["Description"],
                     country_code=country_iso,
-                    exchange_code=None # No tenemos el exchange en la data raw
+                    exchange_code=target_exchange_code # Asignamos el exchange encontrado
                 )
                 db.add(obj)
                 count_idx += 1
             else:
                 obj.name = item["Description"]
                 obj.country_code = country_iso
+                # Opcional: Actualizar el exchange si ya existía pero estaba vacío
+                if obj.exchange_code is None and target_exchange_code is not None:
+                     obj.exchange_code = target_exchange_code
         
         db.commit()
         logger.info(f"✅ Indices creados/actualizados: {count_idx}")

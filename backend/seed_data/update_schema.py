@@ -6,8 +6,17 @@ from sqlalchemy import text
 sys.path.append(".")
 from app.db.session import engine
 from app.db.base import Base
-# Importamos TODOS los modelos actualizados
-from app.models.asset import * 
+
+# ✅ IMPORTAR TODOS LOS MODELOS (en orden de dependencias)
+from app.models.user import User, Role, Permission, RolePermission, AuditLog
+from app.models.portfolio import Portfolio, PortfolioAdvisor, Account
+from app.models.asset import (
+    StockExchange, Industry, AssetClass, AssetSubClass, Asset,
+    Trade, CashJournal, FXTransaction, PerformanceAttribution,
+    CorporateAction, Position, MarketPrice, MarketIndex,
+    Currency, Country
+)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
