@@ -1,0 +1,303 @@
+import sys
+import logging
+
+# Configuración para encontrar los módulos de la app dentro del contenedor
+sys.path.append(".")
+
+from app.db.session import SessionLocal
+from app.models.asset import Country
+from app.models.portfolio import Account, Portfolio # <--- ESTO SOLUCIONA EL ERROR
+from app.models.user import User
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Datos proporcionados (CountryId será ignorado)
+RAW_DATA = {
+  "Results": [
+    {"CountryId": 4, "Name": "Afghanistan", "Code": "AF"},
+    {"CountryId": 248, "Name": "Aland", "Code": "AX"},
+    {"CountryId": 8, "Name": "Albania", "Code": "AL"},
+    {"CountryId": 12, "Name": "Algeria", "Code": "DZ"},
+    {"CountryId": 16, "Name": "AmericanSamoa", "Code": "AS"},
+    {"CountryId": 20, "Name": "Andorra", "Code": "AD"},
+    {"CountryId": 24, "Name": "Angola", "Code": "AO"},
+    {"CountryId": 660, "Name": "Anguilla", "Code": "AI"},
+    {"CountryId": 10, "Name": "AntarcticTerritory", "Code": "AQ"},
+    {"CountryId": 28, "Name": "AntiguaBarbuda", "Code": "AG"},
+    {"CountryId": 32, "Name": "Argentina", "Code": "AR"},
+    {"CountryId": 51, "Name": "Armenia", "Code": "AM"},
+    {"CountryId": 533, "Name": "Aruba", "Code": "AW"},
+    {"CountryId": 10000, "Name": "Ascension", "Code": "AC"},
+    {"CountryId": 36, "Name": "Australia", "Code": "AU"},
+    {"CountryId": 40, "Name": "Austria", "Code": "AT"},
+    {"CountryId": 31, "Name": "Azerbaijan", "Code": "AZ"},
+    {"CountryId": 44, "Name": "Bahamas", "Code": "BS"},
+    {"CountryId": 48, "Name": "Bahrain", "Code": "BH"},
+    {"CountryId": 581, "Name": "BakerIsland", "Code": "UM"},
+    {"CountryId": 50, "Name": "Bangladesh", "Code": "BD"},
+    {"CountryId": 52, "Name": "Barbados", "Code": "BB"},
+    {"CountryId": 112, "Name": "Belarus", "Code": "BY"},
+    {"CountryId": 56, "Name": "Belgium", "Code": "BE"},
+    {"CountryId": 84, "Name": "Belize", "Code": "BZ"},
+    {"CountryId": 204, "Name": "Benin", "Code": "BJ"},
+    {"CountryId": 60, "Name": "Bermuda", "Code": "BM"},
+    {"CountryId": 64, "Name": "Bhutan", "Code": "BT"},
+    {"CountryId": 68, "Name": "Bolivia", "Code": "BO"},
+    {"CountryId": 70, "Name": "BosniaHerzegovina", "Code": "BA"},
+    {"CountryId": 72, "Name": "Botswana", "Code": "BW"},
+    {"CountryId": 74, "Name": "BouvetIsland", "Code": "BV"},
+    {"CountryId": 76, "Name": "Brazil", "Code": "BR"},
+    {"CountryId": 86, "Name": "BritishIndianOceanTerritory", "Code": "IO"},
+    {"CountryId": 92, "Name": "BritishVirginIslands", "Code": "VG"},
+    {"CountryId": 96, "Name": "Brunei", "Code": "BN"},
+    {"CountryId": 100, "Name": "Bulgaria", "Code": "BG"},
+    {"CountryId": 854, "Name": "BurkinaFaso", "Code": "BF"},
+    {"CountryId": 108, "Name": "Burundi", "Code": "BI"},
+    {"CountryId": 116, "Name": "Cambodia", "Code": "KH"},
+    {"CountryId": 120, "Name": "Cameroon", "Code": "CM"},
+    {"CountryId": 124, "Name": "Canada", "Code": "CA"},
+    {"CountryId": 132, "Name": "CapeVerde", "Code": "CV"},
+    {"CountryId": 136, "Name": "CaymanIslands", "Code": "KY"},
+    {"CountryId": 140, "Name": "CentralAfricanRepublic", "Code": "CF"},
+    {"CountryId": 148, "Name": "Chad", "Code": "TD"},
+    {"CountryId": 152, "Name": "Chile", "Code": "CL"},
+    {"CountryId": 156, "Name": "China", "Code": "CN"},
+    {"CountryId": 162, "Name": "ChristmasIsland", "Code": "CX"},
+    {"CountryId": 166, "Name": "CocosIslands", "Code": "CC"},
+    {"CountryId": 170, "Name": "Colombia", "Code": "CO"},
+    {"CountryId": 174, "Name": "Comoros", "Code": "KM"},
+    {"CountryId": 178, "Name": "CongoBrazzaville", "Code": "CG"},
+    {"CountryId": 180, "Name": "CongoKinshasa", "Code": "CD"},
+    {"CountryId": 184, "Name": "CookIslands", "Code": "CK"},
+    {"CountryId": 188, "Name": "CostaRica", "Code": "CR"},
+    {"CountryId": 384, "Name": "CoteDIvoire", "Code": "CI"},
+    {"CountryId": 191, "Name": "Croatia", "Code": "HR"},
+    {"CountryId": 192, "Name": "Cuba", "Code": "CU"},
+    {"CountryId": 196, "Name": "Cyprus", "Code": "CY"},
+    {"CountryId": 203, "Name": "CzechRepublic", "Code": "CZ"},
+    {"CountryId": 9999, "Name": "Default", "Code": "XX"},
+    {"CountryId": 208, "Name": "Denmark", "Code": "DK"},
+    {"CountryId": 262, "Name": "Djibouti", "Code": "DJ"},
+    {"CountryId": 212, "Name": "Dominica", "Code": "DM"},
+    {"CountryId": 214, "Name": "DominicanRepublic", "Code": "DO"},
+    {"CountryId": 218, "Name": "Ecuador", "Code": "EC"},
+    {"CountryId": 818, "Name": "Egypt", "Code": "EG"},
+    {"CountryId": 222, "Name": "ElSalvador", "Code": "SV"},
+    {"CountryId": 226, "Name": "EquatorialGuinea", "Code": "GQ"},
+    {"CountryId": 232, "Name": "Eritrea", "Code": "ER"},
+    {"CountryId": 233, "Name": "Estonia", "Code": "EE"},
+    {"CountryId": 231, "Name": "Ethiopia", "Code": "ET"},
+    {"CountryId": 238, "Name": "FalklandIslands", "Code": "FK"},
+    {"CountryId": 234, "Name": "FaroeIslands", "Code": "FO"},
+    {"CountryId": 242, "Name": "Fiji", "Code": "FJ"},
+    {"CountryId": 246, "Name": "Finland", "Code": "FI"},
+    {"CountryId": 250, "Name": "France", "Code": "FR"},
+    {"CountryId": 254, "Name": "FrenchGuiana", "Code": "GF"},
+    {"CountryId": 258, "Name": "FrenchPolynesia", "Code": "PF"},
+    {"CountryId": 260, "Name": "FrenchSouthernAntarcticLands", "Code": "TF"},
+    {"CountryId": 266, "Name": "Gabon", "Code": "GA"},
+    {"CountryId": 270, "Name": "Gambia", "Code": "GM"},
+    {"CountryId": 268, "Name": "Georgia", "Code": "GE"},
+    {"CountryId": 276, "Name": "Germany", "Code": "DE"},
+    {"CountryId": 288, "Name": "Ghana", "Code": "GH"},
+    {"CountryId": 292, "Name": "Gibraltar", "Code": "GI"},
+    {"CountryId": 300, "Name": "Greece", "Code": "GR"},
+    {"CountryId": 304, "Name": "Greenland", "Code": "GL"},
+    {"CountryId": 308, "Name": "Grenada", "Code": "GD"},
+    {"CountryId": 312, "Name": "Guadeloupe", "Code": "GP"},
+    {"CountryId": 316, "Name": "Guam", "Code": "GU"},
+    {"CountryId": 320, "Name": "Guatemala", "Code": "GT"},
+    {"CountryId": 831, "Name": "Guernsey", "Code": "GG"},
+    {"CountryId": 324, "Name": "Guinea", "Code": "GN"},
+    {"CountryId": 624, "Name": "GuineaBissau", "Code": "GW"},
+    {"CountryId": 328, "Name": "Guyana", "Code": "GY"},
+    {"CountryId": 332, "Name": "Haiti", "Code": "HT"},
+    {"CountryId": 334, "Name": "HeardIslandMcDonaldIslands", "Code": "HM"},
+    {"CountryId": 340, "Name": "Honduras", "Code": "HN"},
+    {"CountryId": 344, "Name": "HongKong", "Code": "HK"},
+    {"CountryId": 348, "Name": "Hungary", "Code": "HU"},
+    {"CountryId": 352, "Name": "Iceland", "Code": "IS"},
+    {"CountryId": 356, "Name": "India", "Code": "IN"},
+    {"CountryId": 360, "Name": "Indonesia", "Code": "ID"},
+    {"CountryId": 364, "Name": "Iran", "Code": "IR"},
+    {"CountryId": 368, "Name": "Iraq", "Code": "IQ"},
+    {"CountryId": 372, "Name": "Ireland", "Code": "IE"},
+    {"CountryId": 833, "Name": "IsleofMan", "Code": "IM"},
+    {"CountryId": 376, "Name": "Israel", "Code": "IL"},
+    {"CountryId": 380, "Name": "Italy", "Code": "IT"},
+    {"CountryId": 388, "Name": "Jamaica", "Code": "JM"},
+    {"CountryId": 392, "Name": "Japan", "Code": "JP"},
+    {"CountryId": 832, "Name": "Jersey", "Code": "JE"},
+    {"CountryId": 400, "Name": "Jordan", "Code": "JO"},
+    {"CountryId": 398, "Name": "Kazakhstan", "Code": "KZ"},
+    {"CountryId": 404, "Name": "Kenya", "Code": "KE"},
+    {"CountryId": 296, "Name": "Kiribati", "Code": "KI"},
+    {"CountryId": 414, "Name": "Kuwait", "Code": "KW"},
+    {"CountryId": 417, "Name": "Kyrgyzstan", "Code": "KG"},
+    {"CountryId": 418, "Name": "Laos", "Code": "LA"},
+    {"CountryId": 428, "Name": "Latvia", "Code": "LV"},
+    {"CountryId": 422, "Name": "Lebanon", "Code": "LB"},
+    {"CountryId": 426, "Name": "Lesotho", "Code": "LS"},
+    {"CountryId": 430, "Name": "Liberia", "Code": "LR"},
+    {"CountryId": 434, "Name": "Libya", "Code": "LY"},
+    {"CountryId": 438, "Name": "Liechtenstein", "Code": "LI"},
+    {"CountryId": 440, "Name": "Lithuania", "Code": "LT"},
+    {"CountryId": 442, "Name": "Luxembourg", "Code": "LU"},
+    {"CountryId": 446, "Name": "Macau", "Code": "MO"},
+    {"CountryId": 807, "Name": "Macedonia", "Code": "MK"},
+    {"CountryId": 450, "Name": "Madagascar", "Code": "MG"},
+    {"CountryId": 454, "Name": "Malawi", "Code": "MW"},
+    {"CountryId": 458, "Name": "Malaysia", "Code": "MY"},
+    {"CountryId": 462, "Name": "Maldives", "Code": "MV"},
+    {"CountryId": 466, "Name": "Mali", "Code": "ML"},
+    {"CountryId": 470, "Name": "Malta", "Code": "MT"},
+    {"CountryId": 584, "Name": "MarshallIslands", "Code": "MH"},
+    {"CountryId": 474, "Name": "Martinique", "Code": "MQ"},
+    {"CountryId": 478, "Name": "Mauritania", "Code": "MR"},
+    {"CountryId": 480, "Name": "Mauritius", "Code": "MU"},
+    {"CountryId": 175, "Name": "Mayotte", "Code": "YT"},
+    {"CountryId": 484, "Name": "Mexico", "Code": "MX"},
+    {"CountryId": 583, "Name": "Micronesia", "Code": "FM"},
+    {"CountryId": 498, "Name": "Moldova", "Code": "MD"},
+    {"CountryId": 492, "Name": "Monaco", "Code": "MC"},
+    {"CountryId": 496, "Name": "Mongolia", "Code": "MN"},
+    {"CountryId": 499, "Name": "Montenegro", "Code": "ME"},
+    {"CountryId": 500, "Name": "Montserrat", "Code": "MS"},
+    {"CountryId": 504, "Name": "Morocco", "Code": "MA"},
+    {"CountryId": 508, "Name": "Mozambique", "Code": "MZ"},
+    {"CountryId": 104, "Name": "Myanmar", "Code": "MM"},
+    {"CountryId": 516, "Name": "Namibia", "Code": "NA"},
+    {"CountryId": 520, "Name": "Nauru", "Code": "NR"},
+    {"CountryId": 524, "Name": "Nepal", "Code": "NP"},
+    {"CountryId": 528, "Name": "Netherlands", "Code": "NL"},
+    {"CountryId": 530, "Name": "NetherlandsAntilles", "Code": "AN"},
+    {"CountryId": 540, "Name": "NewCaledonia", "Code": "NC"},
+    {"CountryId": 554, "Name": "NewZealand", "Code": "NZ"},
+    {"CountryId": 558, "Name": "Nicaragua", "Code": "NI"},
+    {"CountryId": 562, "Name": "Niger", "Code": "NE"},
+    {"CountryId": 566, "Name": "Nigeria", "Code": "NG"},
+    {"CountryId": 570, "Name": "Niue", "Code": "NU"},
+    {"CountryId": 574, "Name": "NorfolkIsland", "Code": "NF"},
+    {"CountryId": 580, "Name": "NorthernMarianaIslands", "Code": "MP"},
+    {"CountryId": 408, "Name": "NorthKorea", "Code": "KP"},
+    {"CountryId": 578, "Name": "Norway", "Code": "NO"},
+    {"CountryId": 512, "Name": "Oman", "Code": "OM"},
+    {"CountryId": 586, "Name": "Pakistan", "Code": "PK"},
+    {"CountryId": 585, "Name": "Palau", "Code": "PW"},
+    {"CountryId": 591, "Name": "Panama", "Code": "PA"},
+    {"CountryId": 598, "Name": "PapuaNewGuinea", "Code": "PG"},
+    {"CountryId": 600, "Name": "Paraguay", "Code": "PY"},
+    {"CountryId": 604, "Name": "Peru", "Code": "PE"},
+    {"CountryId": 608, "Name": "Philippines", "Code": "PH"},
+    {"CountryId": 612, "Name": "PitcairnIslands", "Code": "PN"},
+    {"CountryId": 616, "Name": "Poland", "Code": "PL"},
+    {"CountryId": 620, "Name": "Portugal", "Code": "PT"},
+    {"CountryId": 630, "Name": "PuertoRico", "Code": "PR"},
+    {"CountryId": 634, "Name": "Qatar", "Code": "QA"},
+    {"CountryId": 638, "Name": "Reunion", "Code": "RE"},
+    {"CountryId": 642, "Name": "Romania", "Code": "RO"},
+    {"CountryId": 643, "Name": "Russia", "Code": "RU"},
+    {"CountryId": 646, "Name": "Rwanda", "Code": "RW"},
+    {"CountryId": 654, "Name": "SaintHelena", "Code": "SH"},
+    {"CountryId": 659, "Name": "SaintKittsNevis", "Code": "KN"},
+    {"CountryId": 662, "Name": "SaintLucia", "Code": "LC"},
+    {"CountryId": 666, "Name": "SaintPierreMiquelon", "Code": "PM"},
+    {"CountryId": 670, "Name": "SaintVincenttheGrenadines", "Code": "VC"},
+    {"CountryId": 882, "Name": "Samoa", "Code": "WS"},
+    {"CountryId": 674, "Name": "SanMarino", "Code": "SM"},
+    {"CountryId": 678, "Name": "SaoTomePrincipe", "Code": "ST"},
+    {"CountryId": 682, "Name": "SaudiArabia", "Code": "SA"},
+    {"CountryId": 686, "Name": "Senegal", "Code": "SN"},
+    {"CountryId": 688, "Name": "Serbia", "Code": "RS"},
+    {"CountryId": 690, "Name": "Seychelles", "Code": "SC"},
+    {"CountryId": 694, "Name": "SierraLeone", "Code": "SL"},
+    {"CountryId": 702, "Name": "Singapore", "Code": "SG"},
+    {"CountryId": 703, "Name": "Slovakia", "Code": "SK"},
+    {"CountryId": 705, "Name": "Slovenia", "Code": "SI"},
+    {"CountryId": 90, "Name": "SolomonIslands", "Code": "SB"},
+    {"CountryId": 706, "Name": "Somalia", "Code": "SO"},
+    {"CountryId": 710, "Name": "SouthAfrica", "Code": "ZA"},
+    {"CountryId": 239, "Name": "SouthGeorgiaSouthSandwichIslands", "Code": "GS"},
+    {"CountryId": 410, "Name": "SouthKorea", "Code": "KR"},
+    {"CountryId": 724, "Name": "Spain", "Code": "ES"},
+    {"CountryId": 144, "Name": "SriLanka", "Code": "LK"},
+    {"CountryId": 736, "Name": "Sudan", "Code": "SD"},
+    {"CountryId": 740, "Name": "Suriname", "Code": "SR"},
+    {"CountryId": 744, "Name": "Svalbard", "Code": "SJ"},
+    {"CountryId": 748, "Name": "Swaziland", "Code": "SZ"},
+    {"CountryId": 752, "Name": "Sweden", "Code": "SE"},
+    {"CountryId": 756, "Name": "Switzerland", "Code": "CH"},
+    {"CountryId": 760, "Name": "Syria", "Code": "SY"},
+    {"CountryId": 158, "Name": "Taiwan", "Code": "TW"},
+    {"CountryId": 762, "Name": "Tajikistan", "Code": "TJ"},
+    {"CountryId": 834, "Name": "Tanzania", "Code": "TZ"},
+    {"CountryId": 764, "Name": "Thailand", "Code": "TH"},
+    {"CountryId": 626, "Name": "TimorLeste", "Code": "TL"},
+    {"CountryId": 768, "Name": "Togo", "Code": "TG"},
+    {"CountryId": 772, "Name": "Tokelau", "Code": "TK"},
+    {"CountryId": 776, "Name": "Tonga", "Code": "TO"},
+    {"CountryId": 780, "Name": "TrinidadTobago", "Code": "TT"},
+    {"CountryId": 10001, "Name": "TristandaCunha", "Code": "TA"},
+    {"CountryId": 788, "Name": "Tunisia", "Code": "TN"},
+    {"CountryId": 792, "Name": "Turkey", "Code": "TR"},
+    {"CountryId": 795, "Name": "Turkmenistan", "Code": "TM"},
+    {"CountryId": 796, "Name": "TurksCaicosIslands", "Code": "TC"},
+    {"CountryId": 798, "Name": "Tuvalu", "Code": "TV"},
+    {"CountryId": 850, "Name": "U.S.VirginIslands", "Code": "VI"},
+    {"CountryId": 800, "Name": "Uganda", "Code": "UG"},
+    {"CountryId": 804, "Name": "Ukraine", "Code": "UA"},
+    {"CountryId": 784, "Name": "UnitedArabEmirates", "Code": "AE"},
+    {"CountryId": 826, "Name": "UnitedKingdom", "Code": "GB"},
+    {"CountryId": 840, "Name": "UnitedStates", "Code": "US"},
+    {"CountryId": 858, "Name": "Uruguay", "Code": "UY"},
+    {"CountryId": 860, "Name": "Uzbekistan", "Code": "UZ"},
+    {"CountryId": 548, "Name": "Vanuatu", "Code": "VU"},
+    {"CountryId": 336, "Name": "VaticanCity", "Code": "VA"},
+    {"CountryId": 862, "Name": "Venezuela", "Code": "VE"},
+    {"CountryId": 704,  "Name": "Vietnam", "Code": "VN"},
+    {"CountryId": 876, "Name": "WallisFutuna", "Code": "WF"},
+    {"CountryId": 887, "Name": "Yemen", "Code": "YE"},
+    {"CountryId": 894,  "Name": "Zambia", "Code": "ZM"},
+    {"CountryId": 716, "Name": "Zimbabwe", "Code": "ZW"}
+  ]
+}
+
+def seed_countries():
+    db = SessionLocal()
+    try:
+        logger.info(f"--- 🌍 Iniciando Semilla de Países ({len(RAW_DATA['Results'])} registros) ---")
+        
+        count_new = 0
+        count_updated = 0
+        
+        for item in RAW_DATA["Results"]:
+            # Usamos 'Code' como ID (ISO) y descartamos 'CountryId'
+            iso_code = item["Code"]
+            name = item["Name"]
+            
+            # Buscar si ya existe
+            country = db.query(Country).filter(Country.iso_code == iso_code).first()
+            
+            if not country:
+                country = Country(iso_code=iso_code, name=name)
+                db.add(country)
+                count_new += 1
+            else:
+                # Actualizar nombre si cambió
+                if country.name != name:
+                    country.name = name
+                    count_updated += 1
+        
+        db.commit()
+        logger.info(f"✅ Países procesados: {count_new} creados, {count_updated} actualizados.")
+        logger.info("--- 🏁 Semilla de Países Completada ---")
+
+    except Exception as e:
+        logger.error(f"❌ Error insertando países: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    seed_countries()

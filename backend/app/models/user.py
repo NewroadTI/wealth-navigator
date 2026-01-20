@@ -51,9 +51,6 @@ class User(Base):
 
 
 
-# ... (Tu código existente de User, Role, Permissions) ...
-from sqlalchemy.dialects.postgresql import JSONB # Necesario para Audit Logs
-
 # --- FALTABA ESTO ---
 
 class AuditLog(Base):

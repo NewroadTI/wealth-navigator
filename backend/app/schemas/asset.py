@@ -194,3 +194,56 @@ class PerformanceAttributionRead(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ... (Tus imports y schemas existentes: CurrencyRead, CountryRead, etc.)
+
+# --- MARKET DATA SCHEMAS ---
+
+class StockExchangeRead(BaseModel):
+    exchange_code: str
+    name: str
+    country_code: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class MarketIndexRead(BaseModel):
+    index_code: str
+    name: str
+    country_code: Optional[str] = None
+    exchange_code: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class IndustryRead(BaseModel):
+    industry_code: str
+    name: str
+    sector: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+
+from typing import List, Optional # Asegúrate de tener estos imports arriba
+
+# ... tus otros schemas ...
+
+# --- ASSET HIERARCHY SCHEMAS ---
+
+class AssetSubClassRead(BaseModel):
+    sub_class_id: int
+    code: Optional[str] = None
+    name: str
+    class Config:
+        from_attributes = True
+
+class AssetClassRead(BaseModel):
+    class_id: int
+    code: str
+    name: str
+    description: Optional[str] = None # Si agregaste descripción en la DB
+    
+    # AQUÍ ESTÁ LA MAGIA: Una lista de hijos dentro del padre
+    sub_classes: List[AssetSubClassRead] = []
+    
+    class Config:
+        from_attributes = True
