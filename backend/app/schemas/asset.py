@@ -1,8 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional
-from datetime import date, datetime
+from typing import Optional, List, Dict, Any # Agrega Dict y Any para JSONBfrom datetime import date, datetime
 from decimal import Decimal
-
+from datetime import date, datetime
 # --- CATALOG SCHEMAS ---
 class CurrencyRead(BaseModel):
     code: str
@@ -19,7 +18,7 @@ class CountryRead(BaseModel):
 # --- ASSET SCHEMAS ---
 class AssetBase(BaseModel):
     symbol: str
-    name: str
+    name: Optional[str] = None
     description: Optional[str] = None
     isin: Optional[str] = None
     figi: Optional[str] = None
@@ -27,7 +26,9 @@ class AssetBase(BaseModel):
     ib_conid: Optional[int] = None
     
     # Clasificación
-    sector: Optional[str] = None
+    class_id: int
+    sub_class_id: Optional[int] = None
+    industry_code: Optional[str] = None
     country_code: Optional[str] = None
     currency: Optional[str] = None
     
@@ -35,25 +36,50 @@ class AssetBase(BaseModel):
     multiplier: Optional[Decimal] = 1
     contract_size: Optional[Decimal] = 0
     
-    # Derivados (Opciones/Futuros)
+    # Derivados
     underlying_symbol: Optional[str] = None
     strike_price: Optional[Decimal] = None
     expiry_date: Optional[date] = None
-    put_call: Optional[str] = None # 'PUT', 'CALL'
+    put_call: Optional[str] = None 
     
-    # Bonos
+    # Bonos / Notas Estructuradas
     maturity_date: Optional[date] = None
     coupon_rate: Optional[Decimal] = None
     
+    issuer: Optional[str] = None
+    product_category: Optional[str] = None
+    
+    initial_fixing_date: Optional[date] = None
+    next_autocall_date: Optional[date] = None
+    next_coupon_payment_date: Optional[date] = None
+    
+    autocall_trigger: Optional[Decimal] = None
+    coupon_trigger: Optional[Decimal] = None
+    capital_barrier: Optional[Decimal] = None
+    protection_level: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
+    
+    # JSONB field para baskets
+    structured_note_details: Optional[Dict[str, Any]] = None
+    
     is_active: Optional[bool] = True
 
+# --- CREATE ---
 class AssetCreate(AssetBase):
-    class_id: int
-    sub_class_id: Optional[int] = None
+    pass
 
+# --- UPDATE ---
+class AssetUpdate(BaseModel):
+    # Hacemos todos opcionales para permitir actualizaciones parciales
+    symbol: Optional[str] = None
+    class_id: Optional[int] = None
+    is_active: Optional[bool] = None
+    # ... puedes agregar el resto de campos como opcionales si necesitas editar todo
+
+# --- READ ---
 class AssetRead(AssetBase):
     asset_id: int
-    class_id: int
+
     class Config:
         from_attributes = True
 

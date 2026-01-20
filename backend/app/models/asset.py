@@ -2,8 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, Foreign
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 from sqlalchemy import event, DDL
-
-
+from sqlalchemy.dialects.postgresql import JSONB  # <--- IMPORTANTE: Agrega esto
 
 
 class StockExchange(Base):
@@ -45,6 +44,8 @@ class AssetSubClass(Base):
 
     asset_class = relationship("AssetClass", back_populates="sub_classes")
 
+
+
 class Asset(Base):
     __tablename__ = "assets"
     asset_id = Column(Integer, primary_key=True, index=True)
@@ -52,40 +53,59 @@ class Asset(Base):
     class_id = Column(Integer, ForeignKey("asset_classes.class_id"), nullable=False)
     sub_class_id = Column(Integer, ForeignKey("asset_sub_classes.sub_class_id"))
     
-    symbol = Column(String, nullable=False)
+    symbol = Column(String, nullable=False) # ISIN suele usarse aquí o en isin
     description = Column(String)
     isin = Column(String)
     figi = Column(String)
     cusip = Column(String)
     ib_conid = Column(Integer, unique=True)
     
-    #sector es ahora industry_code
-    sector = Column(String)
-    # --- NUEVA FOREIGN KEY A INDUSTRY ---
+    # --- CLASIFICACIÓN ---
     industry_code = Column(String, ForeignKey("industries.industry_code"), nullable=True)
-    
-    # --- CAMBIO IMPORTANTE: AHORA ES FOREIGN KEY ---
     country_code = Column(CHAR(2), ForeignKey("countries.iso_code"), nullable=True)
-    
     currency = Column(CHAR(3))
     
+    # --- DATOS GENERALES DE CONTRATO ---
     multiplier = Column(Numeric, default=1)
-    contract_size = Column(Numeric, default=0)
+    contract_size = Column(Numeric, default=0) # Aquí podrías poner el "Size" (ej. 370000) o en Positions
     
-    underlying_symbol = Column(String)
-    strike_price = Column(Numeric)
+    # --- DATOS DE OPCIONES / FUTUROS (Ya los tenías) ---
+    underlying_symbol = Column(String) # Para opciones simples (1 a 1)
+    strike_price = Column(Numeric)     # Para opciones simples
     expiry_date = Column(Date)
     put_call = Column(String(4))
     
-    maturity_date = Column(Date)
-    coupon_rate = Column(Numeric)
+    # --- DATOS DE RENTA FIJA / NOTAS ESTRUCTURADAS ---
+    maturity_date = Column(Date)       # Final Fixing Date / Redemption Date
+    coupon_rate = Column(Numeric)      # Coupon p.a. (ej. 17.15)
+    
+    # +++++ NUEVAS COLUMNAS PARA NOTAS ESTRUCTURADAS +++++
+    
+    issuer = Column(String, nullable=True)           # Ej: BNP Paribas
+    product_category = Column(String, nullable=True) # Ej: Phoenix Autocall
+    
+    # Fechas Críticas
+    initial_fixing_date = Column(Date, nullable=True)
+    next_autocall_date = Column(Date, nullable=True)
+    next_coupon_payment_date = Column(Date, nullable=True)
+    
+    # Barreras y Triggers (Guardar como decimal: 55% = 0.55 o 55.0 segun tu estandar)
+    autocall_trigger = Column(Numeric, nullable=True) # Ej: 100.00
+    coupon_trigger = Column(Numeric, nullable=True)   # Ej: 55.00
+    capital_barrier = Column(Numeric, nullable=True)  # Ej: 50.00
+    protection_level = Column(Numeric, nullable=True) # Ej: 100.00 (Capital Protection)
+    
+    payment_frequency = Column(String, nullable=True) # Ej: Quarterly
+    
+    # Detalles de Subyacentes (JSONB)
+    # Aquí guardarás la lista: [{'ticker': '9888 HK', 'initial_level': 143.8}, ...]
+    structured_note_details = Column(JSONB, nullable=True) 
     
     is_active = Column(Boolean, default=True)
     
-    # Relación nueva para acceder a datos del país desde el asset
+    # Relaciones
     country = relationship("Country", back_populates="assets")
-    industry = relationship("Industry", back_populates="assets") # <--- NUEVO
-
+    industry = relationship("Industry", back_populates="assets")
 
 # --- TRANSACCIONES ---
 class Trade(Base):
