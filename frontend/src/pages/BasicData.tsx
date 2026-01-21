@@ -24,7 +24,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3, ArrowUpDown, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3, Coins, ArrowUpDown, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -54,6 +54,11 @@ type IndexApi = {
   exchange_code?: string | null;
 };
 
+type CurrencyApi = {
+  code: string;
+  name: string;
+};
+
 type SortConfig = { key: string; direction: 'asc' | 'desc' };
 
 const BasicData = () => {
@@ -67,6 +72,7 @@ const BasicData = () => {
   const [countrySort, setCountrySort] = useState<SortConfig>({ key: 'iso_code', direction: 'asc' });
   const [industrySort, setIndustrySort] = useState<SortConfig>({ key: 'industry_code', direction: 'asc' });
   const [indexSort, setIndexSort] = useState<SortConfig>({ key: 'index_code', direction: 'asc' });
+  const [currencySort, setCurrencySort] = useState<SortConfig>({ key: 'code', direction: 'asc' });
   
   const [exchanges, setExchanges] = useState<ExchangeApi[]>([]);
   const [exchangesLoading, setExchangesLoading] = useState(false);
@@ -117,6 +123,17 @@ const BasicData = () => {
   const [indexExchangeOpen, setIndexExchangeOpen] = useState(false);
   const [indexEditCountryOpen, setIndexEditCountryOpen] = useState(false);
   const [indexEditExchangeOpen, setIndexEditExchangeOpen] = useState(false);
+
+  const [currencies, setCurrencies] = useState<CurrencyApi[]>([]);
+  const [currenciesLoading, setCurrenciesLoading] = useState(false);
+  const [currenciesError, setCurrenciesError] = useState<string | null>(null);
+  const [isCreateCurrencyOpen, setIsCreateCurrencyOpen] = useState(false);
+  const [isEditCurrencyOpen, setIsEditCurrencyOpen] = useState(false);
+  const [currencyDraft, setCurrencyDraft] = useState({ code: '', name: '' });
+  const [editingCurrency, setEditingCurrency] = useState<CurrencyApi | null>(null);
+  const [currencyActionLoading, setCurrencyActionLoading] = useState(false);
+  const [currencyActionError, setCurrencyActionError] = useState<string | null>(null);
+  const [currencyToDelete, setCurrencyToDelete] = useState<CurrencyApi | null>(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
   
@@ -252,6 +269,29 @@ const BasicData = () => {
     return () => controller.abort();
   }, [apiBaseUrl]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadCurrencies = async () => {
+      try {
+        setCurrenciesLoading(true);
+        setCurrenciesError(null);
+        const data = await fetchAllPages<CurrencyApi>('/api/v1/catalogs/currencies', controller.signal);
+        setCurrencies(data);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setCurrenciesError('Could not load Currencies.');
+        setCurrencies([]);
+      } finally {
+        setCurrenciesLoading(false);
+      }
+    };
+
+    loadCurrencies();
+    return () => controller.abort();
+  }, [apiBaseUrl]);
+
   const countryNameByIso = useMemo(() => {
     const map = new Map<string, string>();
     for (const country of countries) {
@@ -301,6 +341,11 @@ const BasicData = () => {
     setIndices(data);
   };
 
+  const refreshCurrencies = async () => {
+    const data = await fetchAllPages<CurrencyApi>('/api/v1/catalogs/currencies');
+    setCurrencies(data);
+  };
+
   const handleCreateExchange = async () => {
     if (!exchangeDraft.exchange_code.trim() || !exchangeDraft.name.trim()) {
       setExchangeActionError('Code and Name fields are required.');
@@ -329,7 +374,7 @@ const BasicData = () => {
       setIsCreateExchangeOpen(false);
 
       toast({
-        title: '✅ Exchange created',
+        title: 'Exchange created',
         description: `Exchange "${exchangeDraft.name}" has been created successfully.`,
         variant: 'success',
       });
@@ -381,7 +426,7 @@ const BasicData = () => {
       setEditingExchange(null);
 
       toast({
-        title: '✅ Exchange updated',
+        title: 'Exchange updated',
         description: `Exchange "${exchangeDraft.name}" has been updated successfully.`,
         variant: 'success',
       });
@@ -408,13 +453,13 @@ const BasicData = () => {
       await refreshExchanges();
 
       toast({
-        title: '✅ Exchange deleted',
+        title: 'Exchange deleted',
         description: `Exchange "${exchangeCode}" has been deleted successfully.`,
         variant: 'success',
       });
     } catch (error: any) {
       toast({
-        title: '❌ Error deleting',
+        title: 'Error deleting',
         description: error.message || 'Could not delete the exchange.',
         variant: 'destructive',
       });
@@ -450,7 +495,7 @@ const BasicData = () => {
       setIsCreateCountryOpen(false);
       
       toast({
-        title: '✅ Country created',
+        title: 'Country created',
         description: `Country "${countryDraft.name}" has been created successfully.`,
         variant: 'success',
       });
@@ -500,7 +545,7 @@ const BasicData = () => {
       setEditingCountry(null);
       
       toast({
-        title: '✅ Country updated',
+        title: 'Country updated',
         description: `Country "${countryDraft.name}" has been updated successfully.`,
         variant: 'success',
       });
@@ -527,13 +572,13 @@ const BasicData = () => {
       await refreshCountries();
       
       toast({
-        title: '✅ Country deleted',
+        title: 'Country deleted',
         description: `Country "${isoCode}" has been deleted successfully.`,
         variant: 'success',
       });
     } catch (error: any) {
       toast({
-        title: '❌ Error deleting',
+        title: 'Error deleting',
         description: error.message || 'Could not delete the country.',
         variant: 'destructive',
       });
@@ -570,7 +615,7 @@ const BasicData = () => {
       setIsCreateIndustryOpen(false);
       
       toast({
-        title: '✅ Industry created',
+        title: 'Industry created',
         description: `Industry "${industryDraft.name}" has been created successfully.`,
         variant: 'success',
       });
@@ -622,7 +667,7 @@ const BasicData = () => {
       setEditingIndustry(null);
       
       toast({
-        title: '✅ Industry updated',
+        title: 'Industry updated',
         description: `Industry "${industryDraft.name}" has been updated successfully.`,
         variant: 'success',
       });
@@ -649,13 +694,13 @@ const BasicData = () => {
       await refreshIndustries();
       
       toast({
-        title: '✅ Industry deleted',
+        title: 'Industry deleted',
         description: `Industry "${industryCode}" has been deleted successfully.`,
         variant: 'success',
       });
     } catch (error: any) {
       toast({
-        title: '❌ Error deleting',
+        title: 'Error deleting',
         description: error.message || 'Could not delete the industry.',
         variant: 'destructive',
       });
@@ -693,7 +738,7 @@ const BasicData = () => {
       setIsCreateIndexOpen(false);
 
       toast({
-        title: '✅ Index created',
+        title: 'Index created',
         description: `Index "${indexDraft.name}" has been created successfully.`,
         variant: 'success',
       });
@@ -747,7 +792,7 @@ const BasicData = () => {
       setEditingIndex(null);
 
       toast({
-        title: '✅ Index updated',
+        title: 'Index updated',
         description: `Index "${indexDraft.name}" has been updated successfully.`,
         variant: 'success',
       });
@@ -774,18 +819,137 @@ const BasicData = () => {
       await refreshIndices();
 
       toast({
-        title: '✅ Index deleted',
+        title: 'Index deleted',
         description: `Index "${indexCode}" has been deleted successfully.`,
         variant: 'success',
       });
     } catch (error: any) {
       toast({
-        title: '❌ Error deleting',
+        title: 'Error deleting',
         description: error.message || 'Could not delete the index.',
         variant: 'destructive',
       });
     } finally {
       setIndexActionLoading(false);
+    }
+  };
+
+  const handleCreateCurrency = async () => {
+    if (!currencyDraft.code.trim() || !currencyDraft.name.trim()) {
+      setCurrencyActionError('Code and Name fields are required.');
+      return;
+    }
+    try {
+      setCurrencyActionLoading(true);
+      setCurrencyActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/currencies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: currencyDraft.code.trim().toUpperCase(),
+          name: currencyDraft.name.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshCurrencies();
+      setCurrencyDraft({ code: '', name: '' });
+      setIsCreateCurrencyOpen(false);
+
+      toast({
+        title: 'Currency created',
+        description: `Currency "${currencyDraft.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setCurrencyActionError(error.message || 'Could not create the currency.');
+    } finally {
+      setCurrencyActionLoading(false);
+    }
+  };
+
+  const handleEditCurrency = (currency: CurrencyApi) => {
+    setEditingCurrency(currency);
+    setCurrencyDraft({
+      code: currency.code,
+      name: currency.name,
+    });
+    setCurrencyActionError(null);
+    setIsEditCurrencyOpen(true);
+  };
+
+  const handleUpdateCurrency = async () => {
+    if (!editingCurrency) {
+      return;
+    }
+    if (!currencyDraft.name.trim()) {
+      setCurrencyActionError('Name field is required.');
+      return;
+    }
+    try {
+      setCurrencyActionLoading(true);
+      setCurrencyActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/currencies/${editingCurrency.code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: currencyDraft.name.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshCurrencies();
+      setIsEditCurrencyOpen(false);
+      setEditingCurrency(null);
+
+      toast({
+        title: 'Currency updated',
+        description: `Currency "${currencyDraft.name}" has been updated successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setCurrencyActionError(error.message || 'Could not update the currency.');
+    } finally {
+      setCurrencyActionLoading(false);
+    }
+  };
+
+  const handleDeleteCurrency = async (code: string) => {
+    try {
+      setCurrencyActionLoading(true);
+      setCurrencyActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/currencies/${code}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshCurrencies();
+
+      toast({
+        title: 'Currency deleted',
+        description: `Currency "${code}" has been deleted successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting',
+        description: error.message || 'Could not delete the currency.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCurrencyActionLoading(false);
     }
   };
 
@@ -871,6 +1035,24 @@ const BasicData = () => {
     });
   }, [countryNameByIso, exchangeNameByCode, indices, searchQuery, indexSort]);
 
+  const filteredCurrencies = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    let result = currencies;
+    if (query) {
+      result = result.filter((currency) => {
+        return (
+          currency.code.toLowerCase().includes(query) ||
+          currency.name.toLowerCase().includes(query)
+        );
+      });
+    }
+    return [...result].sort((a, b) => {
+      const aVal = String((a as Record<string, unknown>)[currencySort.key] ?? '').toLowerCase();
+      const bVal = String((b as Record<string, unknown>)[currencySort.key] ?? '').toLowerCase();
+      return currencySort.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+  }, [currencies, searchQuery, currencySort]);
+
   // Sortable column header component
   const SortableHeader = ({ label, sortKey, currentSort, onSort }: { label: string; sortKey: string; currentSort: SortConfig; onSort: (key: string) => void }) => (
     <th
@@ -906,6 +1088,10 @@ const BasicData = () => {
                 <TabsTrigger value="indices" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
                   <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                   Indices
+                </TabsTrigger>
+                <TabsTrigger value="currencies" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
+                  <Coins className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  Currencies
                 </TabsTrigger>
               </TabsList>
 
@@ -2117,6 +2303,217 @@ const BasicData = () => {
                         handleDeleteIndex(indexToDelete.index_code);
                       }
                       setIndexToDelete(null);
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </TabsContent>
+
+        {/* Currencies Tab */}
+        <TabsContent value="currencies">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <h3 className="font-semibold text-foreground text-sm md:text-base">Currencies</h3>
+              <Dialog
+                open={isCreateCurrencyOpen}
+                onOpenChange={(open) => {
+                  setIsCreateCurrencyOpen(open);
+                  setCurrencyActionError(null);
+                  if (open) {
+                    setCurrencyDraft({ code: '', name: '' });
+                  }
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
+                    <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
+                    Add Currency
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Add Currency</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    {currencyActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {currencyActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div>
+                      <Label htmlFor="currency-code">Code *</Label>
+                      <Input
+                        id="currency-code"
+                        placeholder="USD"
+                        className="mt-1"
+                        value={currencyDraft.code}
+                        onChange={(e) => setCurrencyDraft({ ...currencyDraft, code: e.target.value.toUpperCase() })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="currency-name">Name *</Label>
+                      <Input
+                        id="currency-name"
+                        placeholder="US Dollar"
+                        className="mt-1"
+                        value={currencyDraft.name}
+                        onChange={(e) => setCurrencyDraft({ ...currencyDraft, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button variant="outline" onClick={() => setIsCreateCurrencyOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleCreateCurrency}
+                        disabled={currencyActionLoading}
+                      >
+                        {currencyActionLoading ? 'Creating...' : 'Create'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog
+                open={isEditCurrencyOpen}
+                onOpenChange={(open) => {
+                  setIsEditCurrencyOpen(open);
+                  setCurrencyActionError(null);
+                  if (!open) {
+                    setEditingCurrency(null);
+                  }
+                }}
+              >
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Edit Currency</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    {currencyActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {currencyActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div>
+                      <Label htmlFor="edit-currency-code">Code</Label>
+                      <Input
+                        id="edit-currency-code"
+                        className="mt-1"
+                        value={currencyDraft.code}
+                        disabled
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-currency-name">Name *</Label>
+                      <Input
+                        id="edit-currency-name"
+                        className="mt-1"
+                        value={currencyDraft.name}
+                        onChange={(e) => setCurrencyDraft({ ...currencyDraft, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button variant="outline" onClick={() => setIsEditCurrencyOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleUpdateCurrency}
+                        disabled={currencyActionLoading}
+                      >
+                        {currencyActionLoading ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <SortableHeader label="Code" sortKey="code" currentSort={currencySort} onSort={(k) => toggleSort(setCurrencySort, k)} />
+                    <SortableHeader label="Name" sortKey="name" currentSort={currencySort} onSort={(k) => toggleSort(setCurrencySort, k)} />
+                    <th className="text-xs md:text-sm">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currenciesLoading && (
+                    <tr>
+                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        Loading...
+                      </td>
+                    </tr>
+                  )}
+                  {currenciesError && (
+                    <tr>
+                      <td colSpan={3} className="text-destructive text-xs md:text-sm text-center py-6">
+                        {currenciesError}
+                      </td>
+                    </tr>
+                  )}
+                  {!currenciesLoading && !currenciesError && filteredCurrencies.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        No currencies found.
+                      </td>
+                    </tr>
+                  )}
+                  {!currenciesLoading && !currenciesError && filteredCurrencies.map((currency) => (
+                    <tr key={currency.code}>
+                      <td className="font-medium text-foreground text-xs md:text-sm">{currency.code}</td>
+                      <td className="text-foreground text-xs md:text-sm">{currency.name}</td>
+                      <td>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8"
+                            onClick={() => handleEditCurrency(currency)}
+                          >
+                            <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
+                            onClick={() => setCurrencyToDelete(currency)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <AlertDialog open={!!currencyToDelete} onOpenChange={(open) => !open && setCurrencyToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete currency</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete currency "{currencyToDelete?.code}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (currencyToDelete) {
+                        handleDeleteCurrency(currencyToDelete.code);
+                      }
+                      setCurrencyToDelete(null);
                     }}
                   >
                     Delete

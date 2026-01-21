@@ -9,6 +9,13 @@ class CurrencyRead(BaseModel):
     class Config:
         from_attributes = True
 
+class CurrencyCreate(BaseModel):
+    code: str
+    name: str
+
+class CurrencyUpdate(BaseModel):
+    name: str
+
 class CountryRead(BaseModel):
     iso_code: str
     name: Optional[str] = None

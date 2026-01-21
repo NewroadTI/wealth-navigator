@@ -7,7 +7,7 @@ from app.api import deps
 from app.models.asset import Country, Currency, StockExchange, MarketIndex
 from app.schemas.asset import (
     CountryRead, CountryCreate, CountryUpdate,
-    CurrencyRead,
+    CurrencyRead, CurrencyCreate, CurrencyUpdate,
     StockExchangeRead, StockExchangeCreate, StockExchangeUpdate,
     MarketIndexRead, MarketIndexCreate, MarketIndexUpdate
 )
@@ -120,6 +120,87 @@ def get_currencies(
     """
     currencies = db.query(Currency).order_by(Currency.code).offset(skip).limit(limit).all()
     return currencies
+
+
+@router.post("/currencies", response_model=CurrencyRead, status_code=status.HTTP_201_CREATED)
+def create_currency(
+    payload: CurrencyCreate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Crea una nueva moneda en el catálogo.
+    """
+    # Verificar si ya existe
+    existing = db.query(Currency).filter(Currency.code == payload.code.upper()).first()
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Currency with code '{payload.code}' already exists."
+        )
+    
+    # Crear nueva moneda
+    new_currency = Currency(
+        code=payload.code.upper(),
+        name=payload.name
+    )
+    
+    db.add(new_currency)
+    db.commit()
+    db.refresh(new_currency)
+    return new_currency
+
+
+@router.put("/currencies/{code}", response_model=CurrencyRead)
+def update_currency(
+    code: str,
+    payload: CurrencyUpdate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Actualiza una moneda existente.
+    """
+    currency = db.query(Currency).filter(Currency.code == code.upper()).first()
+    if not currency:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Currency with code '{code}' was not found."
+        )
+    
+    # Actualizar el nombre
+    currency.name = payload.name
+    
+    db.commit()
+    db.refresh(currency)
+    return currency
+
+
+@router.delete("/currencies/{code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_currency(
+    code: str,
+    db: Session = Depends(deps.get_db)
+) -> None:
+    """
+    Elimina una moneda del catálogo.
+    """
+    currency = db.query(Currency).filter(Currency.code == code.upper()).first()
+    if not currency:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Currency with code '{code}' was not found."
+        )
+    
+    # Verificar si hay activos usando esta moneda
+    from app.models.asset import Asset
+    assets_count = db.query(Asset).filter(Asset.currency == code.upper()).count()
+    
+    if assets_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete currency '{currency.name}' because it has {assets_count} asset(s) associated."
+        )
+    
+    db.delete(currency)
+    db.commit()
 
 
 # 2. ENDPOINT DE EXCHANGES
