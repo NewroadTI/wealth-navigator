@@ -240,6 +240,15 @@ class StockExchangeRead(BaseModel):
     class Config:
         from_attributes = True
 
+class StockExchangeCreate(BaseModel):
+    exchange_code: str
+    name: str
+    country_code: Optional[str] = None
+
+class StockExchangeUpdate(BaseModel):
+    name: Optional[str] = None
+    country_code: Optional[str] = None
+
 class MarketIndexRead(BaseModel):
     index_code: str
     name: str
@@ -247,6 +256,17 @@ class MarketIndexRead(BaseModel):
     exchange_code: Optional[str] = None
     class Config:
         from_attributes = True
+
+class MarketIndexCreate(BaseModel):
+    index_code: str
+    name: str
+    country_code: Optional[str] = None
+    exchange_code: Optional[str] = None
+
+class MarketIndexUpdate(BaseModel):
+    name: Optional[str] = None
+    country_code: Optional[str] = None
+    exchange_code: Optional[str] = None
 
 class IndustryRead(BaseModel):
     industry_code: str

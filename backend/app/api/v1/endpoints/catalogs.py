@@ -7,9 +7,9 @@ from app.api import deps
 from app.models.asset import Country, Currency, StockExchange, MarketIndex
 from app.schemas.asset import (
     CountryRead, CountryCreate, CountryUpdate,
-    CurrencyRead, 
-    StockExchangeRead, 
-    MarketIndexRead
+    CurrencyRead,
+    StockExchangeRead, StockExchangeCreate, StockExchangeUpdate,
+    MarketIndexRead, MarketIndexCreate, MarketIndexUpdate
 )
 
 router = APIRouter()
@@ -40,7 +40,7 @@ def create_country(
     if existing:
         raise HTTPException(
             status_code=400, 
-            detail=f"El país con código ISO '{payload.iso_code}' ya existe en el sistema."
+            detail=f"Country with ISO code '{payload.iso_code}' already exists."
         )
     
     # Crear nuevo país
@@ -68,7 +68,7 @@ def update_country(
     if not country:
         raise HTTPException(
             status_code=404, 
-            detail=f"No se encontró el país con código ISO '{iso_code}'."
+            detail=f"Country with ISO code '{iso_code}' was not found."
         )
     
     # Actualizar el nombre
@@ -91,7 +91,7 @@ def delete_country(
     if not country:
         raise HTTPException(
             status_code=404, 
-            detail=f"No se encontró el país con código ISO '{iso_code}'."
+            detail=f"Country with ISO code '{iso_code}' was not found."
         )
     
     # Verificar si hay activos o exchanges usando este país
@@ -102,7 +102,7 @@ def delete_country(
     if assets_count > 0 or exchanges_count > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"No se puede eliminar el país '{country.name}' porque tiene {assets_count} activo(s) y {exchanges_count} exchange(s) asociados."
+            detail=f"Cannot delete country '{country.name}' because it has {assets_count} asset(s) and {exchanges_count} exchange(s) associated."
         )
     
     db.delete(country)
@@ -135,6 +135,87 @@ def get_stock_exchanges(
     exchanges = db.query(StockExchange).order_by(StockExchange.exchange_code).offset(skip).limit(limit).all()
     return exchanges
 
+
+@router.post("/exchanges", response_model=StockExchangeRead, status_code=status.HTTP_201_CREATED)
+def create_stock_exchange(
+    payload: StockExchangeCreate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Crea una bolsa de valores (Stock Exchange).
+    """
+    existing = db.query(StockExchange).filter(StockExchange.exchange_code == payload.exchange_code.upper()).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Stock exchange already exists.")
+
+    if payload.country_code:
+        country = db.query(Country).filter(Country.iso_code == payload.country_code.upper()).first()
+        if not country:
+            raise HTTPException(status_code=400, detail="Country code does not exist.")
+
+    obj = StockExchange(
+        exchange_code=payload.exchange_code.upper(),
+        name=payload.name,
+        country_code=payload.country_code.upper() if payload.country_code else None,
+    )
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/exchanges/{exchange_code}", response_model=StockExchangeRead)
+def update_stock_exchange(
+    exchange_code: str,
+    payload: StockExchangeUpdate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Actualiza una bolsa de valores (Stock Exchange).
+    """
+    obj = db.query(StockExchange).filter(StockExchange.exchange_code == exchange_code.upper()).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Stock exchange was not found.")
+
+    if payload.country_code is not None:
+        if payload.country_code == "":
+            obj.country_code = None
+        else:
+            country = db.query(Country).filter(Country.iso_code == payload.country_code.upper()).first()
+            if not country:
+                raise HTTPException(status_code=400, detail="Country code does not exist.")
+            obj.country_code = payload.country_code.upper()
+
+    if payload.name is not None:
+        obj.name = payload.name
+
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/exchanges/{exchange_code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_stock_exchange(
+    exchange_code: str,
+    db: Session = Depends(deps.get_db)
+) -> None:
+    """
+    Elimina una bolsa de valores (Stock Exchange).
+    """
+    obj = db.query(StockExchange).filter(StockExchange.exchange_code == exchange_code.upper()).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Stock exchange was not found.")
+
+    indices_count = db.query(MarketIndex).filter(MarketIndex.exchange_code == obj.exchange_code).count()
+    if indices_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete stock exchange '{obj.exchange_code}' because it has {indices_count} index/indices associated.",
+        )
+
+    db.delete(obj)
+    db.commit()
+
 # 3. ENDPOINT DE INDICES
 @router.get("/indices", response_model=List[MarketIndexRead])
 def get_market_indices(
@@ -147,6 +228,95 @@ def get_market_indices(
     """
     indices = db.query(MarketIndex).order_by(MarketIndex.index_code).offset(skip).limit(limit).all()
     return indices
+
+
+@router.post("/indices", response_model=MarketIndexRead, status_code=status.HTTP_201_CREATED)
+def create_market_index(
+    payload: MarketIndexCreate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Crea un índice de mercado (Market Index).
+    """
+    existing = db.query(MarketIndex).filter(MarketIndex.index_code == payload.index_code.upper()).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Market index already exists.")
+
+    if payload.country_code:
+        country = db.query(Country).filter(Country.iso_code == payload.country_code.upper()).first()
+        if not country:
+            raise HTTPException(status_code=400, detail="Country code does not exist.")
+
+    if payload.exchange_code:
+        exchange = db.query(StockExchange).filter(StockExchange.exchange_code == payload.exchange_code.upper()).first()
+        if not exchange:
+            raise HTTPException(status_code=400, detail="Exchange code does not exist.")
+
+    obj = MarketIndex(
+        index_code=payload.index_code.upper(),
+        name=payload.name,
+        country_code=payload.country_code.upper() if payload.country_code else None,
+        exchange_code=payload.exchange_code.upper() if payload.exchange_code else None,
+    )
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/indices/{index_code}", response_model=MarketIndexRead)
+def update_market_index(
+    index_code: str,
+    payload: MarketIndexUpdate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Actualiza un índice de mercado (Market Index).
+    """
+    obj = db.query(MarketIndex).filter(MarketIndex.index_code == index_code.upper()).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Market index was not found.")
+
+    if payload.country_code is not None:
+        if payload.country_code == "":
+            obj.country_code = None
+        else:
+            country = db.query(Country).filter(Country.iso_code == payload.country_code.upper()).first()
+            if not country:
+                raise HTTPException(status_code=400, detail="Country code does not exist.")
+            obj.country_code = payload.country_code.upper()
+
+    if payload.exchange_code is not None:
+        if payload.exchange_code == "" or payload.exchange_code == "-":
+            obj.exchange_code = None
+        else:
+            exchange = db.query(StockExchange).filter(StockExchange.exchange_code == payload.exchange_code.upper()).first()
+            if not exchange:
+                raise HTTPException(status_code=400, detail="Exchange code does not exist.")
+            obj.exchange_code = payload.exchange_code.upper()
+
+    if payload.name is not None:
+        obj.name = payload.name
+
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/indices/{index_code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_market_index(
+    index_code: str,
+    db: Session = Depends(deps.get_db)
+) -> None:
+    """
+    Elimina un índice de mercado (Market Index).
+    """
+    obj = db.query(MarketIndex).filter(MarketIndex.index_code == index_code.upper()).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Market index was not found.")
+
+    db.delete(obj)
+    db.commit()
 
 
 # ... imports ...
@@ -177,7 +347,7 @@ def create_industry(
     """
     existing = db.query(Industry).filter(Industry.industry_code == payload.industry_code).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Industry ya existe.")
+        raise HTTPException(status_code=400, detail="Industry already exists.")
 
     obj = Industry(
         industry_code=payload.industry_code,
@@ -201,7 +371,7 @@ def update_industry(
     """
     obj = db.query(Industry).filter(Industry.industry_code == industry_code).first()
     if not obj:
-        raise HTTPException(status_code=404, detail="Industry no encontrada.")
+        raise HTTPException(status_code=404, detail="Industry was not found.")
 
     if payload.name is not None:
         obj.name = payload.name
@@ -223,7 +393,7 @@ def delete_industry(
     """
     obj = db.query(Industry).filter(Industry.industry_code == industry_code).first()
     if not obj:
-        raise HTTPException(status_code=404, detail="Industry no encontrada.")
+        raise HTTPException(status_code=404, detail="Industry was not found.")
 
     db.delete(obj)
     db.commit()

@@ -5,7 +5,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3, ArrowUpDown } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3, ArrowUpDown, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -52,6 +71,15 @@ const BasicData = () => {
   const [exchanges, setExchanges] = useState<ExchangeApi[]>([]);
   const [exchangesLoading, setExchangesLoading] = useState(false);
   const [exchangesError, setExchangesError] = useState<string | null>(null);
+  const [isCreateExchangeOpen, setIsCreateExchangeOpen] = useState(false);
+  const [isEditExchangeOpen, setIsEditExchangeOpen] = useState(false);
+  const [exchangeDraft, setExchangeDraft] = useState({ exchange_code: '', name: '', country_code: '' });
+  const [editingExchange, setEditingExchange] = useState<ExchangeApi | null>(null);
+  const [exchangeActionLoading, setExchangeActionLoading] = useState(false);
+  const [exchangeActionError, setExchangeActionError] = useState<string | null>(null);
+  const [exchangeToDelete, setExchangeToDelete] = useState<ExchangeApi | null>(null);
+  const [exchangeCountryOpen, setExchangeCountryOpen] = useState(false);
+  const [exchangeEditCountryOpen, setExchangeEditCountryOpen] = useState(false);
   
   const [countries, setCountries] = useState<CountryApi[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
@@ -62,6 +90,7 @@ const BasicData = () => {
   const [editingCountry, setEditingCountry] = useState<CountryApi | null>(null);
   const [countryActionLoading, setCountryActionLoading] = useState(false);
   const [countryActionError, setCountryActionError] = useState<string | null>(null);
+  const [countryToDelete, setCountryToDelete] = useState<CountryApi | null>(null);
   
   const [industries, setIndustries] = useState<IndustryApi[]>([]);
   const [industriesLoading, setIndustriesLoading] = useState(false);
@@ -72,10 +101,22 @@ const BasicData = () => {
   const [editingIndustry, setEditingIndustry] = useState<IndustryApi | null>(null);
   const [industryActionLoading, setIndustryActionLoading] = useState(false);
   const [industryActionError, setIndustryActionError] = useState<string | null>(null);
+  const [industryToDelete, setIndustryToDelete] = useState<IndustryApi | null>(null);
   
   const [indices, setIndices] = useState<IndexApi[]>([]);
   const [indicesLoading, setIndicesLoading] = useState(false);
   const [indicesError, setIndicesError] = useState<string | null>(null);
+  const [indexToDelete, setIndexToDelete] = useState<IndexApi | null>(null);
+  const [isCreateIndexOpen, setIsCreateIndexOpen] = useState(false);
+  const [isEditIndexOpen, setIsEditIndexOpen] = useState(false);
+  const [indexDraft, setIndexDraft] = useState({ index_code: '', name: '', country_code: '', exchange_code: '' });
+  const [editingIndex, setEditingIndex] = useState<IndexApi | null>(null);
+  const [indexActionLoading, setIndexActionLoading] = useState(false);
+  const [indexActionError, setIndexActionError] = useState<string | null>(null);
+  const [indexCountryOpen, setIndexCountryOpen] = useState(false);
+  const [indexExchangeOpen, setIndexExchangeOpen] = useState(false);
+  const [indexEditCountryOpen, setIndexEditCountryOpen] = useState(false);
+  const [indexEditExchangeOpen, setIndexEditExchangeOpen] = useState(false);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
   
@@ -229,14 +270,157 @@ const BasicData = () => {
     return map;
   }, [exchanges]);
 
+  const industrySectorOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const industry of industries) {
+      const sector = industry.sector?.trim();
+      if (sector) {
+        set.add(sector);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [industries]);
+
   const refreshIndustries = async () => {
     const data = await fetchAllPages<IndustryApi>('/api/v1/catalogs/industries');
     setIndustries(data);
   };
 
+  const refreshExchanges = async () => {
+    const data = await fetchAllPages<ExchangeApi>('/api/v1/catalogs/exchanges');
+    setExchanges(data);
+  };
+
   const refreshCountries = async () => {
     const data = await fetchAllPages<CountryApi>('/api/v1/catalogs/countries');
     setCountries(data);
+  };
+
+  const refreshIndices = async () => {
+    const data = await fetchAllPages<IndexApi>('/api/v1/catalogs/indices');
+    setIndices(data);
+  };
+
+  const handleCreateExchange = async () => {
+    if (!exchangeDraft.exchange_code.trim() || !exchangeDraft.name.trim()) {
+      setExchangeActionError('Code and Name fields are required.');
+      return;
+    }
+    try {
+      setExchangeActionLoading(true);
+      setExchangeActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/exchanges`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exchange_code: exchangeDraft.exchange_code.trim().toUpperCase(),
+          name: exchangeDraft.name.trim(),
+          country_code: exchangeDraft.country_code.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshExchanges();
+      setExchangeDraft({ exchange_code: '', name: '', country_code: '' });
+      setIsCreateExchangeOpen(false);
+
+      toast({
+        title: '✅ Exchange created',
+        description: `Exchange "${exchangeDraft.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setExchangeActionError(error.message || 'Could not create the exchange.');
+    } finally {
+      setExchangeActionLoading(false);
+    }
+  };
+
+  const handleEditExchange = (exchange: ExchangeApi) => {
+    setEditingExchange(exchange);
+    setExchangeDraft({
+      exchange_code: exchange.exchange_code,
+      name: exchange.name,
+      country_code: exchange.country_code ?? '',
+    });
+    setExchangeActionError(null);
+    setIsEditExchangeOpen(true);
+  };
+
+  const handleUpdateExchange = async () => {
+    if (!editingExchange) {
+      return;
+    }
+    if (!exchangeDraft.name.trim()) {
+      setExchangeActionError('Name field is required.');
+      return;
+    }
+    try {
+      setExchangeActionLoading(true);
+      setExchangeActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/exchanges/${editingExchange.exchange_code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: exchangeDraft.name.trim(),
+          country_code: exchangeDraft.country_code.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshExchanges();
+      setIsEditExchangeOpen(false);
+      setEditingExchange(null);
+
+      toast({
+        title: '✅ Exchange updated',
+        description: `Exchange "${exchangeDraft.name}" has been updated successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setExchangeActionError(error.message || 'Could not update the exchange.');
+    } finally {
+      setExchangeActionLoading(false);
+    }
+  };
+
+  const handleDeleteExchange = async (exchangeCode: string) => {
+    try {
+      setExchangeActionLoading(true);
+      setExchangeActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/exchanges/${exchangeCode}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshExchanges();
+
+      toast({
+        title: '✅ Exchange deleted',
+        description: `Exchange "${exchangeCode}" has been deleted successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: '❌ Error deleting',
+        description: error.message || 'Could not delete the exchange.',
+        variant: 'destructive',
+      });
+    } finally {
+      setExchangeActionLoading(false);
+    }
   };
 
   const handleCreateCountry = async () => {
@@ -328,11 +512,6 @@ const BasicData = () => {
   };
 
   const handleDeleteCountry = async (isoCode: string) => {
-    const country = countries.find(c => c.iso_code === isoCode);
-    const confirmed = window.confirm(`Are you sure you want to delete country "${country?.name || isoCode}"?`);
-    if (!confirmed) {
-      return;
-    }
     try {
       setCountryActionLoading(true);
       setCountryActionError(null);
@@ -349,7 +528,7 @@ const BasicData = () => {
       
       toast({
         title: '✅ Country deleted',
-        description: `Country "${country?.name || isoCode}" has been deleted successfully.`,
+        description: `Country "${isoCode}" has been deleted successfully.`,
         variant: 'success',
       });
     } catch (error: any) {
@@ -455,11 +634,6 @@ const BasicData = () => {
   };
 
   const handleDeleteIndustry = async (industryCode: string) => {
-    const industry = industries.find(i => i.industry_code === industryCode);
-    const confirmed = window.confirm(`Are you sure you want to delete industry "${industry?.name || industryCode}"?`);
-    if (!confirmed) {
-      return;
-    }
     try {
       setIndustryActionLoading(true);
       setIndustryActionError(null);
@@ -476,7 +650,7 @@ const BasicData = () => {
       
       toast({
         title: '✅ Industry deleted',
-        description: `Industry "${industry?.name || industryCode}" has been deleted successfully.`,
+        description: `Industry "${industryCode}" has been deleted successfully.`,
         variant: 'success',
       });
     } catch (error: any) {
@@ -487,6 +661,131 @@ const BasicData = () => {
       });
     } finally {
       setIndustryActionLoading(false);
+    }
+  };
+
+  const handleCreateIndex = async () => {
+    if (!indexDraft.index_code.trim() || !indexDraft.name.trim()) {
+      setIndexActionError('Code and Name fields are required.');
+      return;
+    }
+    try {
+      setIndexActionLoading(true);
+      setIndexActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/indices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          index_code: indexDraft.index_code.trim().toUpperCase(),
+          name: indexDraft.name.trim(),
+          country_code: indexDraft.country_code.trim() || null,
+          exchange_code: indexDraft.exchange_code.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshIndices();
+      setIndexDraft({ index_code: '', name: '', country_code: '', exchange_code: '' });
+      setIsCreateIndexOpen(false);
+
+      toast({
+        title: '✅ Index created',
+        description: `Index "${indexDraft.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setIndexActionError(error.message || 'Could not create the index.');
+    } finally {
+      setIndexActionLoading(false);
+    }
+  };
+
+  const handleEditIndex = (index: IndexApi) => {
+    setEditingIndex(index);
+    setIndexDraft({
+      index_code: index.index_code,
+      name: index.name,
+      country_code: index.country_code ?? '',
+      exchange_code: index.exchange_code ?? '',
+    });
+    setIndexActionError(null);
+    setIsEditIndexOpen(true);
+  };
+
+  const handleUpdateIndex = async () => {
+    if (!editingIndex) {
+      return;
+    }
+    if (!indexDraft.name.trim()) {
+      setIndexActionError('Name field is required.');
+      return;
+    }
+    try {
+      setIndexActionLoading(true);
+      setIndexActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/indices/${editingIndex.index_code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: indexDraft.name.trim(),
+          country_code: indexDraft.country_code.trim() || null,
+          exchange_code: indexDraft.exchange_code.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshIndices();
+      setIsEditIndexOpen(false);
+      setEditingIndex(null);
+
+      toast({
+        title: '✅ Index updated',
+        description: `Index "${indexDraft.name}" has been updated successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setIndexActionError(error.message || 'Could not update the index.');
+    } finally {
+      setIndexActionLoading(false);
+    }
+  };
+
+  const handleDeleteIndex = async (indexCode: string) => {
+    try {
+      setIndexActionLoading(true);
+      setIndexActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/indices/${indexCode}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshIndices();
+
+      toast({
+        title: '✅ Index deleted',
+        description: `Index "${indexCode}" has been deleted successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: '❌ Error deleting',
+        description: error.message || 'Could not delete the index.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIndexActionLoading(false);
     }
   };
 
@@ -630,39 +929,221 @@ const BasicData = () => {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <h3 className="font-semibold text-foreground text-sm md:text-base">Stock Exchanges</h3>
-              <Dialog>
+              <Dialog
+                open={isCreateExchangeOpen}
+                onOpenChange={(open) => {
+                  setIsCreateExchangeOpen(open);
+                  setExchangeActionError(null);
+                  if (open) {
+                    setExchangeDraft({ exchange_code: '', name: '', country_code: '' });
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
                     <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
                     Add Exchange
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Add Stock Exchange</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
+                    {exchangeActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {exchangeActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label>Code</Label>
-                        <Input placeholder="NYSE" className="mt-1" />
+                        <Label htmlFor="exchange-code">Code *</Label>
+                        <Input
+                          id="exchange-code"
+                          placeholder="NYSE"
+                          className="mt-1"
+                          value={exchangeDraft.exchange_code}
+                          onChange={(e) => setExchangeDraft({ ...exchangeDraft, exchange_code: e.target.value.toUpperCase() })}
+                        />
                       </div>
                       <div>
-                        <Label>Timezone</Label>
-                        <Input placeholder="EST" className="mt-1" />
+                        <Label htmlFor="exchange-country">Country</Label>
+                        <div className="mt-1">
+                          <Popover open={exchangeCountryOpen} onOpenChange={setExchangeCountryOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                id="exchange-country"
+                                className="w-full justify-between"
+                              >
+                                {exchangeDraft.country_code
+                                  ? (countryNameByIso.get(exchangeDraft.country_code) ?? exchangeDraft.country_code)
+                                  : 'Select country'}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-full p-0"
+                              align="start"
+                              onWheel={(event) => event.stopPropagation()}
+                            >
+                              <Command>
+                                <CommandInput placeholder="Search country..." />
+                                <CommandEmpty>No country found.</CommandEmpty>
+                                <CommandList className="max-h-60 overflow-auto">
+                                  <CommandGroup>
+                                    {countries.map((country) => (
+                                      <CommandItem
+                                        key={country.iso_code}
+                                        value={`${country.name ?? country.iso_code} ${country.iso_code}`}
+                                        onSelect={() => {
+                                          setExchangeDraft({
+                                            ...exchangeDraft,
+                                            country_code: country.iso_code,
+                                          });
+                                          setExchangeCountryOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${exchangeDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
+                                        />
+                                        <span>{country.name ?? country.iso_code}</span>
+                                        <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
                     </div>
                     <div>
-                      <Label>Name</Label>
-                      <Input placeholder="New York Stock Exchange" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label>Country</Label>
-                      <Input placeholder="United States" className="mt-1" />
+                      <Label htmlFor="exchange-name">Name *</Label>
+                      <Input
+                        id="exchange-name"
+                        placeholder="New York Stock Exchange"
+                        className="mt-1"
+                        value={exchangeDraft.name}
+                        onChange={(e) => setExchangeDraft({ ...exchangeDraft, name: e.target.value })}
+                      />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline">Cancel</Button>
-                      <Button className="bg-primary text-primary-foreground">Save</Button>
+                      <Button variant="outline" onClick={() => setIsCreateExchangeOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleCreateExchange}
+                        disabled={exchangeActionLoading}
+                      >
+                        {exchangeActionLoading ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isEditExchangeOpen} onOpenChange={setIsEditExchangeOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Edit Stock Exchange</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    {exchangeActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {exchangeActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-exchange-code">Code</Label>
+                        <Input
+                          id="edit-exchange-code"
+                          className="mt-1"
+                          value={exchangeDraft.exchange_code}
+                          disabled
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-exchange-country">Country</Label>
+                        <div className="mt-1">
+                          <Popover open={exchangeEditCountryOpen} onOpenChange={setExchangeEditCountryOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                id="edit-exchange-country"
+                                className="w-full justify-between"
+                              >
+                                {exchangeDraft.country_code
+                                  ? (countryNameByIso.get(exchangeDraft.country_code) ?? exchangeDraft.country_code)
+                                  : 'Select country'}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-full p-0"
+                              align="start"
+                              onWheel={(event) => event.stopPropagation()}
+                            >
+                              <Command>
+                                <CommandInput placeholder="Search country..." />
+                                <CommandEmpty>No country found.</CommandEmpty>
+                                <CommandList className="max-h-60 overflow-auto">
+                                  <CommandGroup>
+                                    {countries.map((country) => (
+                                      <CommandItem
+                                        key={country.iso_code}
+                                        value={`${country.name ?? country.iso_code} ${country.iso_code}`}
+                                        onSelect={() => {
+                                          setExchangeDraft({
+                                            ...exchangeDraft,
+                                            country_code: country.iso_code,
+                                          });
+                                          setExchangeEditCountryOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${exchangeDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
+                                        />
+                                        <span>{country.name ?? country.iso_code}</span>
+                                        <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-exchange-name">Name *</Label>
+                      <Input
+                        id="edit-exchange-name"
+                        className="mt-1"
+                        value={exchangeDraft.name}
+                        onChange={(e) => setExchangeDraft({ ...exchangeDraft, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button variant="outline" onClick={() => setIsEditExchangeOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleUpdateExchange}
+                        disabled={exchangeActionLoading}
+                      >
+                        {exchangeActionLoading ? 'Saving...' : 'Save'}
+                      </Button>
                     </div>
                   </div>
                 </DialogContent>
@@ -677,28 +1158,27 @@ const BasicData = () => {
                     <th className="text-xs md:text-sm hidden sm:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setExchangeSort, 'country_code')}>
                       <div className="flex items-center gap-1">Country <ArrowUpDown className={`h-3 w-3 ${exchangeSort.key === 'country_code' ? 'opacity-100' : 'opacity-40'}`} /></div>
                     </th>
-                    <th className="text-xs md:text-sm hidden md:table-cell">Timezone</th>
                     <th className="text-xs md:text-sm">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {exchangesLoading && (
                     <tr>
-                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
                         Loading exchanges...
                       </td>
                     </tr>
                   )}
                   {!exchangesLoading && exchangesError && (
                     <tr>
-                      <td colSpan={5} className="text-destructive text-xs md:text-sm text-center py-6">
+                      <td colSpan={4} className="text-destructive text-xs md:text-sm text-center py-6">
                         {exchangesError}
                       </td>
                     </tr>
                   )}
                   {!exchangesLoading && !exchangesError && filteredExchanges.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
                         No exchanges to display.
                       </td>
                     </tr>
@@ -712,13 +1192,23 @@ const BasicData = () => {
                           ? (countryNameByIso.get(exchange.country_code) ?? exchange.country_code)
                           : '—'}
                       </td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">—</td>
                       <td>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8"
+                            onClick={() => handleEditExchange(exchange)}
+                          >
                             <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-destructive">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
+                            onClick={() => setExchangeToDelete(exchange)}
+                            disabled={exchangeActionLoading}
+                          >
                             <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                           </Button>
                         </div>
@@ -728,6 +1218,29 @@ const BasicData = () => {
                 </tbody>
               </table>
             </div>
+            <AlertDialog open={!!exchangeToDelete} onOpenChange={(open) => !open && setExchangeToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete exchange</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete exchange "{exchangeToDelete?.exchange_code}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (exchangeToDelete) {
+                        handleDeleteExchange(exchangeToDelete.exchange_code);
+                      }
+                      setExchangeToDelete(null);
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </TabsContent>
 
@@ -896,7 +1409,7 @@ const BasicData = () => {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                            onClick={() => handleDeleteCountry(country.iso_code)}
+                            onClick={() => setCountryToDelete(country)}
                             disabled={countryActionLoading}
                           >
                             <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
@@ -908,6 +1421,29 @@ const BasicData = () => {
                 </tbody>
               </table>
             </div>
+            <AlertDialog open={!!countryToDelete} onOpenChange={(open) => !open && setCountryToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete country</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete country "{countryToDelete?.name ?? countryToDelete?.iso_code}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (countryToDelete) {
+                        handleDeleteCountry(countryToDelete.iso_code);
+                      }
+                      setCountryToDelete(null);
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </TabsContent>
 
@@ -963,13 +1499,20 @@ const BasicData = () => {
                       />
                     </div>
                     <div>
-                      <Label>Sector</Label>
+                      <Label htmlFor="industry-sector">Sector</Label>
                       <Input
+                        id="industry-sector"
+                        list="industry-sector-options"
                         placeholder="Information Technology"
                         className="mt-1"
                         value={industryDraft.sector}
                         onChange={(e) => setIndustryDraft({ ...industryDraft, sector: e.target.value })}
                       />
+                      <datalist id="industry-sector-options">
+                        {industrySectorOptions.map((sector) => (
+                          <option key={sector} value={sector} />
+                        ))}
+                      </datalist>
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                       <Button variant="outline" onClick={() => setIsCreateIndustryOpen(false)}>
@@ -1012,12 +1555,19 @@ const BasicData = () => {
                       />
                     </div>
                     <div>
-                      <Label>Sector</Label>
+                      <Label htmlFor="edit-industry-sector">Sector</Label>
                       <Input
+                        id="edit-industry-sector"
+                        list="industry-sector-options"
                         className="mt-1"
                         value={industryDraft.sector}
                         onChange={(e) => setIndustryDraft({ ...industryDraft, sector: e.target.value })}
                       />
+                      <datalist id="industry-sector-options">
+                        {industrySectorOptions.map((sector) => (
+                          <option key={sector} value={sector} />
+                        ))}
+                      </datalist>
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                       <Button variant="outline" onClick={() => setIsEditIndustryOpen(false)}>
@@ -1090,7 +1640,7 @@ const BasicData = () => {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                            onClick={() => handleDeleteIndustry(industry.industry_code)}
+                            onClick={() => setIndustryToDelete(industry)}
                             disabled={industryActionLoading}
                           >
                             <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
@@ -1102,6 +1652,29 @@ const BasicData = () => {
                 </tbody>
               </table>
             </div>
+            <AlertDialog open={!!industryToDelete} onOpenChange={(open) => !open && setIndustryToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete industry</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete industry "{industryToDelete?.name ?? industryToDelete?.industry_code}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (industryToDelete) {
+                        handleDeleteIndustry(industryToDelete.industry_code);
+                      }
+                      setIndustryToDelete(null);
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </TabsContent>
 
@@ -1110,7 +1683,16 @@ const BasicData = () => {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <h3 className="font-semibold text-foreground text-sm md:text-base">Market Indices</h3>
-              <Dialog>
+              <Dialog
+                open={isCreateIndexOpen}
+                onOpenChange={(open) => {
+                  setIsCreateIndexOpen(open);
+                  setIndexActionError(null);
+                  if (open) {
+                    setIndexDraft({ index_code: '', name: '', country_code: '', exchange_code: '' });
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
                     <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
@@ -1122,27 +1704,322 @@ const BasicData = () => {
                     <DialogTitle>Add Market Index</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
+                    {indexActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {indexActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label>Code</Label>
-                        <Input placeholder="SPX" className="mt-1" />
+                        <Label htmlFor="index-code">Code *</Label>
+                        <Input
+                          id="index-code"
+                          placeholder="SPX"
+                          className="mt-1"
+                          value={indexDraft.index_code}
+                          onChange={(e) => setIndexDraft({ ...indexDraft, index_code: e.target.value.toUpperCase() })}
+                        />
                       </div>
                       <div>
-                        <Label>Exchange</Label>
-                        <Input placeholder="NYSE" className="mt-1" />
+                        <Label htmlFor="index-exchange">Exchange</Label>
+                        <div className="mt-1">
+                          <Popover open={indexExchangeOpen} onOpenChange={setIndexExchangeOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                id="index-exchange"
+                                className="w-full justify-between"
+                              >
+                                {indexDraft.exchange_code || '-'}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-full p-0"
+                              align="start"
+                              onWheel={(event) => event.stopPropagation()}
+                            >
+                              <Command>
+                                <CommandInput placeholder="Search exchange..." />
+                                <CommandEmpty>No exchange found.</CommandEmpty>
+                                <CommandList className="max-h-60 overflow-auto">
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="-"
+                                      onSelect={() => {
+                                        setIndexDraft({ ...indexDraft, exchange_code: '' });
+                                        setIndexExchangeOpen(false);
+                                      }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === '' ? 'opacity-100' : 'opacity-0'}`} />
+                                      -
+                                    </CommandItem>
+                                    {exchanges.map((exchange) => (
+                                      <CommandItem
+                                        key={exchange.exchange_code}
+                                        value={`${exchange.exchange_code} ${exchange.name}`}
+                                        onSelect={() => {
+                                          setIndexDraft({
+                                            ...indexDraft,
+                                            exchange_code: exchange.exchange_code,
+                                          });
+                                          setIndexExchangeOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === exchange.exchange_code ? 'opacity-100' : 'opacity-0'}`}
+                                        />
+                                        <span>{exchange.exchange_code}</span>
+                                        <span className="ml-2 text-xs text-muted-foreground">{exchange.name}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
                     </div>
                     <div>
-                      <Label>Name</Label>
-                      <Input placeholder="S&P 500" className="mt-1" />
+                      <Label htmlFor="index-name">Name *</Label>
+                      <Input
+                        id="index-name"
+                        placeholder="S&P 500"
+                        className="mt-1"
+                        value={indexDraft.name}
+                        onChange={(e) => setIndexDraft({ ...indexDraft, name: e.target.value })}
+                      />
                     </div>
                     <div>
-                      <Label>Country</Label>
-                      <Input placeholder="United States" className="mt-1" />
+                      <Label htmlFor="index-country">Country</Label>
+                      <div className="mt-1">
+                        <Popover open={indexCountryOpen} onOpenChange={setIndexCountryOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              id="index-country"
+                              className="w-full justify-between"
+                            >
+                              {indexDraft.country_code
+                                ? (countryNameByIso.get(indexDraft.country_code) ?? indexDraft.country_code)
+                                : 'Select country'}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-full p-0"
+                            align="start"
+                            onWheel={(event) => event.stopPropagation()}
+                          >
+                            <Command>
+                              <CommandInput placeholder="Search country..." />
+                              <CommandEmpty>No country found.</CommandEmpty>
+                              <CommandList className="max-h-60 overflow-auto">
+                                <CommandGroup>
+                                  {countries.map((country) => (
+                                    <CommandItem
+                                      key={country.iso_code}
+                                      value={`${country.name ?? country.iso_code} ${country.iso_code}`}
+                                      onSelect={() => {
+                                        setIndexDraft({
+                                          ...indexDraft,
+                                          country_code: country.iso_code,
+                                        });
+                                        setIndexCountryOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${indexDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
+                                      />
+                                      <span>{country.name ?? country.iso_code}</span>
+                                      <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline">Cancel</Button>
-                      <Button className="bg-primary text-primary-foreground">Save</Button>
+                      <Button variant="outline" onClick={() => setIsCreateIndexOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleCreateIndex}
+                        disabled={indexActionLoading}
+                      >
+                        {indexActionLoading ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isEditIndexOpen} onOpenChange={setIsEditIndexOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Edit Market Index</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    {indexActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {indexActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-index-code">Code</Label>
+                        <Input
+                          id="edit-index-code"
+                          className="mt-1"
+                          value={indexDraft.index_code}
+                          disabled
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-index-exchange">Exchange</Label>
+                        <div className="mt-1">
+                          <Popover open={indexEditExchangeOpen} onOpenChange={setIndexEditExchangeOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                id="edit-index-exchange"
+                                className="w-full justify-between"
+                              >
+                                {indexDraft.exchange_code || '-'}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-full p-0"
+                              align="start"
+                              onWheel={(event) => event.stopPropagation()}
+                            >
+                              <Command>
+                                <CommandInput placeholder="Search exchange..." />
+                                <CommandEmpty>No exchange found.</CommandEmpty>
+                                <CommandList className="max-h-60 overflow-auto">
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="-"
+                                      onSelect={() => {
+                                        setIndexDraft({ ...indexDraft, exchange_code: '' });
+                                        setIndexEditExchangeOpen(false);
+                                      }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === '' ? 'opacity-100' : 'opacity-0'}`} />
+                                      -
+                                    </CommandItem>
+                                    {exchanges.map((exchange) => (
+                                      <CommandItem
+                                        key={exchange.exchange_code}
+                                        value={`${exchange.exchange_code} ${exchange.name}`}
+                                        onSelect={() => {
+                                          setIndexDraft({
+                                            ...indexDraft,
+                                            exchange_code: exchange.exchange_code,
+                                          });
+                                          setIndexEditExchangeOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === exchange.exchange_code ? 'opacity-100' : 'opacity-0'}`}
+                                        />
+                                        <span>{exchange.exchange_code}</span>
+                                        <span className="ml-2 text-xs text-muted-foreground">{exchange.name}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-index-name">Name *</Label>
+                      <Input
+                        id="edit-index-name"
+                        className="mt-1"
+                        value={indexDraft.name}
+                        onChange={(e) => setIndexDraft({ ...indexDraft, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-index-country">Country</Label>
+                      <div className="mt-1">
+                        <Popover open={indexEditCountryOpen} onOpenChange={setIndexEditCountryOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              id="edit-index-country"
+                              className="w-full justify-between"
+                            >
+                              {indexDraft.country_code
+                                ? (countryNameByIso.get(indexDraft.country_code) ?? indexDraft.country_code)
+                                : 'Select country'}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-full p-0"
+                            align="start"
+                            onWheel={(event) => event.stopPropagation()}
+                          >
+                            <Command>
+                              <CommandInput placeholder="Search country..." />
+                              <CommandEmpty>No country found.</CommandEmpty>
+                              <CommandList className="max-h-60 overflow-auto">
+                                <CommandGroup>
+                                  {countries.map((country) => (
+                                    <CommandItem
+                                      key={country.iso_code}
+                                      value={`${country.name ?? country.iso_code} ${country.iso_code}`}
+                                      onSelect={() => {
+                                        setIndexDraft({
+                                          ...indexDraft,
+                                          country_code: country.iso_code,
+                                        });
+                                        setIndexEditCountryOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${indexDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
+                                      />
+                                      <span>{country.name ?? country.iso_code}</span>
+                                      <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button variant="outline" onClick={() => setIsEditIndexOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleUpdateIndex}
+                        disabled={indexActionLoading}
+                      >
+                        {indexActionLoading ? 'Saving...' : 'Save'}
+                      </Button>
                     </div>
                   </div>
                 </DialogContent>
@@ -1201,10 +2078,20 @@ const BasicData = () => {
                       </td>
                       <td>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8"
+                            onClick={() => handleEditIndex(index)}
+                          >
                             <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-destructive">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
+                            onClick={() => setIndexToDelete(index)}
+                          >
                             <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                           </Button>
                         </div>
@@ -1214,6 +2101,29 @@ const BasicData = () => {
                 </tbody>
               </table>
             </div>
+            <AlertDialog open={!!indexToDelete} onOpenChange={(open) => !open && setIndexToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete market index</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete index "{indexToDelete?.index_code}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (indexToDelete) {
+                        handleDeleteIndex(indexToDelete.index_code);
+                      }
+                      setIndexToDelete(null);
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </TabsContent>
         </Tabs>
