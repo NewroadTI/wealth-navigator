@@ -5,7 +5,12 @@ from app.api import deps
 
 # Importamos el Modelo (SQLAlchemy) y el Schema (Pydantic)
 from app.models.asset import Country, Currency, StockExchange, MarketIndex
-from app.schemas.asset import CountryRead, CurrencyRead, StockExchangeRead, MarketIndexRead
+from app.schemas.asset import (
+    CountryRead, CountryCreate, CountryUpdate,
+    CurrencyRead, 
+    StockExchangeRead, 
+    MarketIndexRead
+)
 
 router = APIRouter()
 
@@ -16,10 +21,92 @@ def get_countries(
     limit: int = 300 # Límite alto por defecto para traer todos los países de una
 ) -> Any:
     """
-    Recupera el catálogo maestro de países .
+    Recupera el catálogo maestro de países.
     """
     countries = db.query(Country).order_by(Country.name).offset(skip).limit(limit).all()
     return countries
+
+
+@router.post("/countries", response_model=CountryRead, status_code=status.HTTP_201_CREATED)
+def create_country(
+    payload: CountryCreate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Crea un nuevo país en el catálogo.
+    """
+    # Verificar si ya existe
+    existing = db.query(Country).filter(Country.iso_code == payload.iso_code.upper()).first()
+    if existing:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El país con código ISO '{payload.iso_code}' ya existe en el sistema."
+        )
+    
+    # Crear nuevo país
+    new_country = Country(
+        iso_code=payload.iso_code.upper(),
+        name=payload.name
+    )
+    
+    db.add(new_country)
+    db.commit()
+    db.refresh(new_country)
+    return new_country
+
+
+@router.put("/countries/{iso_code}", response_model=CountryRead)
+def update_country(
+    iso_code: str,
+    payload: CountryUpdate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Actualiza un país existente.
+    """
+    country = db.query(Country).filter(Country.iso_code == iso_code.upper()).first()
+    if not country:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No se encontró el país con código ISO '{iso_code}'."
+        )
+    
+    # Actualizar el nombre
+    country.name = payload.name
+    
+    db.commit()
+    db.refresh(country)
+    return country
+
+
+@router.delete("/countries/{iso_code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_country(
+    iso_code: str,
+    db: Session = Depends(deps.get_db)
+) -> None:
+    """
+    Elimina un país del catálogo.
+    """
+    country = db.query(Country).filter(Country.iso_code == iso_code.upper()).first()
+    if not country:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No se encontró el país con código ISO '{iso_code}'."
+        )
+    
+    # Verificar si hay activos o exchanges usando este país
+    from app.models.asset import Asset
+    assets_count = db.query(Asset).filter(Asset.country_code == iso_code.upper()).count()
+    exchanges_count = db.query(StockExchange).filter(StockExchange.country_code == iso_code.upper()).count()
+    
+    if assets_count > 0 or exchanges_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar el país '{country.name}' porque tiene {assets_count} activo(s) y {exchanges_count} exchange(s) asociados."
+        )
+    
+    db.delete(country)
+    db.commit()
 
 
 @router.get("/currencies", response_model=List[CurrencyRead])

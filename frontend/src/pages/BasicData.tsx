@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3, ArrowUpDown } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Data is fetched from API (catalogs)
 
@@ -33,28 +35,64 @@ type IndexApi = {
   exchange_code?: string | null;
 };
 
+type SortConfig = { key: string; direction: 'asc' | 'desc' };
+
 const BasicData = () => {
+  const [activeTab, setActiveTab] = useState('exchanges');
   const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+  const contentRef = useRef<HTMLDivElement>(null);
+  
+  // Sorting state for each table
+  const [exchangeSort, setExchangeSort] = useState<SortConfig>({ key: 'exchange_code', direction: 'asc' });
+  const [countrySort, setCountrySort] = useState<SortConfig>({ key: 'iso_code', direction: 'asc' });
+  const [industrySort, setIndustrySort] = useState<SortConfig>({ key: 'industry_code', direction: 'asc' });
+  const [indexSort, setIndexSort] = useState<SortConfig>({ key: 'index_code', direction: 'asc' });
+  
   const [exchanges, setExchanges] = useState<ExchangeApi[]>([]);
   const [exchangesLoading, setExchangesLoading] = useState(false);
   const [exchangesError, setExchangesError] = useState<string | null>(null);
+  
   const [countries, setCountries] = useState<CountryApi[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesError, setCountriesError] = useState<string | null>(null);
+  const [isCreateCountryOpen, setIsCreateCountryOpen] = useState(false);
+  const [isEditCountryOpen, setIsEditCountryOpen] = useState(false);
+  const [countryDraft, setCountryDraft] = useState({ iso_code: '', name: '' });
+  const [editingCountry, setEditingCountry] = useState<CountryApi | null>(null);
+  const [countryActionLoading, setCountryActionLoading] = useState(false);
+  const [countryActionError, setCountryActionError] = useState<string | null>(null);
+  
   const [industries, setIndustries] = useState<IndustryApi[]>([]);
   const [industriesLoading, setIndustriesLoading] = useState(false);
   const [industriesError, setIndustriesError] = useState<string | null>(null);
-  const [indices, setIndices] = useState<IndexApi[]>([]);
-  const [indicesLoading, setIndicesLoading] = useState(false);
-  const [indicesError, setIndicesError] = useState<string | null>(null);
   const [isCreateIndustryOpen, setIsCreateIndustryOpen] = useState(false);
   const [isEditIndustryOpen, setIsEditIndustryOpen] = useState(false);
   const [industryDraft, setIndustryDraft] = useState({ industry_code: '', name: '', sector: '' });
   const [editingIndustry, setEditingIndustry] = useState<IndustryApi | null>(null);
   const [industryActionLoading, setIndustryActionLoading] = useState(false);
   const [industryActionError, setIndustryActionError] = useState<string | null>(null);
+  
+  const [indices, setIndices] = useState<IndexApi[]>([]);
+  const [indicesLoading, setIndicesLoading] = useState(false);
+  const [indicesError, setIndicesError] = useState<string | null>(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+  
+  // Handle sort toggle
+  const toggleSort = (setSort: React.Dispatch<React.SetStateAction<SortConfig>>, key: string) => {
+    setSort(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+  
+  // Handle tab change with scroll to top
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchQuery('');
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const fetchAllPages = async <T,>(
     path: string,
@@ -93,7 +131,7 @@ const BasicData = () => {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        setExchangesError('No se pudo cargar Exchanges.');
+        setExchangesError('Could not load Exchanges.');
         setExchanges([]);
       } finally {
         setExchangesLoading(false);
@@ -116,7 +154,7 @@ const BasicData = () => {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        setCountriesError('No se pudo cargar Countries.');
+        setCountriesError('Could not load Countries.');
         setCountries([]);
       } finally {
         setCountriesLoading(false);
@@ -139,7 +177,7 @@ const BasicData = () => {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        setIndustriesError('No se pudo cargar Industries.');
+        setIndustriesError('Could not load Industries.');
         setIndustries([]);
       } finally {
         setIndustriesLoading(false);
@@ -162,7 +200,7 @@ const BasicData = () => {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        setIndicesError('No se pudo cargar Indices.');
+        setIndicesError('Could not load Indices.');
         setIndices([]);
       } finally {
         setIndicesLoading(false);
@@ -196,9 +234,138 @@ const BasicData = () => {
     setIndustries(data);
   };
 
+  const refreshCountries = async () => {
+    const data = await fetchAllPages<CountryApi>('/api/v1/catalogs/countries');
+    setCountries(data);
+  };
+
+  const handleCreateCountry = async () => {
+    if (!countryDraft.iso_code.trim() || !countryDraft.name.trim()) {
+      setCountryActionError('ISO Code and Name fields are required.');
+      return;
+    }
+    try {
+      setCountryActionLoading(true);
+      setCountryActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/countries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          iso_code: countryDraft.iso_code.trim().toUpperCase(),
+          name: countryDraft.name.trim(),
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+      
+      await refreshCountries();
+      setCountryDraft({ iso_code: '', name: '' });
+      setIsCreateCountryOpen(false);
+      
+      toast({
+        title: '✅ Country created',
+        description: `Country "${countryDraft.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setCountryActionError(error.message || 'Could not create the country.');
+    } finally {
+      setCountryActionLoading(false);
+    }
+  };
+
+  const handleEditCountry = (country: CountryApi) => {
+    setEditingCountry(country);
+    setCountryDraft({
+      iso_code: country.iso_code,
+      name: country.name ?? '',
+    });
+    setCountryActionError(null);
+    setIsEditCountryOpen(true);
+  };
+
+  const handleUpdateCountry = async () => {
+    if (!editingCountry) {
+      return;
+    }
+    if (!countryDraft.name.trim()) {
+      setCountryActionError('Name field is required.');
+      return;
+    }
+    try {
+      setCountryActionLoading(true);
+      setCountryActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/countries/${editingCountry.iso_code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: countryDraft.name.trim(),
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+      
+      await refreshCountries();
+      setIsEditCountryOpen(false);
+      setEditingCountry(null);
+      
+      toast({
+        title: '✅ Country updated',
+        description: `Country "${countryDraft.name}" has been updated successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setCountryActionError(error.message || 'Could not update the country.');
+    } finally {
+      setCountryActionLoading(false);
+    }
+  };
+
+  const handleDeleteCountry = async (isoCode: string) => {
+    const country = countries.find(c => c.iso_code === isoCode);
+    const confirmed = window.confirm(`Are you sure you want to delete country "${country?.name || isoCode}"?`);
+    if (!confirmed) {
+      return;
+    }
+    try {
+      setCountryActionLoading(true);
+      setCountryActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/countries/${isoCode}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+      
+      await refreshCountries();
+      
+      toast({
+        title: '✅ Country deleted',
+        description: `Country "${country?.name || isoCode}" has been deleted successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: '❌ Error deleting',
+        description: error.message || 'Could not delete the country.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCountryActionLoading(false);
+    }
+  };
+
   const handleCreateIndustry = async () => {
     if (!industryDraft.industry_code.trim() || !industryDraft.name.trim()) {
-      setIndustryActionError('Completa Code y Name.');
+      setIndustryActionError('Code and Name fields are required.');
       return;
     }
     try {
@@ -213,14 +380,23 @@ const BasicData = () => {
           sector: industryDraft.sector.trim() || null,
         }),
       });
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
+      
       await refreshIndustries();
       setIndustryDraft({ industry_code: '', name: '', sector: '' });
       setIsCreateIndustryOpen(false);
-    } catch (error) {
-      setIndustryActionError('No se pudo crear la industria.');
+      
+      toast({
+        title: '✅ Industry created',
+        description: `Industry "${industryDraft.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setIndustryActionError(error.message || 'Could not create the industry.');
     } finally {
       setIndustryActionLoading(false);
     }
@@ -242,7 +418,7 @@ const BasicData = () => {
       return;
     }
     if (!industryDraft.name.trim()) {
-      setIndustryActionError('Completa Name.');
+      setIndustryActionError('Name field is required.');
       return;
     }
     try {
@@ -256,21 +432,31 @@ const BasicData = () => {
           sector: industryDraft.sector.trim() || null,
         }),
       });
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
+      
       await refreshIndustries();
       setIsEditIndustryOpen(false);
       setEditingIndustry(null);
-    } catch (error) {
-      setIndustryActionError('No se pudo actualizar la industria.');
+      
+      toast({
+        title: '✅ Industry updated',
+        description: `Industry "${industryDraft.name}" has been updated successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setIndustryActionError(error.message || 'Could not update the industry.');
     } finally {
       setIndustryActionLoading(false);
     }
   };
 
   const handleDeleteIndustry = async (industryCode: string) => {
-    const confirmed = window.confirm('¿Eliminar la industria seleccionada?');
+    const industry = industries.find(i => i.industry_code === industryCode);
+    const confirmed = window.confirm(`Are you sure you want to delete industry "${industry?.name || industryCode}"?`);
     if (!confirmed) {
       return;
     }
@@ -280,12 +466,25 @@ const BasicData = () => {
       const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/industries/${industryCode}`, {
         method: 'DELETE',
       });
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
+      
       await refreshIndustries();
-    } catch (error) {
-      setIndustryActionError('No se pudo eliminar la industria.');
+      
+      toast({
+        title: '✅ Industry deleted',
+        description: `Industry "${industry?.name || industryCode}" has been deleted successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: '❌ Error deleting',
+        description: error.message || 'Could not delete the industry.',
+        variant: 'destructive',
+      });
     } finally {
       setIndustryActionLoading(false);
     }
@@ -293,102 +492,138 @@ const BasicData = () => {
 
   const filteredExchanges = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return exchanges;
+    let result = exchanges;
+    if (query) {
+      result = result.filter((exchange) => {
+        const countryName = exchange.country_code ? (countryNameByIso.get(exchange.country_code) ?? '') : '';
+        return (
+          exchange.exchange_code.toLowerCase().includes(query) ||
+          exchange.name.toLowerCase().includes(query) ||
+          (exchange.country_code ?? '').toLowerCase().includes(query) ||
+          countryName.toLowerCase().includes(query)
+        );
+      });
     }
-    return exchanges.filter((exchange) => {
-      const countryName = exchange.country_code ? (countryNameByIso.get(exchange.country_code) ?? '') : '';
-      return (
-        exchange.exchange_code.toLowerCase().includes(query) ||
-        exchange.name.toLowerCase().includes(query) ||
-        (exchange.country_code ?? '').toLowerCase().includes(query) ||
-        countryName.toLowerCase().includes(query)
-      );
+    return [...result].sort((a, b) => {
+      const aVal = String((a as Record<string, unknown>)[exchangeSort.key] ?? '').toLowerCase();
+      const bVal = String((b as Record<string, unknown>)[exchangeSort.key] ?? '').toLowerCase();
+      return exchangeSort.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
-  }, [countryNameByIso, exchanges, searchQuery]);
+  }, [countryNameByIso, exchanges, searchQuery, exchangeSort]);
 
   const filteredCountries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return countries;
+    let result = countries;
+    if (query) {
+      result = result.filter((country) => {
+        return (
+          country.iso_code.toLowerCase().includes(query) ||
+          (country.name ?? '').toLowerCase().includes(query)
+        );
+      });
     }
-    return countries.filter((country) => {
-      return (
-        country.iso_code.toLowerCase().includes(query) ||
-        (country.name ?? '').toLowerCase().includes(query)
-      );
+    return [...result].sort((a, b) => {
+      const aVal = String((a as Record<string, unknown>)[countrySort.key] ?? '').toLowerCase();
+      const bVal = String((b as Record<string, unknown>)[countrySort.key] ?? '').toLowerCase();
+      return countrySort.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
-  }, [countries, searchQuery]);
+  }, [countries, searchQuery, countrySort]);
 
   const filteredIndustries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return industries;
+    let result = industries;
+    if (query) {
+      result = result.filter((industry) => {
+        return (
+          industry.industry_code.toLowerCase().includes(query) ||
+          industry.name.toLowerCase().includes(query) ||
+          (industry.sector ?? '').toLowerCase().includes(query)
+        );
+      });
     }
-    return industries.filter((industry) => {
-      return (
-        industry.industry_code.toLowerCase().includes(query) ||
-        industry.name.toLowerCase().includes(query) ||
-        (industry.sector ?? '').toLowerCase().includes(query)
-      );
+    return [...result].sort((a, b) => {
+      const aVal = String((a as Record<string, unknown>)[industrySort.key] ?? '').toLowerCase();
+      const bVal = String((b as Record<string, unknown>)[industrySort.key] ?? '').toLowerCase();
+      return industrySort.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
-  }, [industries, searchQuery]);
+  }, [industries, searchQuery, industrySort]);
 
   const filteredIndices = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return indices;
+    let result = indices;
+    if (query) {
+      result = result.filter((index) => {
+        const exchangeName = index.exchange_code ? (exchangeNameByCode.get(index.exchange_code) ?? '') : '';
+        const countryName = index.country_code ? (countryNameByIso.get(index.country_code) ?? '') : '';
+        return (
+          index.index_code.toLowerCase().includes(query) ||
+          index.name.toLowerCase().includes(query) ||
+          (index.exchange_code ?? '').toLowerCase().includes(query) ||
+          (index.country_code ?? '').toLowerCase().includes(query) ||
+          exchangeName.toLowerCase().includes(query) ||
+          countryName.toLowerCase().includes(query)
+        );
+      });
     }
-    return indices.filter((index) => {
-      const exchangeName = index.exchange_code ? (exchangeNameByCode.get(index.exchange_code) ?? '') : '';
-      const countryName = index.country_code ? (countryNameByIso.get(index.country_code) ?? '') : '';
-      return (
-        index.index_code.toLowerCase().includes(query) ||
-        index.name.toLowerCase().includes(query) ||
-        (index.exchange_code ?? '').toLowerCase().includes(query) ||
-        (index.country_code ?? '').toLowerCase().includes(query) ||
-        exchangeName.toLowerCase().includes(query) ||
-        countryName.toLowerCase().includes(query)
-      );
+    return [...result].sort((a, b) => {
+      const aVal = String((a as Record<string, unknown>)[indexSort.key] ?? '').toLowerCase();
+      const bVal = String((b as Record<string, unknown>)[indexSort.key] ?? '').toLowerCase();
+      return indexSort.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
-  }, [countryNameByIso, exchangeNameByCode, indices, searchQuery]);
+  }, [countryNameByIso, exchangeNameByCode, indices, searchQuery, indexSort]);
+
+  // Sortable column header component
+  const SortableHeader = ({ label, sortKey, currentSort, onSort }: { label: string; sortKey: string; currentSort: SortConfig; onSort: (key: string) => void }) => (
+    <th
+      className="text-xs md:text-sm cursor-pointer hover:bg-muted/50 transition-colors select-none"
+      onClick={() => onSort(sortKey)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <ArrowUpDown className={`h-3 w-3 ${currentSort.key === sortKey ? 'opacity-100' : 'opacity-40'}`} />
+      </div>
+    </th>
+  );
 
   return (
     <AppLayout title="Basic Data" subtitle="Manage reference data for the system">
-      <Tabs defaultValue="exchanges" className="space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4">
-          <TabsList className="bg-muted/50 p-1 w-full sm:w-auto overflow-x-auto flex-nowrap">
-            <TabsTrigger value="exchanges" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
-              <Building className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-              Exchanges
-            </TabsTrigger>
-            <TabsTrigger value="countries" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
-              <Globe className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-              Countries
-            </TabsTrigger>
-            <TabsTrigger value="industries" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
-              <Factory className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-              Industries
-            </TabsTrigger>
-            <TabsTrigger value="indices" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
-              <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-              Indices
-            </TabsTrigger>
-          </TabsList>
+      <div ref={contentRef} className="h-full overflow-auto">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 md:space-y-6">
+          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mt-4 pt-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4">
+              <TabsList className="bg-muted/50 p-1 w-full sm:w-auto overflow-x-auto flex-nowrap">
+                <TabsTrigger value="exchanges" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
+                  <Building className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  Exchanges
+                </TabsTrigger>
+                <TabsTrigger value="countries" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
+                  <Globe className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  Countries
+                </TabsTrigger>
+                <TabsTrigger value="industries" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
+                  <Factory className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  Industries
+                </TabsTrigger>
+                <TabsTrigger value="indices" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
+                  <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  Indices
+                </TabsTrigger>
+              </TabsList>
 
-          <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-48 md:w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-muted/50 border-border text-sm"
-              />
+              <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-48 md:w-64">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 bg-muted/50 border-border text-sm"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Exchanges Tab */}
         <TabsContent value="exchanges">
@@ -437,9 +672,11 @@ const BasicData = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="text-xs md:text-sm">Code</th>
-                    <th className="text-xs md:text-sm">Name</th>
-                    <th className="text-xs md:text-sm hidden sm:table-cell">Country</th>
+                    <SortableHeader label="Code" sortKey="exchange_code" currentSort={exchangeSort} onSort={(k) => toggleSort(setExchangeSort, k)} />
+                    <SortableHeader label="Name" sortKey="name" currentSort={exchangeSort} onSort={(k) => toggleSort(setExchangeSort, k)} />
+                    <th className="text-xs md:text-sm hidden sm:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setExchangeSort, 'country_code')}>
+                      <div className="flex items-center gap-1">Country <ArrowUpDown className={`h-3 w-3 ${exchangeSort.key === 'country_code' ? 'opacity-100' : 'opacity-40'}`} /></div>
+                    </th>
                     <th className="text-xs md:text-sm hidden md:table-cell">Timezone</th>
                     <th className="text-xs md:text-sm">Actions</th>
                   </tr>
@@ -448,7 +685,7 @@ const BasicData = () => {
                   {exchangesLoading && (
                     <tr>
                       <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Cargando exchanges...
+                        Loading exchanges...
                       </td>
                     </tr>
                   )}
@@ -462,7 +699,7 @@ const BasicData = () => {
                   {!exchangesLoading && !exchangesError && filteredExchanges.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No hay exchanges para mostrar.
+                        No exchanges to display.
                       </td>
                     </tr>
                   )}
@@ -499,7 +736,16 @@ const BasicData = () => {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <h3 className="font-semibold text-foreground text-sm md:text-base">Countries</h3>
-              <Dialog>
+              <Dialog
+                open={isCreateCountryOpen}
+                onOpenChange={(open) => {
+                  setIsCreateCountryOpen(open);
+                  setCountryActionError(null);
+                  if (open) {
+                    setCountryDraft({ iso_code: '', name: '' });
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
                     <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
@@ -511,27 +757,91 @@ const BasicData = () => {
                     <DialogTitle>Add Country</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Code (ISO)</Label>
-                        <Input placeholder="US" className="mt-1" />
-                      </div>
-                      <div>
-                        <Label>Currency</Label>
-                        <Input placeholder="USD" className="mt-1" />
-                      </div>
+                    {countryActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {countryActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div>
+                      <Label htmlFor="country-iso">ISO Code *</Label>
+                      <Input
+                        id="country-iso"
+                        placeholder="US"
+                        className="mt-1"
+                        maxLength={2}
+                        value={countryDraft.iso_code}
+                        onChange={(e) => setCountryDraft({ ...countryDraft, iso_code: e.target.value.toUpperCase() })}
+                      />
                     </div>
                     <div>
-                      <Label>Name</Label>
-                      <Input placeholder="United States" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label>Region</Label>
-                      <Input placeholder="North America" className="mt-1" />
+                      <Label htmlFor="country-name">Name *</Label>
+                      <Input
+                        id="country-name"
+                        placeholder="United States"
+                        className="mt-1"
+                        value={countryDraft.name}
+                        onChange={(e) => setCountryDraft({ ...countryDraft, name: e.target.value })}
+                      />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline">Cancel</Button>
-                      <Button className="bg-primary text-primary-foreground">Save</Button>
+                      <Button variant="outline" onClick={() => setIsCreateCountryOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleCreateCountry}
+                        disabled={countryActionLoading}
+                      >
+                        {countryActionLoading ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isEditCountryOpen} onOpenChange={setIsEditCountryOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Edit Country</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    {countryActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {countryActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <div>
+                      <Label htmlFor="edit-country-iso">ISO Code</Label>
+                      <Input
+                        id="edit-country-iso"
+                        className="mt-1"
+                        value={countryDraft.iso_code}
+                        disabled
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-country-name">Name *</Label>
+                      <Input
+                        id="edit-country-name"
+                        className="mt-1"
+                        value={countryDraft.name}
+                        onChange={(e) => setCountryDraft({ ...countryDraft, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button variant="outline" onClick={() => setIsEditCountryOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="bg-primary text-primary-foreground"
+                        onClick={handleUpdateCountry}
+                        disabled={countryActionLoading}
+                      >
+                        {countryActionLoading ? 'Saving...' : 'Save'}
+                      </Button>
                     </div>
                   </div>
                 </DialogContent>
@@ -541,32 +851,30 @@ const BasicData = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="text-xs md:text-sm">Code</th>
-                    <th className="text-xs md:text-sm">Name</th>
-                    <th className="text-xs md:text-sm hidden sm:table-cell">Currency</th>
-                    <th className="text-xs md:text-sm hidden md:table-cell">Region</th>
+                    <SortableHeader label="Code" sortKey="iso_code" currentSort={countrySort} onSort={(k) => toggleSort(setCountrySort, k)} />
+                    <SortableHeader label="Name" sortKey="name" currentSort={countrySort} onSort={(k) => toggleSort(setCountrySort, k)} />
                     <th className="text-xs md:text-sm">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {countriesLoading && (
                     <tr>
-                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Cargando countries...
+                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        Loading countries...
                       </td>
                     </tr>
                   )}
                   {!countriesLoading && countriesError && (
                     <tr>
-                      <td colSpan={5} className="text-destructive text-xs md:text-sm text-center py-6">
+                      <td colSpan={3} className="text-destructive text-xs md:text-sm text-center py-6">
                         {countriesError}
                       </td>
                     </tr>
                   )}
                   {!countriesLoading && !countriesError && filteredCountries.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No hay countries para mostrar.
+                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
+                        No countries to display.
                       </td>
                     </tr>
                   )}
@@ -574,14 +882,23 @@ const BasicData = () => {
                     <tr key={country.iso_code}>
                       <td className="font-medium text-foreground text-xs md:text-sm">{country.iso_code}</td>
                       <td className="text-foreground text-xs md:text-sm">{country.name ?? '—'}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">—</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">—</td>
                       <td>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8"
+                            onClick={() => handleEditCountry(country)}
+                          >
                             <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-destructive">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
+                            onClick={() => handleDeleteCountry(country.iso_code)}
+                            disabled={countryActionLoading}
+                          >
                             <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                           </Button>
                         </div>
@@ -620,6 +937,13 @@ const BasicData = () => {
                     <DialogTitle>Add Industry</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
+                    {industryActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {industryActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     <div>
                       <Label>Code</Label>
                       <Input
@@ -656,12 +980,9 @@ const BasicData = () => {
                         onClick={handleCreateIndustry}
                         disabled={industryActionLoading}
                       >
-                        Save
+                        {industryActionLoading ? 'Saving...' : 'Save'}
                       </Button>
                     </div>
-                    {industryActionError && (
-                      <p className="text-xs text-destructive">{industryActionError}</p>
-                    )}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -671,6 +992,13 @@ const BasicData = () => {
                     <DialogTitle>Edit Industry</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
+                    {industryActionError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-sm text-red-800">
+                          {industryActionError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     <div>
                       <Label>Code</Label>
                       <Input className="mt-1" value={industryDraft.industry_code} disabled />
@@ -700,12 +1028,9 @@ const BasicData = () => {
                         onClick={handleUpdateIndustry}
                         disabled={industryActionLoading}
                       >
-                        Save
+                        {industryActionLoading ? 'Saving...' : 'Save'}
                       </Button>
                     </div>
-                    {industryActionError && (
-                      <p className="text-xs text-destructive">{industryActionError}</p>
-                    )}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -714,9 +1039,11 @@ const BasicData = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="text-xs md:text-sm">Code</th>
-                    <th className="text-xs md:text-sm">Name</th>
-                    <th className="text-xs md:text-sm hidden sm:table-cell">Sector</th>
+                    <SortableHeader label="Code" sortKey="industry_code" currentSort={industrySort} onSort={(k) => toggleSort(setIndustrySort, k)} />
+                    <SortableHeader label="Name" sortKey="name" currentSort={industrySort} onSort={(k) => toggleSort(setIndustrySort, k)} />
+                    <th className="text-xs md:text-sm hidden sm:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setIndustrySort, 'sector')}>
+                      <div className="flex items-center gap-1">Sector <ArrowUpDown className={`h-3 w-3 ${industrySort.key === 'sector' ? 'opacity-100' : 'opacity-40'}`} /></div>
+                    </th>
                     <th className="text-xs md:text-sm">Actions</th>
                   </tr>
                 </thead>
@@ -724,7 +1051,7 @@ const BasicData = () => {
                   {industriesLoading && (
                     <tr>
                       <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Cargando industries...
+                        Loading industries...
                       </td>
                     </tr>
                   )}
@@ -738,7 +1065,7 @@ const BasicData = () => {
                   {!industriesLoading && !industriesError && filteredIndustries.length === 0 && (
                     <tr>
                       <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No hay industries para mostrar.
+                        No industries to display.
                       </td>
                     </tr>
                   )}
@@ -825,10 +1152,14 @@ const BasicData = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="text-xs md:text-sm">Code</th>
-                    <th className="text-xs md:text-sm">Name</th>
-                    <th className="text-xs md:text-sm hidden sm:table-cell">Exchange</th>
-                    <th className="text-xs md:text-sm hidden md:table-cell">Country</th>
+                    <SortableHeader label="Code" sortKey="index_code" currentSort={indexSort} onSort={(k) => toggleSort(setIndexSort, k)} />
+                    <SortableHeader label="Name" sortKey="name" currentSort={indexSort} onSort={(k) => toggleSort(setIndexSort, k)} />
+                    <th className="text-xs md:text-sm hidden sm:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setIndexSort, 'exchange_code')}>
+                      <div className="flex items-center gap-1">Exchange <ArrowUpDown className={`h-3 w-3 ${indexSort.key === 'exchange_code' ? 'opacity-100' : 'opacity-40'}`} /></div>
+                    </th>
+                    <th className="text-xs md:text-sm hidden md:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setIndexSort, 'country_code')}>
+                      <div className="flex items-center gap-1">Country <ArrowUpDown className={`h-3 w-3 ${indexSort.key === 'country_code' ? 'opacity-100' : 'opacity-40'}`} /></div>
+                    </th>
                     <th className="text-xs md:text-sm">Actions</th>
                   </tr>
                 </thead>
@@ -836,7 +1167,7 @@ const BasicData = () => {
                   {indicesLoading && (
                     <tr>
                       <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Cargando indices...
+                        Loading indices...
                       </td>
                     </tr>
                   )}
@@ -850,7 +1181,7 @@ const BasicData = () => {
                   {!indicesLoading && !indicesError && filteredIndices.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No hay indices para mostrar.
+                        No indices to display.
                       </td>
                     </tr>
                   )}
@@ -885,7 +1216,8 @@ const BasicData = () => {
             </div>
           </div>
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      </div>
     </AppLayout>
   );
 };

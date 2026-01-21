@@ -15,6 +15,13 @@ class CountryRead(BaseModel):
     class Config:
         from_attributes = True
 
+class CountryCreate(BaseModel):
+    iso_code: str
+    name: str
+
+class CountryUpdate(BaseModel):
+    name: str
+
 # --- ASSET SCHEMAS ---
 class AssetBase(BaseModel):
     symbol: str
