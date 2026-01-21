@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
-import { portfolios, assets, getPortfolioTransactions } from '@/lib/mockData';
+import { portfolios, getPortfolioTransactions } from '@/lib/mockData';
+import { assetsApi, catalogsApi, AssetApi, AssetClass } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,28 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Search, Plus, Download, Package } from 'lucide-react';
+import { Search, Plus, Download, Package, ArrowUpDown } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 
-const assetClasses = ['Equity', 'Fixed Income', 'Funds', 'Derivatives', 'Custom'];
-const assetSubclasses: Record<string, string[]> = {
-  'Equity': ['Common Stock', 'Preferred Stock', 'ADR', 'Warrant', 'Rights'],
-  'Fixed Income': ['Government Bond', 'Corporate Bond', 'Structured Note', 'Factoring'],
-  'Funds': ['ETF', 'Mutual Fund', 'Closed-End Fund', 'Private Equity'],
-  'Derivatives': ['Futures', 'Call Option', 'Put Option'],
-  'Custom': ['Art', 'Loan', 'Real Estate', 'Other'],
-};
-
-// Mock current prices
-const mockPrices: Record<string, number> = {
-  'AAPL': 189.45,
-  'MSFT': 378.92,
-  'NVDA': 875.34,
-  'VTI': 242.18,
-  'AGG': 98.23,
-  'DE10Y': 97.23,
-  'AAPL-C-200': 12.50,
-};
+type AssetSortKey = 'symbol' | 'description' | 'class' | 'type' | 'currency' | 'isin' | 'country' | 'industry';
+type SortConfig = { key: AssetSortKey; direction: 'asc' | 'desc' };
 
 const Assets = () => {
   const location = useLocation();
@@ -41,32 +25,138 @@ const Assets = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isNewAssetOpen, setIsNewAssetOpen] = useState(false);
   const [newAssetClass, setNewAssetClass] = useState<string>('Equity');
+  const [assetClasses, setAssetClasses] = useState<AssetClass[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [assets, setAssets] = useState<AssetApi[]>([]);
+  const [isLoadingAssets, setIsLoadingAssets] = useState(true);
+  const [assetSort, setAssetSort] = useState<SortConfig>({ key: 'symbol', direction: 'asc' });
+
+  // Cargar asset classes desde el API
+  useEffect(() => {
+    const loadAssetClasses = async () => {
+      try {
+        setIsLoadingClasses(true);
+        const classes = await catalogsApi.getAssetClasses();
+        setAssetClasses(classes);
+        // Inicializar newAssetClass con el primer asset class
+        if (classes.length > 0) {
+          setNewAssetClass(classes[0].code);
+        }
+      } catch (error) {
+        console.error('Error loading asset classes:', error);
+      } finally {
+        setIsLoadingClasses(false);
+      }
+    };
+    loadAssetClasses();
+  }, []);
+
+  // Cargar assets desde el API
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadAssets = async () => {
+      try {
+        setIsLoadingAssets(true);
+        const data = await assetsApi.getAssets({ skip: 0, limit: 3000 });
+        if (!controller.signal.aborted) {
+          setAssets(data);
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Error loading assets:', error);
+        setAssets([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingAssets(false);
+        }
+      }
+    };
+    loadAssets();
+    return () => controller.abort();
+  }, []);
+
+  const classNameById = useMemo(() => new Map(assetClasses.map((cls) => [cls.class_id, cls.name])), [assetClasses]);
+  const subClassNameById = useMemo(() => {
+    return new Map(assetClasses.flatMap((cls) => cls.sub_classes.map((sub) => [sub.sub_class_id, sub.name])));
+  }, [assetClasses]);
+
+  const selectedClassId = selectedAssetClass === 'all' ? null : Number(selectedAssetClass);
+  const selectedSubClassId = selectedAssetSubclass === 'all' ? null : Number(selectedAssetSubclass);
+  const selectedClassName = selectedClassId ? classNameById.get(selectedClassId) : undefined;
   
   // Get transactions filtered by portfolio and asset class
   const filteredTransactions = selectedPortfolio === 'all'
     ? []
     : getPortfolioTransactions(selectedPortfolio).filter(
-        t => (selectedAssetClass === 'all' || t.assetClass === selectedAssetClass)
+        t => (selectedAssetClass === 'all' || (selectedClassName ? t.assetClass === selectedClassName : true))
       );
 
   const portfolio = portfolios.find(p => p.id === selectedPortfolio);
 
   // Filter assets
   const filteredAssets = useMemo(() => {
-    return assets.filter(a => {
-      if (selectedAssetClass !== 'all' && a.assetClass !== selectedAssetClass) return false;
-      if (selectedAssetSubclass !== 'all' && a.assetType !== selectedAssetSubclass) return false;
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return a.symbol.toLowerCase().includes(query) || 
-               a.name.toLowerCase().includes(query) ||
-               (a.isin && a.isin.toLowerCase().includes(query));
-      }
-      return true;
-    });
-  }, [selectedAssetClass, selectedAssetSubclass, searchQuery]);
+    const query = searchQuery.trim().toLowerCase();
+    let result = assets;
 
-  const availableSubclasses = selectedAssetClass !== 'all' ? assetSubclasses[selectedAssetClass] || [] : [];
+    if (selectedClassId !== null) {
+      result = result.filter((asset) => asset.class_id === selectedClassId);
+    }
+    if (selectedSubClassId !== null) {
+      result = result.filter((asset) => asset.sub_class_id === selectedSubClassId);
+    }
+    if (query) {
+      result = result.filter((asset) => {
+        const haystack = [
+          asset.symbol,
+          asset.description,
+          asset.isin,
+          asset.country_code,
+          asset.industry_code,
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).toLowerCase());
+        return haystack.some((value) => value.includes(query));
+      });
+    }
+
+    const getSortableValue = (asset: AssetApi, key: AssetSortKey) => {
+      switch (key) {
+        case 'symbol':
+          return asset.symbol ?? '';
+        case 'description':
+          return asset.description ?? '';
+        case 'class':
+          return classNameById.get(asset.class_id ?? -1) ?? '';
+        case 'type':
+          return subClassNameById.get(asset.sub_class_id ?? -1) ?? '';
+        case 'currency':
+          return asset.currency ?? '';
+        case 'isin':
+          return asset.isin ?? '';
+        case 'country':
+          return asset.country_code ?? '';
+        case 'industry':
+          return asset.industry_code ?? '';
+        default:
+          return '';
+      }
+    };
+
+    return [...result].sort((a, b) => {
+      const aVal = String(getSortableValue(a, assetSort.key)).toLowerCase();
+      const bVal = String(getSortableValue(b, assetSort.key)).toLowerCase();
+      return assetSort.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+  }, [assets, selectedClassId, selectedSubClassId, searchQuery, assetSort, classNameById, subClassNameById]);
+
+  // Obtener subclasses disponibles para la clase seleccionada
+  const availableSubclasses = useMemo(() => {
+    if (selectedClassId === null) return [];
+    const selectedClass = assetClasses.find(c => c.class_id === selectedClassId);
+    return selectedClass?.sub_classes || [];
+  }, [selectedClassId, assetClasses]);
 
   // Build current filter string for saving
   const currentFilters = useMemo(() => {
@@ -80,10 +170,29 @@ const Assets = () => {
 
   const filterTitle = useMemo(() => {
     const parts = ['Assets'];
-    if (selectedAssetClass !== 'all') parts.push(selectedAssetClass);
+    if (selectedAssetClass !== 'all' && selectedClassName) parts.push(selectedClassName);
     if (searchQuery) parts.push(`"${searchQuery}"`);
     return parts.join(' - ');
-  }, [selectedAssetClass, searchQuery]);
+  }, [selectedAssetClass, selectedClassName, searchQuery]);
+
+  const toggleSort = (key: AssetSortKey) => {
+    setAssetSort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const SortableHeader = ({ label, sortKey }: { label: string; sortKey: AssetSortKey }) => (
+    <th
+      className="text-xs cursor-pointer hover:bg-muted/50 transition-colors select-none"
+      onClick={() => toggleSort(sortKey)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <ArrowUpDown className={`h-3 w-3 ${assetSort.key === sortKey ? 'opacity-100' : 'opacity-40'}`} />
+      </div>
+    </th>
+  );
 
   return (
     <AppLayout title="Assets" subtitle="Manage and filter assets by portfolio and type">
@@ -105,14 +214,21 @@ const Assets = () => {
               </SelectContent>
             </Select>
             
-            <Select value={selectedAssetClass} onValueChange={(v) => { setSelectedAssetClass(v); setSelectedAssetSubclass('all'); }}>
+            <Select
+              value={selectedAssetClass}
+              onValueChange={(v) => {
+                setSelectedAssetClass(v);
+                setSelectedAssetSubclass('all');
+              }}
+              disabled={isLoadingClasses}
+            >
               <SelectTrigger className="w-full sm:w-36 md:w-44 bg-muted/50 border-border text-xs md:text-sm h-8 md:h-9">
-                <SelectValue placeholder="Asset Class" />
+                <SelectValue placeholder={isLoadingClasses ? "Loading..." : "Asset Class"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Classes</SelectItem>
                 {assetClasses.map((ac) => (
-                  <SelectItem key={ac} value={ac}>{ac}</SelectItem>
+                  <SelectItem key={ac.class_id} value={String(ac.class_id)}>{ac.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -124,8 +240,10 @@ const Assets = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Subclasses</SelectItem>
-                  {availableSubclasses.map((asc) => (
-                    <SelectItem key={asc} value={asc}>{asc}</SelectItem>
+                  {availableSubclasses.map((subclass) => (
+                    <SelectItem key={subclass.sub_class_id} value={String(subclass.sub_class_id)}>
+                      {subclass.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -165,16 +283,16 @@ const Assets = () => {
                   <DialogTitle>Register New Asset</DialogTitle>
                 </DialogHeader>
                 <Tabs value={newAssetClass} onValueChange={setNewAssetClass} className="mt-4">
-                  <TabsList className="grid grid-cols-5 w-full text-xs">
-                    <TabsTrigger value="Equity">Equity</TabsTrigger>
-                    <TabsTrigger value="Fixed Income">Fixed Inc.</TabsTrigger>
-                    <TabsTrigger value="Funds">Funds</TabsTrigger>
-                    <TabsTrigger value="Derivatives">Deriv.</TabsTrigger>
-                    <TabsTrigger value="Custom">Custom</TabsTrigger>
+                  <TabsList className="grid w-full text-xs" style={{ gridTemplateColumns: `repeat(${assetClasses.length}, minmax(0, 1fr))` }}>
+                    {assetClasses.map((ac) => (
+                      <TabsTrigger key={ac.class_id} value={ac.code}>
+                        {ac.name.length > 10 ? ac.name.substring(0, 8) + '.' : ac.name}
+                      </TabsTrigger>
+                    ))}
                   </TabsList>
                   
-                  {Object.entries(assetSubclasses).map(([classType, types]) => (
-                    <TabsContent key={classType} value={classType} className="space-y-4 mt-4">
+                  {assetClasses.map((assetClass) => (
+                    <TabsContent key={assetClass.class_id} value={assetClass.code} className="space-y-4 mt-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="symbol" className="text-sm">Symbol / Ticker</Label>
@@ -194,9 +312,13 @@ const Assets = () => {
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent>
-                              {types.map(t => (
-                                <SelectItem key={t} value={t}>{t}</SelectItem>
-                              ))}
+                              {assetClass.sub_classes.length > 0 ? (
+                                assetClass.sub_classes.map(sc => (
+                                  <SelectItem key={sc.sub_class_id} value={sc.code}>{sc.name}</SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="default">Default</SelectItem>
+                              )}
                             </SelectContent>
                           </Select>
                         </div>
@@ -227,7 +349,7 @@ const Assets = () => {
                         </div>
                       </div>
 
-                      {classType === 'Fixed Income' && (
+                      {assetClass.code === 'FIXED_INCOME' && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
                             <Label htmlFor="coupon" className="text-sm">Coupon (%)</Label>
@@ -244,7 +366,7 @@ const Assets = () => {
                         </div>
                       )}
 
-                      {classType === 'Derivatives' && (
+                      {assetClass.code === 'DERIVATIVES' && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
                             <Label htmlFor="strike" className="text-sm">Strike Price</Label>
@@ -297,39 +419,41 @@ const Assets = () => {
             <Package className="h-4 w-4 md:h-5 md:w-5 text-primary" />
             <h3 className="font-semibold text-foreground text-sm md:text-base">Asset Catalog</h3>
           </div>
-          <span className="text-xs text-muted-foreground">{filteredAssets.length} assets</span>
+          <span className="text-xs text-muted-foreground">
+            {isLoadingAssets ? 'Loading...' : `${filteredAssets.length} assets`}
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th className="text-xs">Symbol</th>
-                <th className="text-xs">Name</th>
-                <th className="text-xs hidden sm:table-cell">Class</th>
-                <th className="text-xs hidden md:table-cell">Type</th>
-                <th className="text-xs">Price</th>
-                <th className="text-xs hidden lg:table-cell">Currency</th>
-                <th className="text-xs hidden xl:table-cell">Exchange</th>
-                <th className="text-xs hidden xl:table-cell">ISIN</th>
+                <SortableHeader label="Symbol" sortKey="symbol" />
+                <SortableHeader label="Description" sortKey="description" />
+                <SortableHeader label="Class" sortKey="class" />
+                <SortableHeader label="Type" sortKey="type" />
+                <SortableHeader label="Currency" sortKey="currency" />
+                <SortableHeader label="ISIN" sortKey="isin" />
+                <SortableHeader label="Country" sortKey="country" />
+                <SortableHeader label="Industry" sortKey="industry" />
               </tr>
             </thead>
             <tbody>
               {filteredAssets.map((asset) => (
-                <tr key={asset.id}>
-                  <td className="font-medium text-foreground text-xs md:text-sm">{asset.symbol}</td>
-                  <td className="text-foreground text-xs md:text-sm max-w-[150px] truncate">{asset.name}</td>
-                  <td className="hidden sm:table-cell">
+                <tr key={asset.asset_id}>
+                  <td className="font-medium text-foreground text-xs md:text-sm">{asset.symbol || '-'}</td>
+                  <td className="text-foreground text-xs md:text-sm max-w-[220px] truncate">{asset.description || '-'}</td>
+                  <td className="text-muted-foreground text-xs md:text-sm">
                     <span className="px-1.5 py-0.5 text-[10px] md:text-xs rounded-full bg-primary/20 text-primary">
-                      {asset.assetClass}
+                      {classNameById.get(asset.class_id ?? -1) || '-'}
                     </span>
                   </td>
-                  <td className="text-muted-foreground text-xs hidden md:table-cell">{asset.assetType}</td>
-                  <td className="font-medium mono text-foreground text-xs md:text-sm">
-                    {mockPrices[asset.symbol] ? formatCurrency(mockPrices[asset.symbol]) : '-'}
+                  <td className="text-muted-foreground text-xs md:text-sm">
+                    {subClassNameById.get(asset.sub_class_id ?? -1) || '-'}
                   </td>
-                  <td className="text-muted-foreground text-xs hidden lg:table-cell">{asset.currency}</td>
-                  <td className="text-muted-foreground text-xs hidden xl:table-cell">{asset.exchange || '-'}</td>
-                  <td className="text-muted-foreground mono text-[10px] hidden xl:table-cell">{asset.isin || '-'}</td>
+                  <td className="text-muted-foreground text-xs md:text-sm">{asset.currency || '-'}</td>
+                  <td className="text-muted-foreground mono text-[10px] md:text-xs">{asset.isin || '-'}</td>
+                  <td className="text-muted-foreground text-xs md:text-sm">{asset.country_code || '-'}</td>
+                  <td className="text-muted-foreground text-xs md:text-sm">{asset.industry_code || '-'}</td>
                 </tr>
               ))}
             </tbody>
