@@ -12,9 +12,9 @@ from app.models.user import User, Role, Permission, RolePermission, AuditLog
 from app.models.portfolio import Portfolio, PortfolioAdvisor, Account
 from app.models.asset import (
     StockExchange, Industry, AssetClass, AssetSubClass, Asset,
-    Trade, CashJournal, FXTransaction, PerformanceAttribution,
+    Trades, CashJournal, FXTransaction, PerformanceAttribution,
     CorporateAction, Position, MarketPrice, MarketIndex,
-    Currency, Country
+    Currency, Country, CorporateAction
 )
 
 logging.basicConfig(level=logging.INFO)

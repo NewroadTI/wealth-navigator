@@ -1,0 +1,36 @@
+Date,Type,Description,Amount
+05/12/21,DEPOSIT,Cash Receipts / Electronic Fund Transfers ,66225
+05/14/21,ACATIN,"Banort 5 3/4 10/04/31 (BANORT 5 3/4 10/04/31 8AC3) Quantity: 30,000",32362.5
+05/14/21,ACATIN,"Gnbsud 6 1/2 04/03/27 (GNBSUD 6 1/2 04/03/27) Quantity: 30,000",30465
+05/14/21,ACATIN,"Orazen 5 5/8 04/28/27 (ORAZEN 5 5/8 04/28/27) Quantity: 30,000",30750
+05/14/21,ACATIN,"Bcolo 4 7/8 10/18/27 (BCOLO 4 7/8 10/18/27) Quantity: 30,000",30639
+05/14/21,ACATIN,"Inrshm 5 3/4 04/03/28 (INRSHM 5 3/4 04/03/28 3AD3) Quantity: 30,000",30604.5
+05/14/21,ACATIN,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: 30,000",31284
+05/14/21,ACATIN,"Termoc 7 7/8 01/30/29 (TERMOC 7 7/8 01/30/29 FAB6) Quantity: 30,000",29909.23
+05/17/21,DEPOSIT,Cash Receipts / Electronic Fund Transfers ,30000
+05/19/21,ACATIN,"Biopharma Credit Plc (BPCR) Quantity: 41,041",39727.69
+05/24/21,DEPOSIT,Cash Receipts / Electronic Fund Transfers ,40000
+02/06/23,ACATOUT,"Banort 5 3/4 10/04/31 (BANORT 5 3/4 10/04/31 8AC3) Quantity: -30,000",-28800
+02/06/23,ACATOUT,"Gnbsud 7.051 04/03/27 (GNBSUD 6 1/2 04/03/27) Quantity: -30,000",-28500
+02/06/23,ACATOUT,"Orsape 5 5/8 04/28/27 (ORSAPE 5 5/8 04/28/27) Quantity: -30,000",-27366.3
+02/06/23,ACATOUT,"Bcolo 7.139 10/18/27 (BCOLO 4 7/8 10/18/27) Quantity: -30,000",-30397.5
+02/06/23,ACATOUT,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: -30,000",-25348.45
+02/06/23,ACATOUT,"Termoc 7 7/8 01/30/29 (TERMOC 7 7/8 01/30/29 FAB6) Quantity: -30,000",-22145.63
+02/15/23,NA,Adjustment: Other (orf Adjustment Credit) ,0.07
+11/14/23,TRNSFROUT,Transfer From U6177570 To U13349959 ,-3000
+11/14/23,TRNSFROUT,Transfer From U6177570 To U13349959 ,-29000
+11/27/23,TRNSFROUT,Transfer From U6177570 To U6177570-P ,-24770
+11/27/23,TRNSFRIN,Transfer From U13349959 To U6177570 ,37000
+11/27/23,TRNSFRIN,Transfer From U6177570 To U6177570-P ,24770
+02/14/24,WITHDRAWAL,Disbursement Initiated By Daniel E Cicirello Cook ,-36000
+02/15/24,TRNSFROUT,Transfer From U6177570 To U13349959 ,-360
+08/01/24,TRNSFRIN,Transfer From U6177570-P To U6177570 ,37778
+08/01/24,TRNSFROUT,Transfer From U6177570-P To U6177570 ,-37778
+12/19/24,NA,Adjustment: Commission (consolidated Audit Trail Fee Refund) ,0.41
+03/14/25,ACATIN,"Ishares Bitcoin Trust Etf (IBIT) Quantity: 2,017",91813.84
+04/10/25,ACATOUT,Ishares Short Treasury Bond (SHV) Quantity: -843,-92898.6
+04/29/25,WITHDRAWAL,Disbursement Initiated By Daniel E Cicirello Cook ,-50500
+05/15/25,ACATOUT,Ishares Short Treasury Bond (SHV) Quantity: -640,-70540.8
+10/21/25,ACATIN,Ishares Short Treasury Bond (SHV) Quantity: 33,3642.21
+10/21/25,ACATIN,"Ishares Bitcoin Trust Etf (IBIT) Quantity: 1,670",105093.1
+12/22/25,DEPOSIT,Cash Receipts / Electronic Fund Transfers ,120400

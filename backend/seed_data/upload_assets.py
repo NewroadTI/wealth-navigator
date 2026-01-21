@@ -7,7 +7,11 @@ from decimal import Decimal
 # --- CONFIGURACIÓN ---
 # NOTA: Agregué el "/" al final para evitar redirecciones 307 de FastAPI
 API_URL = "http://localhost:8000/api/v1/assets/" 
-INPUT_FILE = "assets_ready_for_db.json"
+# Reemplaza la línea de INPUT_FILE por:
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INPUT_FILE = os.path.join(BASE_DIR, "assets_ready_for_db.json")
+
 ERROR_LOG_FILE = "upload_errors.json"
 
 def load_json_data(filename):

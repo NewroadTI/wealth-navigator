@@ -7,7 +7,8 @@ sys.path.append(".")
 from app.db.session import SessionLocal
 
 # --- IMPORTACIONES COMPLETAS (Crucial para evitar errores de SQLAlchemy) ---
-from app.models.asset import Currency
+from app.models.asset import Currency,Country, CorporateAction, Trades
+
 # Importamos Portfolio y User para que el ORM conozca todas las tablas relacionadas
 from app.models.portfolio import Account, Portfolio
 from app.models.user import User

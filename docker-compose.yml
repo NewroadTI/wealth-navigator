@@ -1,7 +1,7 @@
 services:
   # --- Base de Datos (Postgres + Timescale) ---
   db:
-    image: timescale/timescaledb-ha:pg16
+    image: timescale/timescaledb:latest-pg16
     container_name: wealthroad-db
     restart: always
     environment:

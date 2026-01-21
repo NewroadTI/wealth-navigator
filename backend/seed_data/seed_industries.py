@@ -6,7 +6,7 @@ import re
 sys.path.append(".")
 
 from app.db.session import SessionLocal
-from app.models.asset import Industry 
+from app.models.asset import Industry , Country, CorporateAction, Trades
 from app.models.portfolio import Account, Portfolio
 from app.models.user import User
 logging.basicConfig(level=logging.INFO)
