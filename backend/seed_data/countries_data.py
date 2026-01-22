@@ -5,7 +5,7 @@ import logging
 sys.path.append(".")
 
 from app.db.session import SessionLocal
-from app.models.asset import Country
+from app.models.asset import Country, CorporateAction, Trades
 from app.models.portfolio import Account, Portfolio # <--- ESTO SOLUCIONA EL ERROR
 from app.models.user import User
 

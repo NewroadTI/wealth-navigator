@@ -1,0 +1,6 @@
+Date,FinancialInstrument,Currency,Symbol,Description,Sector,Quantity,ClosePrice,Value,Cost Basis,UnrealizedP&L,FXRateToBase
+01/13/2026,ETFs,USD,IBIT,ISHARES BITCOIN TRUST ETF,Broad,7065.8833,53.57,378519.37,347360.488701,31158.881299,1
+Total,ETFs,USD,,,,,,378519.37,347360.488701,31158.881299
+01/13/2026,Stocks,USD,QIWI,QIWI PLC-SPONSORED ADR,Industrials,500,5.67,2835,3752.5,-917.5,1
+Total,Stocks,USD,,,,,,2835,3752.5,-917.5
+01/13/2026,Cash,USD,USD,United States Dollar,Cash,-422.051331,1,-422.051331, , ,1

@@ -29,23 +29,23 @@ class User(Base):
     user_id = Column(Integer, primary_key=True, index=True)
     
     username = Column(String, unique=True, nullable=False)
-    email = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=True, index=True)
     password_hash = Column(String, nullable=False)
     
-    full_name = Column(String, nullable=False)
-    phone = Column(String)
+    full_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
     
     # Nuevos campos V3
-    tax_id = Column(String, unique=True)
-    entity_type = Column(String, default='INDIVIDUAL') # INDIVIDUAL, CORP, TRUST
+    tax_id = Column(String, unique=True, nullable=True) # DNI, NIF, SSN, etc.
+    entity_type = Column(String, default='INDIVIDUAL', nullable=True) # INDIVIDUAL, CORP, TRUST
     
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     role_id = Column(Integer, ForeignKey("roles.role_id"))
-    role = relationship("Role", back_populates="users")
     
     # Relaciones Portafolios
+    role = relationship("Role", back_populates="users")
     owned_portfolios = relationship("Portfolio", back_populates="owner")
     advisor_assignments = relationship("PortfolioAdvisor", back_populates="advisor")
 
