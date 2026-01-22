@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { portfolios, getPortfolioTransactions } from '@/lib/mockData';
@@ -6,94 +6,27 @@ import { assetsApi, catalogsApi, AssetApi, AssetClass } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import {
-  AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Search, Plus, Download, Package, ArrowUpDown, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2, ChevronDown, X } from 'lucide-react';
+import { Search, Plus, Download, SlidersHorizontal } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-
-type AssetSortKey =
-  | 'symbol'
-  | 'description'
-  | 'class'
-  | 'type'
-  | 'currency'
-  | 'isin'
-  | 'country'
-  | 'industry'
-  | 'figi'
-  | 'cusip'
-  | 'multiplier'
-  | 'contract_size'
-  | 'underlying_symbol'
-  | 'strike_price'
-  | 'expiry_date'
-  | 'put_call'
-  | 'maturity_date'
-  | 'coupon_rate'
-  | 'issuer'
-  | 'initial_fixing_date'
-  | 'next_autocall_date'
-  | 'next_coupon_payment_date'
-  | 'autocall_trigger'
-  | 'coupon_trigger'
-  | 'capital_barrier'
-  | 'protection_level'
-  | 'payment_frequency';
-type SortConfig = { key: AssetSortKey; direction: 'asc' | 'desc' };
-
-type AssetFormState = {
-  symbol: string;
-  name: string;
-  description: string;
-  isin: string;
-  figi: string;
-  cusip: string;
-  class_id: string;
-  sub_class_id: string;
-  industry_code: string;
-  country_code: string;
-  currency: string;
-  multiplier: string;
-  contract_size: string;
-  underlying_symbol: string;
-  strike_price: string;
-  expiry_date: string;
-  put_call: string;
-  maturity_date: string;
-  coupon_rate: string;
-  issuer: string;
-  initial_fixing_date: string;
-  next_autocall_date: string;
-  next_coupon_payment_date: string;
-  autocall_trigger: string;
-  coupon_trigger: string;
-  capital_barrier: string;
-  protection_level: string;
-  payment_frequency: string;
-};
+  AssetFormFields,
+  AssetFormState,
+  defaultAssetFormState,
+  formatDecimalValue,
+  AssetsTable,
+  AssetSortKey,
+  SortConfig,
+  createColumnDefinitions,
+} from './AssetsSection';
 
 const Assets = () => {
   const { toast } = useToast();
@@ -126,37 +59,6 @@ const Assets = () => {
   const maxAssets = 3000;
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
-  const noneSelectValue = '__none__';
-  const defaultAssetFormState: AssetFormState = {
-    symbol: '',
-    name: '',
-    description: '',
-    isin: '',
-    figi: '',
-    cusip: '',
-    class_id: '',
-    sub_class_id: '',
-    industry_code: '',
-    country_code: '',
-    currency: '',
-    multiplier: '1.0',
-    contract_size: '0.0',
-    underlying_symbol: '',
-    strike_price: '0.0',
-    expiry_date: '',
-    put_call: '',
-    maturity_date: '',
-    coupon_rate: '0.0',
-    issuer: '',
-    initial_fixing_date: '',
-    next_autocall_date: '',
-    next_coupon_payment_date: '',
-    autocall_trigger: '',
-    coupon_trigger: '',
-    capital_barrier: '',
-    protection_level: '',
-    payment_frequency: '',
-  };
   const [newAssetDraft, setNewAssetDraft] = useState<AssetFormState>(defaultAssetFormState);
   const [editAssetDraft, setEditAssetDraft] = useState<AssetFormState>(defaultAssetFormState);
   const [assetToDelete, setAssetToDelete] = useState<AssetApi | null>(null);
@@ -287,16 +189,21 @@ const Assets = () => {
     [industries],
   );
 
+  const columnDefinitions = useMemo(
+    () => createColumnDefinitions(classNameById, subClassNameById),
+    [classNameById, subClassNameById]
+  );
+
   const selectedClassId = selectedAssetClass === 'all' ? null : Number(selectedAssetClass);
   const selectedSubClassId = selectedAssetSubclass === 'all' ? null : Number(selectedAssetSubclass);
   const selectedClassName = selectedClassId ? classNameById.get(selectedClassId) : undefined;
-  
+
   // Get transactions filtered by portfolio and asset class
   const filteredTransactions = selectedPortfolio === 'all'
     ? []
     : getPortfolioTransactions(selectedPortfolio).filter(
-        t => (selectedAssetClass === 'all' || (selectedClassName ? t.assetClass === selectedClassName : true))
-      );
+      t => (selectedAssetClass === 'all' || (selectedClassName ? t.assetClass === selectedClassName : true))
+    );
 
   const portfolio = portfolios.find(p => p.id === selectedPortfolio);
 
@@ -416,14 +323,6 @@ const Assets = () => {
     return selectedClass?.sub_classes || [];
   }, [selectedClassId, assetClasses]);
 
-  const getSubclassesByClassId = (classId: string) => {
-    const numericId = Number(classId);
-    if (!Number.isFinite(numericId)) {
-      return [];
-    }
-    return assetClasses.find((cls) => cls.class_id === numericId)?.sub_classes ?? [];
-  };
-
   const normalizeNumber = (value: string) => {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -449,158 +348,37 @@ const Assets = () => {
     return fallback;
   };
 
-  const formatDecimalValue = (value: string | number | null | undefined) => {
-    if (value === null || value === undefined || value === '') {
-      return '';
-    }
-    const parsed = Number(value);
-    if (Number.isNaN(parsed)) {
-      return String(value);
-    }
-    return Number.isInteger(parsed) ? parsed.toFixed(1) : String(parsed);
-  };
-
-  const SearchableSelect = ({
-    value,
-    onChange,
-    options,
-    placeholder,
-    emptyLabel,
-  }: {
-    value: string;
-    onChange: (value: string) => void;
-    options: Array<{ value: string; label: string; secondary?: string }>;
-    placeholder: string;
-    emptyLabel?: string;
-  }) => {
-    const [open, setOpen] = useState(false);
-    const selected = options.find((option) => option.value === value);
-
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" className="w-full justify-between">
-            <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
-              {selected ? selected.label : placeholder}
-            </span>
-            <ChevronDown className="h-4 w-4 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search..." />
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandList>
-              <CommandGroup>
-                {emptyLabel && (
-                  <CommandItem
-                    value={noneSelectValue}
-                    onSelect={() => {
-                      onChange('');
-                      setOpen(false);
-                    }}
-                  >
-                    {emptyLabel}
-                  </CommandItem>
-                )}
-                {options.map((option) => (
-                  <CommandItem
-                    key={option.value}
-                    value={option.label}
-                    onSelect={() => {
-                      onChange(option.value);
-                      setOpen(false);
-                    }}
-                  >
-                    <div className="flex flex-col">
-                      <span>{option.label}</span>
-                      {option.secondary && (
-                        <span className="text-xs text-muted-foreground">{option.secondary}</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    );
-  };
-
-  const DateField = ({
-    id,
-    label,
-    value,
-    onChange,
-  }: {
-    id: string;
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-  }) => (
-    <div>
-      <Label htmlFor={id} className="text-sm">
-        {label}
-      </Label>
-      <div className="relative mt-1">
-        <Input
-          id={id}
-          type="date"
-          placeholder="No setup"
-          className={`focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-border focus:ring-0 focus:border-border focus:outline-none focus-visible:outline-none ${
-            value ? '' : 'text-muted-foreground'
-          }`}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          style={{ colorScheme: 'dark' }}
-        />
-        {value ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2"
-            onClick={() => onChange('')}
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-
   const buildAssetPayload = (formState: AssetFormState) => {
     const normalizedPutCall = formState.put_call.trim();
     return {
-    symbol: formState.symbol.trim(),
-    name: formState.name.trim() || null,
-    description: formState.description.trim() || null,
-    isin: formState.isin.trim() || null,
-    figi: formState.figi.trim() || null,
-    cusip: formState.cusip.trim() || null,
-    class_id: Number(formState.class_id),
-    sub_class_id: formState.sub_class_id ? Number(formState.sub_class_id) : null,
-    industry_code: formState.industry_code.trim() ? formState.industry_code.trim().toUpperCase() : null,
-    country_code: formState.country_code.trim() ? formState.country_code.trim().toUpperCase() : null,
-    currency: formState.currency.trim() ? formState.currency.trim().toUpperCase() : null,
-    multiplier: normalizeNumber(formState.multiplier),
-    contract_size: normalizeNumber(formState.contract_size),
-    underlying_symbol: formState.underlying_symbol.trim() || null,
-    strike_price: normalizeNumber(formState.strike_price),
-    expiry_date: formState.expiry_date || null,
-    put_call: normalizedPutCall && normalizedPutCall !== '-' ? normalizedPutCall : null,
-    maturity_date: formState.maturity_date || null,
-    coupon_rate: normalizeNumber(formState.coupon_rate),
-    issuer: formState.issuer.trim() || null,
-    initial_fixing_date: formState.initial_fixing_date || null,
-    next_autocall_date: formState.next_autocall_date || null,
-    next_coupon_payment_date: formState.next_coupon_payment_date || null,
-    autocall_trigger: normalizeNumber(formState.autocall_trigger),
-    coupon_trigger: normalizeNumber(formState.coupon_trigger),
-    capital_barrier: normalizeNumber(formState.capital_barrier),
-    protection_level: normalizeNumber(formState.protection_level),
-    payment_frequency: formState.payment_frequency.trim() || null,
+      symbol: formState.symbol.trim(),
+      name: formState.name.trim() || null,
+      description: formState.description.trim() || null,
+      isin: formState.isin.trim() || null,
+      figi: formState.figi.trim() || null,
+      cusip: formState.cusip.trim() || null,
+      class_id: Number(formState.class_id),
+      sub_class_id: formState.sub_class_id ? Number(formState.sub_class_id) : null,
+      industry_code: formState.industry_code.trim() ? formState.industry_code.trim().toUpperCase() : null,
+      country_code: formState.country_code.trim() ? formState.country_code.trim().toUpperCase() : null,
+      currency: formState.currency.trim() ? formState.currency.trim().toUpperCase() : null,
+      multiplier: normalizeNumber(formState.multiplier),
+      contract_size: normalizeNumber(formState.contract_size),
+      underlying_symbol: formState.underlying_symbol.trim() || null,
+      strike_price: normalizeNumber(formState.strike_price),
+      expiry_date: formState.expiry_date || null,
+      put_call: normalizedPutCall && normalizedPutCall !== '-' ? normalizedPutCall : null,
+      maturity_date: formState.maturity_date || null,
+      coupon_rate: normalizeNumber(formState.coupon_rate),
+      issuer: formState.issuer.trim() || null,
+      initial_fixing_date: formState.initial_fixing_date || null,
+      next_autocall_date: formState.next_autocall_date || null,
+      next_coupon_payment_date: formState.next_coupon_payment_date || null,
+      autocall_trigger: normalizeNumber(formState.autocall_trigger),
+      coupon_trigger: normalizeNumber(formState.coupon_trigger),
+      capital_barrier: normalizeNumber(formState.capital_barrier),
+      protection_level: normalizeNumber(formState.protection_level),
+      payment_frequency: formState.payment_frequency.trim() || null,
     };
   };
 
@@ -731,60 +509,6 @@ const Assets = () => {
     }));
   };
 
-  const SortableHeader = ({ label, sortKey }: { label: string; sortKey: AssetSortKey }) => (
-    <th
-      className="text-xs cursor-pointer hover:bg-muted/50 transition-colors select-none"
-      onClick={() => toggleSort(sortKey)}
-    >
-      <div className="flex items-center gap-1">
-        {label}
-        <ArrowUpDown className={`h-3 w-3 ${assetSort.key === sortKey ? 'opacity-100' : 'opacity-40'}`} />
-      </div>
-    </th>
-  );
-
-  const columnDefinitions: Array<{
-    key: AssetSortKey;
-    label: string;
-    getValue: (asset: AssetApi) => ReactNode;
-  }> = [
-    { key: 'symbol', label: 'Symbol', getValue: (asset) => asset.symbol || '-' },
-    { key: 'description', label: 'Description', getValue: (asset) => asset.description || '-' },
-    {
-      key: 'class',
-      label: 'Class',
-      getValue: (asset) => (
-        <span className="px-1.5 py-0.5 text-[10px] md:text-xs rounded-full bg-primary/20 text-primary">
-          {classNameById.get(asset.class_id ?? -1) || '-'}
-        </span>
-      ),
-    },
-    { key: 'type', label: 'Type', getValue: (asset) => subClassNameById.get(asset.sub_class_id ?? -1) || '-' },
-    { key: 'currency', label: 'Currency', getValue: (asset) => asset.currency || '-' },
-    { key: 'isin', label: 'ISIN', getValue: (asset) => asset.isin || '-' },
-    { key: 'country', label: 'Country', getValue: (asset) => asset.country_code || '-' },
-    { key: 'industry', label: 'Industry', getValue: (asset) => asset.industry_code || '-' },
-    { key: 'figi', label: 'FIGI', getValue: (asset) => asset.figi || '-' },
-    { key: 'cusip', label: 'CUSIP', getValue: (asset) => asset.cusip || '-' },
-    { key: 'multiplier', label: 'Multiplier', getValue: (asset) => asset.multiplier || '-' },
-    { key: 'contract_size', label: 'Contract Size', getValue: (asset) => formatDecimalValue(asset.contract_size) || '-' },
-    { key: 'underlying_symbol', label: 'Underlying', getValue: (asset) => asset.underlying_symbol || '-' },
-    { key: 'strike_price', label: 'Strike Price', getValue: (asset) => formatDecimalValue(asset.strike_price) || '-' },
-    { key: 'expiry_date', label: 'Expiry Date', getValue: (asset) => asset.expiry_date || '-' },
-    { key: 'put_call', label: 'Put/Call', getValue: (asset) => asset.put_call || '-' },
-    { key: 'maturity_date', label: 'Maturity Date', getValue: (asset) => asset.maturity_date || '-' },
-    { key: 'coupon_rate', label: 'Coupon Rate', getValue: (asset) => asset.coupon_rate || '-' },
-    { key: 'issuer', label: 'Issuer', getValue: (asset) => asset.issuer || '-' },
-    { key: 'initial_fixing_date', label: 'Initial Fixing', getValue: (asset) => asset.initial_fixing_date || '-' },
-    { key: 'next_autocall_date', label: 'Next Autocall', getValue: (asset) => asset.next_autocall_date || '-' },
-    { key: 'next_coupon_payment_date', label: 'Next Coupon', getValue: (asset) => asset.next_coupon_payment_date || '-' },
-    { key: 'autocall_trigger', label: 'Autocall Trigger', getValue: (asset) => asset.autocall_trigger || '-' },
-    { key: 'coupon_trigger', label: 'Coupon Trigger', getValue: (asset) => asset.coupon_trigger || '-' },
-    { key: 'capital_barrier', label: 'Capital Barrier', getValue: (asset) => asset.capital_barrier || '-' },
-    { key: 'protection_level', label: 'Protection Level', getValue: (asset) => asset.protection_level || '-' },
-    { key: 'payment_frequency', label: 'Payment Frequency', getValue: (asset) => asset.payment_frequency || '-' },
-  ];
-
   const visibleColumnDefs = columnDefinitions.filter((column) => visibleColumns.includes(column.key));
 
   return (
@@ -806,7 +530,7 @@ const Assets = () => {
                 ))}
               </SelectContent>
             </Select>
-            
+
             <Select
               value={selectedAssetClass}
               onValueChange={(v) => {
@@ -853,7 +577,7 @@ const Assets = () => {
               />
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 md:gap-3">
             <Popover>
               <PopoverTrigger asChild>
@@ -919,343 +643,16 @@ const Assets = () => {
                       </AlertDescription>
                     </Alert>
                   )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm">Asset Class *</Label>
-                      <Select
-                        value={newAssetDraft.class_id}
-                        onValueChange={(value) => {
-                          setNewAssetDraft((prev) => ({ ...prev, class_id: value, sub_class_id: '' }));
-                        }}
-                        disabled={isLoadingClasses}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder={isLoadingClasses ? 'Loading...' : 'Select class'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {assetClasses.map((assetClass) => (
-                            <SelectItem key={assetClass.class_id} value={String(assetClass.class_id)}>
-                              {assetClass.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-sm">Asset Subclass</Label>
-                      <Select
-                        value={newAssetDraft.sub_class_id || noneSelectValue}
-                        onValueChange={(value) =>
-                          setNewAssetDraft((prev) => ({
-                            ...prev,
-                            sub_class_id: value === noneSelectValue ? '' : value,
-                          }))
-                        }
-                        disabled={getSubclassesByClassId(newAssetDraft.class_id).length === 0}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select subclass" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={noneSelectValue}>None</SelectItem>
-                          {getSubclassesByClassId(newAssetDraft.class_id).map((subclass) => (
-                            <SelectItem key={subclass.sub_class_id} value={String(subclass.sub_class_id)}>
-                              {subclass.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="asset-symbol" className="text-sm">Symbol *</Label>
-                      <Input
-                        id="asset-symbol"
-                        placeholder="AAPL"
-                        className="mt-1"
-                        value={newAssetDraft.symbol}
-                        onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, symbol: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="asset-description" className="text-sm">Description</Label>
-                      <Input
-                        id="asset-description"
-                        placeholder="Asset description"
-                        className="mt-1"
-                        value={newAssetDraft.description}
-                        onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, description: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Currency</Label>
-                      <div className="mt-1">
-                        <SearchableSelect
-                          value={newAssetDraft.currency}
-                          onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, currency: value }))}
-                          options={currencyOptions}
-                          placeholder="Select currency"
-                          emptyLabel="None"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="asset-isin" className="text-sm">ISIN</Label>
-                      <Input
-                        id="asset-isin"
-                        placeholder="US0378331005"
-                        className="mt-1"
-                        value={newAssetDraft.isin}
-                        onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, isin: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Country</Label>
-                      <div className="mt-1">
-                        <SearchableSelect
-                          value={newAssetDraft.country_code}
-                          onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, country_code: value }))}
-                          options={countryOptions}
-                          placeholder="Select country"
-                          emptyLabel="None"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-sm">Industry</Label>
-                      <div className="mt-1">
-                        <SearchableSelect
-                          value={newAssetDraft.industry_code}
-                          onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, industry_code: value }))}
-                          options={industryOptions}
-                          placeholder="Select industry"
-                          emptyLabel="None"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between">
-                        Additional Fields
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-4 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="asset-figi" className="text-sm">FIGI</Label>
-                          <Input
-                            id="asset-figi"
-                            className="mt-1"
-                            value={newAssetDraft.figi}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, figi: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-cusip" className="text-sm">CUSIP</Label>
-                          <Input
-                            id="asset-cusip"
-                            className="mt-1"
-                            value={newAssetDraft.cusip}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, cusip: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-multiplier" className="text-sm">Multiplier</Label>
-                          <Input
-                            id="asset-multiplier"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.multiplier}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, multiplier: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-contract" className="text-sm">Contract Size</Label>
-                          <Input
-                            id="asset-contract"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.contract_size}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, contract_size: e.target.value }))}
-                            onBlur={() =>
-                              setNewAssetDraft((prev) => ({
-                                ...prev,
-                                contract_size: formatDecimalValue(prev.contract_size),
-                              }))
-                            }
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-underlying" className="text-sm">Underlying Symbol</Label>
-                          <Input
-                            id="asset-underlying"
-                            className="mt-1"
-                            value={newAssetDraft.underlying_symbol}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, underlying_symbol: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-strike" className="text-sm">Strike Price</Label>
-                          <Input
-                            id="asset-strike"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.strike_price}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, strike_price: e.target.value }))}
-                            onBlur={() =>
-                              setNewAssetDraft((prev) => ({
-                                ...prev,
-                                strike_price: formatDecimalValue(prev.strike_price),
-                              }))
-                            }
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="asset-expiry"
-                            label="Expiry Date"
-                            value={newAssetDraft.expiry_date}
-                            onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, expiry_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm">Put/Call</Label>
-                          <Select
-                            value={newAssetDraft.put_call || noneSelectValue}
-                            onValueChange={(value) =>
-                              setNewAssetDraft((prev) => ({
-                                ...prev,
-                                put_call: value === noneSelectValue ? '' : value,
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={noneSelectValue}>-</SelectItem>
-                              <SelectItem value="PUT">PUT</SelectItem>
-                              <SelectItem value="CALL">CALL</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <DateField
-                            id="asset-maturity"
-                            label="Maturity Date"
-                            value={newAssetDraft.maturity_date}
-                            onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, maturity_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-coupon" className="text-sm">Coupon Rate</Label>
-                          <Input
-                            id="asset-coupon"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.coupon_rate}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, coupon_rate: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-issuer" className="text-sm">Issuer</Label>
-                          <Input
-                            id="asset-issuer"
-                            className="mt-1"
-                            value={newAssetDraft.issuer}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, issuer: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="asset-initial-fixing"
-                            label="Initial Fixing Date"
-                            value={newAssetDraft.initial_fixing_date}
-                            onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, initial_fixing_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="asset-next-autocall"
-                            label="Next Autocall Date"
-                            value={newAssetDraft.next_autocall_date}
-                            onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, next_autocall_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="asset-next-coupon"
-                            label="Next Coupon Date"
-                            value={newAssetDraft.next_coupon_payment_date}
-                            onChange={(value) => setNewAssetDraft((prev) => ({ ...prev, next_coupon_payment_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-autocall" className="text-sm">Autocall Trigger</Label>
-                          <Input
-                            id="asset-autocall"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.autocall_trigger}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, autocall_trigger: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-coupon-trigger" className="text-sm">Coupon Trigger</Label>
-                          <Input
-                            id="asset-coupon-trigger"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.coupon_trigger}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, coupon_trigger: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-capital-barrier" className="text-sm">Capital Barrier</Label>
-                          <Input
-                            id="asset-capital-barrier"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.capital_barrier}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, capital_barrier: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-protection" className="text-sm">Protection Level</Label>
-                          <Input
-                            id="asset-protection"
-                            type="number"
-                            className="mt-1"
-                            value={newAssetDraft.protection_level}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, protection_level: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="asset-payment" className="text-sm">Payment Frequency</Label>
-                          <Input
-                            id="asset-payment"
-                            className="mt-1"
-                            value={newAssetDraft.payment_frequency}
-                            onChange={(e) => setNewAssetDraft((prev) => ({ ...prev, payment_frequency: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-
+                  <AssetFormFields
+                    formState={newAssetDraft}
+                    setFormState={setNewAssetDraft}
+                    assetClasses={assetClasses}
+                    isLoadingClasses={isLoadingClasses}
+                    currencyOptions={currencyOptions}
+                    countryOptions={countryOptions}
+                    industryOptions={industryOptions}
+                    idPrefix="asset"
+                  />
                   <div className="flex justify-end gap-3 pt-4">
                     <Button variant="outline" onClick={() => setIsNewAssetOpen(false)}>
                       Cancel
@@ -1294,340 +691,16 @@ const Assets = () => {
                       </AlertDescription>
                     </Alert>
                   )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm">Asset Class *</Label>
-                      <Select
-                        value={editAssetDraft.class_id}
-                        onValueChange={(value) => {
-                          setEditAssetDraft((prev) => ({ ...prev, class_id: value, sub_class_id: '' }));
-                        }}
-                        disabled={isLoadingClasses}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder={isLoadingClasses ? 'Loading...' : 'Select class'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {assetClasses.map((assetClass) => (
-                            <SelectItem key={assetClass.class_id} value={String(assetClass.class_id)}>
-                              {assetClass.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-sm">Asset Subclass</Label>
-                      <Select
-                        value={editAssetDraft.sub_class_id || noneSelectValue}
-                        onValueChange={(value) =>
-                          setEditAssetDraft((prev) => ({
-                            ...prev,
-                            sub_class_id: value === noneSelectValue ? '' : value,
-                          }))
-                        }
-                        disabled={getSubclassesByClassId(editAssetDraft.class_id).length === 0}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select subclass" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={noneSelectValue}>None</SelectItem>
-                          {getSubclassesByClassId(editAssetDraft.class_id).map((subclass) => (
-                            <SelectItem key={subclass.sub_class_id} value={String(subclass.sub_class_id)}>
-                              {subclass.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="edit-asset-symbol" className="text-sm">Symbol *</Label>
-                      <Input
-                        id="edit-asset-symbol"
-                        className="mt-1"
-                        value={editAssetDraft.symbol}
-                        onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, symbol: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-asset-description" className="text-sm">Description</Label>
-                      <Input
-                        id="edit-asset-description"
-                        className="mt-1"
-                        value={editAssetDraft.description}
-                        onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, description: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Currency</Label>
-                      <div className="mt-1">
-                        <SearchableSelect
-                          value={editAssetDraft.currency}
-                          onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, currency: value }))}
-                          options={currencyOptions}
-                          placeholder="Select currency"
-                          emptyLabel="None"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-asset-isin" className="text-sm">ISIN</Label>
-                      <Input
-                        id="edit-asset-isin"
-                        className="mt-1"
-                        value={editAssetDraft.isin}
-                        onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, isin: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm">Country</Label>
-                      <div className="mt-1">
-                        <SearchableSelect
-                          value={editAssetDraft.country_code}
-                          onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, country_code: value }))}
-                          options={countryOptions}
-                          placeholder="Select country"
-                          emptyLabel="None"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-sm">Industry</Label>
-                      <div className="mt-1">
-                        <SearchableSelect
-                          value={editAssetDraft.industry_code}
-                          onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, industry_code: value }))}
-                          options={industryOptions}
-                          placeholder="Select industry"
-                          emptyLabel="None"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between">
-                        Additional Fields
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-4 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edit-asset-figi" className="text-sm">FIGI</Label>
-                          <Input
-                            id="edit-asset-figi"
-                            className="mt-1"
-                            value={editAssetDraft.figi}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, figi: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-cusip" className="text-sm">CUSIP</Label>
-                          <Input
-                            id="edit-asset-cusip"
-                            className="mt-1"
-                            value={editAssetDraft.cusip}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, cusip: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-multiplier" className="text-sm">Multiplier</Label>
-                          <Input
-                            id="edit-asset-multiplier"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.multiplier}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, multiplier: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-contract" className="text-sm">Contract Size</Label>
-                          <Input
-                            id="edit-asset-contract"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.contract_size}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, contract_size: e.target.value }))}
-                            onBlur={() =>
-                              setEditAssetDraft((prev) => ({
-                                ...prev,
-                                contract_size: formatDecimalValue(prev.contract_size),
-                              }))
-                            }
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-underlying" className="text-sm">Underlying Symbol</Label>
-                          <Input
-                            id="edit-asset-underlying"
-                            className="mt-1"
-                            value={editAssetDraft.underlying_symbol}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, underlying_symbol: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-strike" className="text-sm">Strike Price</Label>
-                          <Input
-                            id="edit-asset-strike"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.strike_price}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, strike_price: e.target.value }))}
-                            onBlur={() =>
-                              setEditAssetDraft((prev) => ({
-                                ...prev,
-                                strike_price: formatDecimalValue(prev.strike_price),
-                              }))
-                            }
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="edit-asset-expiry"
-                            label="Expiry Date"
-                            value={editAssetDraft.expiry_date}
-                            onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, expiry_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm">Put/Call</Label>
-                          <Select
-                            value={editAssetDraft.put_call || noneSelectValue}
-                            onValueChange={(value) =>
-                              setEditAssetDraft((prev) => ({
-                                ...prev,
-                                put_call: value === noneSelectValue ? '' : value,
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={noneSelectValue}>-</SelectItem>
-                              <SelectItem value="PUT">PUT</SelectItem>
-                              <SelectItem value="CALL">CALL</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <DateField
-                            id="edit-asset-maturity"
-                            label="Maturity Date"
-                            value={editAssetDraft.maturity_date}
-                            onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, maturity_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-coupon" className="text-sm">Coupon Rate</Label>
-                          <Input
-                            id="edit-asset-coupon"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.coupon_rate}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, coupon_rate: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-issuer" className="text-sm">Issuer</Label>
-                          <Input
-                            id="edit-asset-issuer"
-                            className="mt-1"
-                            value={editAssetDraft.issuer}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, issuer: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="edit-asset-initial-fixing"
-                            label="Initial Fixing Date"
-                            value={editAssetDraft.initial_fixing_date}
-                            onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, initial_fixing_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="edit-asset-next-autocall"
-                            label="Next Autocall Date"
-                            value={editAssetDraft.next_autocall_date}
-                            onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, next_autocall_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <DateField
-                            id="edit-asset-next-coupon"
-                            label="Next Coupon Date"
-                            value={editAssetDraft.next_coupon_payment_date}
-                            onChange={(value) => setEditAssetDraft((prev) => ({ ...prev, next_coupon_payment_date: value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-autocall" className="text-sm">Autocall Trigger</Label>
-                          <Input
-                            id="edit-asset-autocall"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.autocall_trigger}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, autocall_trigger: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-coupon-trigger" className="text-sm">Coupon Trigger</Label>
-                          <Input
-                            id="edit-asset-coupon-trigger"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.coupon_trigger}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, coupon_trigger: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-capital-barrier" className="text-sm">Capital Barrier</Label>
-                          <Input
-                            id="edit-asset-capital-barrier"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.capital_barrier}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, capital_barrier: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-protection" className="text-sm">Protection Level</Label>
-                          <Input
-                            id="edit-asset-protection"
-                            type="number"
-                            className="mt-1"
-                            value={editAssetDraft.protection_level}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, protection_level: e.target.value }))}
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-asset-payment" className="text-sm">Payment Frequency</Label>
-                          <Input
-                            id="edit-asset-payment"
-                            className="mt-1"
-                            value={editAssetDraft.payment_frequency}
-                            onChange={(e) => setEditAssetDraft((prev) => ({ ...prev, payment_frequency: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-
+                  <AssetFormFields
+                    formState={editAssetDraft}
+                    setFormState={setEditAssetDraft}
+                    assetClasses={assetClasses}
+                    isLoadingClasses={isLoadingClasses}
+                    currencyOptions={currencyOptions}
+                    countryOptions={countryOptions}
+                    industryOptions={industryOptions}
+                    idPrefix="edit-asset"
+                  />
                   <div className="flex justify-end gap-3 pt-4">
                     <Button variant="outline" onClick={() => setIsEditAssetOpen(false)}>
                       Cancel
@@ -1664,119 +737,24 @@ const Assets = () => {
       )}
 
       {/* Assets Catalog */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden mb-4 md:mb-6">
-        <div className="p-3 md:p-4 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-            <h3 className="font-semibold text-foreground text-sm md:text-base">Asset Catalog</h3>
-          </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>
-              {isLoadingAssets
-                ? 'Loading...'
-                : totalAssets === 0
-                  ? '0 assets'
-                  : `${pageStart}-${pageEnd} of ${totalAssets}`}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={isLoadingAssets || safePage === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span>
-                Page {safePage} of {totalPages}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={isLoadingAssets || safePage === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                {visibleColumnDefs.map((column) => (
-                  <SortableHeader key={column.key} label={column.label} sortKey={column.key} />
-                ))}
-                <th className="text-xs md:text-sm">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedAssets.map((asset) => (
-                <tr key={asset.asset_id}>
-                  {visibleColumnDefs.map((column) => (
-                    <td
-                      key={column.key}
-                      className={`text-muted-foreground text-xs md:text-sm ${
-                        column.key === 'description' ? 'max-w-[220px] truncate text-foreground' : ''
-                      } ${column.key === 'symbol' ? 'font-medium text-foreground' : ''} ${
-                        column.key === 'isin' ? 'mono text-[10px] md:text-xs' : ''
-                      }`}
-                    >
-                      {column.getValue(asset)}
-                    </td>
-                  ))}
-                  <td>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 md:h-8 md:w-8"
-                        onClick={() => handleEditAsset(asset)}
-                      >
-                        <Pencil className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                        onClick={() => setAssetToDelete(asset)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <AlertDialog open={!!assetToDelete} onOpenChange={(open) => !open && setAssetToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete asset</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete asset "{assetToDelete?.symbol}"? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (assetToDelete) {
-                    handleDeleteAsset(assetToDelete.asset_id);
-                  }
-                  setAssetToDelete(null);
-                }}
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      <AssetsTable
+        assets={pagedAssets}
+        visibleColumnDefs={visibleColumnDefs}
+        sortConfig={assetSort}
+        onSort={toggleSort}
+        isLoading={isLoadingAssets}
+        totalAssets={totalAssets}
+        pageStart={pageStart}
+        pageEnd={pageEnd}
+        currentPage={safePage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        onEdit={handleEditAsset}
+        onDeleteRequest={setAssetToDelete}
+        assetToDelete={assetToDelete}
+        onDeleteConfirm={handleDeleteAsset}
+        onDeleteCancel={() => setAssetToDelete(null)}
+      />
 
       {/* Transactions by Asset */}
       {selectedPortfolio !== 'all' && (
