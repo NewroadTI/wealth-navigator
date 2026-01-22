@@ -86,9 +86,37 @@ class AssetCreate(AssetBase):
 class AssetUpdate(BaseModel):
     # Hacemos todos opcionales para permitir actualizaciones parciales
     symbol: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    isin: Optional[str] = None
+    figi: Optional[str] = None
+    cusip: Optional[str] = None
+    ib_conid: Optional[int] = None
     class_id: Optional[int] = None
+    sub_class_id: Optional[int] = None
+    industry_code: Optional[str] = None
+    country_code: Optional[str] = None
+    currency: Optional[str] = None
+    multiplier: Optional[Decimal] = None
+    contract_size: Optional[Decimal] = None
+    underlying_symbol: Optional[str] = None
+    strike_price: Optional[Decimal] = None
+    expiry_date: Optional[date] = None
+    put_call: Optional[str] = None
+    maturity_date: Optional[date] = None
+    coupon_rate: Optional[Decimal] = None
+    issuer: Optional[str] = None
+    product_category: Optional[str] = None
+    initial_fixing_date: Optional[date] = None
+    next_autocall_date: Optional[date] = None
+    next_coupon_payment_date: Optional[date] = None
+    autocall_trigger: Optional[Decimal] = None
+    coupon_trigger: Optional[Decimal] = None
+    capital_barrier: Optional[Decimal] = None
+    protection_level: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
+    structured_note_details: Optional[Dict[str, Any]] = None
     is_active: Optional[bool] = None
-    # ... puedes agregar el resto de campos como opcionales si necesitas editar todo
 
 # --- READ ---
 class AssetRead(AssetBase):
@@ -308,6 +336,15 @@ class AssetSubClassRead(BaseModel):
     class Config:
         from_attributes = True
 
+class AssetSubClassCreate(BaseModel):
+    code: str
+    name: str
+
+class AssetSubClassUpsert(BaseModel):
+    sub_class_id: Optional[int] = None
+    code: str
+    name: str
+
 class AssetClassRead(BaseModel):
     class_id: int
     code: str
@@ -319,3 +356,15 @@ class AssetClassRead(BaseModel):
     
     class Config:
         from_attributes = True
+
+class AssetClassCreate(BaseModel):
+    code: str
+    name: str
+    description: Optional[str] = None
+    sub_classes: List[AssetSubClassCreate] = []
+
+class AssetClassUpdate(BaseModel):
+    code: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    sub_classes: Optional[List[AssetSubClassUpsert]] = None
