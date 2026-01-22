@@ -1,8 +1,9 @@
 from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Numeric, CHAR, Text, BigInteger
 from sqlalchemy.orm import relationship
-from app.db.base import Base
 from sqlalchemy import event, DDL
 from sqlalchemy.dialects.postgresql import JSONB  # <--- IMPORTANTE: Agrega esto
+
+from app.db.base import Base
 
 
 class StockExchange(Base):
@@ -106,32 +107,77 @@ class Asset(Base):
     # Relaciones
     country = relationship("Country", back_populates="assets")
     industry = relationship("Industry", back_populates="assets")
-
+    corporate_actions = relationship("CorporateAction", back_populates="asset")
 # --- TRANSACCIONES ---
-class Trade(Base):
+# --- TRANSACCIONES ---
+class Trades(Base):
     __tablename__ = "trades"
-    trade_id = Column(Integer, primary_key=True, index=True)
+    
+    # ID interno de tu sistema (Autoincremental)
+    transaction_id = Column(Integer, primary_key=True, index=True)
+    
     account_id = Column(Integer, ForeignKey("accounts.account_id"))
     asset_id = Column(Integer, ForeignKey("assets.asset_id"))
     
-    ib_exec_id = Column(String, unique=True) # ID único ejecución
-    ib_order_id = Column(String)
+    # --- IDENTIFICADORES IBKR (Clave para conciliación) ---
+    # "TransactionID": ID numérico único del movimiento (ej: 37183892878). 
+    # Es el MEJOR campo para evitar duplicados.
+    ib_transaction_id = Column(String, unique=True, nullable=True)
     
+    # "IBExecID": String complejo (ej: 0001506d.695e...). 
+    # A veces es null en cancelaciones o movimientos internos.
+    ib_exec_id = Column(String, index=True, nullable=True) 
+    
+    # "TradeID": Agrupa varias ejecuciones parciales de una misma orden
+    ib_trade_id = Column(String, nullable=True)
+    
+    # "IBOrderID" / "BrokerageOrderID"
+    ib_order_id = Column(String, nullable=True)
+
+    # --- FECHAS ---
+    # "DateTime" o "TradeDate". Incluye hora si está disponible.
     trade_date = Column(DateTime, nullable=False)
-    settlement_date = Column(Date)
     
-    transaction_type = Column(String, nullable=False) # BUY, SELL
+    # "SettleDateTarget": Cuando realmente se mueve el efectivo
+    settlement_date = Column(Date, nullable=True)
+    
+    # "ReportDate": Fecha de corte del reporte
+    report_date = Column(Date, nullable=True)
+
+    # --- CLASIFICACIÓN ---
+    # "TransactionType": ExchTrade, TradeCancel, FracShare, etc.
+    transaction_type = Column(String, nullable=True)
+    
+    # "Buy/Sell": BUY, SELL, SELL (Ca.)
+    side = Column(String, nullable=True)
+    
+    # "Exchange": NYSE, DARK, IDEALFX (Para Forex)
+    exchange = Column(String, nullable=True)
+
+    # --- ECONOMÍA ---
     quantity = Column(Numeric, nullable=False)
-    price = Column(Numeric, nullable=False)
+    price = Column(Numeric, nullable=False)       # "TradePrice"
     
-    gross_amount = Column(Numeric)
-    commission = Column(Numeric)
-    tax = Column(Numeric)
-    net_amount = Column(Numeric) # Dinero final
-    currency = Column(CHAR(3))
+    # Importes Monetarios
+    gross_amount = Column(Numeric, nullable=True) # "TradeMoney" (Cantidad * Precio)
+    net_amount = Column(Numeric, nullable=True)   # "NetCash" (Gross - Comisiones - Impuestos)
+    proceeds = Column(Numeric, nullable=True)     # "Proceeds" (Suele ser igual a TradeMoney en acciones)
+
+    # --- COSTOS Y PNL (Nuevos campos del reporte detallado) ---
+    commission = Column(Numeric, nullable=True)   # "IBCommission"
+    tax = Column(Numeric, nullable=True)          # "Taxes"
     
-    description = Column(Text)
+    # Datos Fiscales y de Rendimiento
+    cost_basis = Column(Numeric, nullable=True)   # "CostBasis" (Base de costo actualizada)
+    realized_pnl = Column(Numeric, nullable=True) # "FifoPnlRealized" (Ganancia/Pérdida realizada en esta venta)
+    mtm_pnl = Column(Numeric, nullable=True)      # "MtmPnl" (Marcado a mercado del día)
+
+    # --- EXTRAS ---
+    currency = Column(CHAR(3))                    # "CurrencyPrimary" o "IBCommissionCurrency"
+    description = Column(Text)                    # "Description"
+    notes = Column(Text, nullable=True)           # "Notes/Codes" (Ej: O, C, P para Open/Close)
     
+    # Relaciones
     account = relationship("Account", back_populates="trades")
     asset = relationship("Asset")
 
@@ -139,16 +185,20 @@ class CashJournal(Base):
     __tablename__ = "cash_journal"
     journal_id = Column(Integer, primary_key=True, index=True)
     account_id = Column(Integer, ForeignKey("accounts.account_id"))
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
     
     date = Column(Date, nullable=False)
-    type = Column(String, nullable=False) # DIVIDEND, INTEREST, FEE
+    ex_date = Column(Date, nullable=True)      # Ex-Date (Fecha de corte del derecho)
+    type = Column(String, nullable=False) 
     amount = Column(Numeric, nullable=False)
-    currency = Column(CHAR(3))
+    currency = Column(CHAR(3), ForeignKey("currencies.code")) 
     
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
+    quantity = Column(Numeric, nullable=True)
+    rate_per_share = Column(Numeric, nullable=True)
+
     description = Column(Text)
-    reference_code = Column(String, unique=True) # TransactionID único
-    
+    reference_code = Column(String, unique=True, nullable=True) # TransactionID único
+    extra_details = Column(JSONB, nullable=True)
     account = relationship("Account", back_populates="cash_journal")
     asset = relationship("Asset")
 
@@ -170,68 +220,133 @@ class FXTransaction(Base):
 class PerformanceAttribution(Base):
     __tablename__ = "performance_attribution"
     attribution_id = Column(BigInteger, primary_key=True, index=True)
-    account_id = Column(Integer, ForeignKey("accounts.account_id"))
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"))
     
-    start_date = Column(Date)
-    end_date = Column(Date)
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
     
-    return_pct = Column(Numeric)
-    contribution_pct = Column(Numeric)
-    realized_pnl = Column(Numeric)
-    unrealized_pnl = Column(Numeric)
+    # asset_id es NULLABLE para soportar filas de totales como "Total Bonds", "Total Crypto"
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
+    
+    # --- Datos del CSV ---
+    # Si asset_id es Null, usamos esto para saber qué es (Ej: 'Total Bonds')
+    category_label = Column(String, nullable=True) 
+    
+    avg_weight = Column(Numeric,nullable=True)      # CSV: AvgWeight (Importante para atribución)
+    return_pct = Column(Numeric,nullable=True)      # CSV: Return
+    contribution_pct = Column(Numeric,nullable=True)# CSV: Contribution
+
+    realized_pnl = Column(Numeric,nullable=True)    # CSV: Realized_P&L
+    unrealized_pnl = Column(Numeric,nullable=True)  # CSV: Unrealized_P&L
+    
+    # Metadata extra
+    is_open_position = Column(Boolean, default=False, nullable=True) # CSV: Open (Yes/No)
+    sector_snapshot = Column(String, ForeignKey("industries.industry_code"), nullable=True)
+  # CSV: Sector (Guardar snapshot pq el sector del activo puede cambiar)
+
+    account = relationship("Account", back_populates="performance_attribution")
+    asset = relationship("Asset")
 
 
 # ... (Tu código existente de Asset, Trade, CashJournal, FXTransaction) ...
 
 # --- FALTABA ESTO ---
 
+
+
 class CorporateAction(Base):
     __tablename__ = "corporate_actions"
+    
+    # Identificadores principales
     action_id = Column(Integer, primary_key=True, index=True)
-    ib_action_id = Column(String, unique=True)
+    ib_action_id = Column(String, unique=True, nullable=True)  # ActionID del tipo 2, puede ser NULL
+    transaction_id = Column(String, nullable=True)  # TransactionID del tipo 2, puede ser NULL
     
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"))
-    account_id = Column(Integer, ForeignKey("accounts.account_id"))
+    # Relaciones obligatorias
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)  # Puede ser NULL si no hay activo
     
-    report_date = Column(Date)
-    execution_date = Column(Date)
+    # Campos del tipo 1
+    action_type = Column(String, nullable=True)  # Tipo normalizado: SPLIT, SPINOFF, MATURITY, RIGHTS, ACQUISITION, DELISTING
     
-    action_type = Column(String) # SPLIT, SPINOFF
-    description = Column(Text)
+    # Fechas (pueden venir en diferentes formatos)
+    report_date = Column(Date, nullable=True)  # Fecha del reporte (tipo 2)
+    execution_date = Column(Date, nullable=True)  # Fecha de ejecución
     
-    ratio_old = Column(Numeric)
-    ratio_new = Column(Numeric)
-    quantity_adjustment = Column(Numeric)
-    cash_in_lieu = Column(Numeric)
+    # Descripciones
+    description = Column(Text, nullable=True)  # Descripción completa
     
-    transaction_id = Column(String)
+    # Campos de ratios (extraíbles de la descripción)
+    ratio_old = Column(Numeric(10, 6), nullable=True)
+    ratio_new = Column(Numeric(10, 6), nullable=True)
+    
+    # Ajustes
+    quantity_adjustment = Column(Numeric(20, 6), nullable=True)  # Cantidad ajustada
+    
+    # Campos del tipo 2
+    symbol = Column(String, nullable=True)  # Símbolo del activo
+    isin = Column(String, nullable=True)  # ISIN del activo
+    cusip = Column(String, nullable=True)  # CUSIP del activo
+    security_id = Column(String, nullable=True)  # SecurityID
+    security_id_type = Column(String, nullable=True)  # Tipo de SecurityID
+    
+    # Campos financieros del tipo 2
+    amount = Column(Numeric(20, 6), nullable=True)
+    proceeds = Column(Numeric(20, 6), nullable=True)
+    value = Column(Numeric(20, 6), nullable=True)
+    fifo_pnl_realized = Column(Numeric(20, 6), nullable=True)
+    mtm_pnl = Column(Numeric(20, 6), nullable=True)
+    
+    # Campos adicionales de metadatos
+    currency = Column(String, nullable=True)  # Moneda
+    
+    
+    # Relaciones
+    account = relationship("Account", back_populates="corporate_actions")
+    asset = relationship("Asset", back_populates="corporate_actions")
+
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Numeric
+from sqlalchemy.orm import relationship
+from app.db.base import Base
 
 class Position(Base):
     __tablename__ = "positions"
     position_id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(Integer, ForeignKey("accounts.account_id"))
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"))
-    report_date = Column(Date, nullable=False)
     
-    # Core Data
-    quantity = Column(Numeric, nullable=False)
+    # Obligatorios: Sin esto no existe una posición
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=False)
+    report_date = Column(Date, nullable=False) # 'As Of' (T1) o 'ReportDate' (T2)
+    quantity = Column(Numeric, nullable=False) # 'Quantity' (T1 & T2)
     
-    # Precios y Costos
-    cost_basis_money = Column(Numeric)
-    cost_basis_price = Column(Numeric)
-    mark_price = Column(Numeric)
-    position_value = Column(Numeric)
+    # --- VALORACIÓN DE MERCADO ---
+    # Nullable=True porque a veces el reporte de resumen falla en traer precios exactos de bonos raros
+    mark_price = Column(Numeric, nullable=True)     # 'ClosePrice' (T1) / 'MarkPrice' (T2)
+    position_value = Column(Numeric, nullable=True) # 'Value' (T1) / 'PositionValue' (T2)
     
-    # P&L
-    fifo_pnl_unrealized = Column(Numeric)
-    percent_of_nav = Column(Numeric)
+    # --- COSTOS Y BASE ---
+    cost_basis_money = Column(Numeric, nullable=True) # 'Cost Basis' (T1) / 'CostBasisMoney' (T2)
+    cost_basis_price = Column(Numeric, nullable=True) # 'CostBasisPrice' (T2). En T1 se puede calcular (Money/Qty)
+    open_price = Column(Numeric, nullable=True)       # 'OpenPrice' (Solo T2) - Precio original de apertura
     
-    # Extras
-    accrued_interest = Column(Numeric)
-    vesting_date = Column(Date)
-    side = Column(String)
-    fx_rate_to_base = Column(Numeric, default=1)
+    # --- P&L (Ganancias y Pérdidas) ---
+    fifo_pnl_unrealized = Column(Numeric, nullable=True) # 'UnrealizedP&L' (T1) / 'FifoPnlUnrealized' (T2)
+    percent_of_nav = Column(Numeric, nullable=True)      # 'PercentOfNAV' (Solo T2)
+    
+    # --- DETALLES DE POSICIÓN ---
+    side = Column(String, nullable=True) # 'Long'/'Short' (Solo T2)
+    level_of_detail = Column(String, nullable=True) # 'SUMMARY'/'LOT' (Solo T2)
+    
+    # --- FECHAS DE TENENCIA (Solo T2) ---
+    open_date_time = Column(DateTime, nullable=True) # 'OpenDateTime' (T2) - Cuándo se abrió
+    vesting_date = Column(Date, nullable=True)       # 'VestingDate' (T2)
+    
+    # --- EXTRAS Y RENTA FIJA ---
+    accrued_interest = Column(Numeric, nullable=True)   # 'AccruedInterest' (T2)
+    fx_rate_to_base = Column(Numeric, default=1, nullable=True) # 'FXRateToBase' (T1 & T2)
+    
+
+    # Relaciones
+    account = relationship("Account", back_populates="positions")
+    asset = relationship("Asset")
 
 class MarketPrice(Base):
     __tablename__ = "market_prices"

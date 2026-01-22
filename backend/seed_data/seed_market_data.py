@@ -5,7 +5,7 @@ import logging
 sys.path.append(".")
 
 from app.db.session import SessionLocal
-from app.models.asset import StockExchange, MarketIndex, Country
+from app.models.asset import StockExchange, MarketIndex, Country, CorporateAction, Trades
 from app.models.portfolio import Account, Portfolio
 from app.models.user import User
 

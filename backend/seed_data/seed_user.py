@@ -13,7 +13,7 @@ from app.core.security import get_password_hash
 from app.models.user import User, Role
 from app.models.portfolio import Portfolio, PortfolioAdvisor, Account
 # AGREGAR ESTA LÍNEA ES LA SOLUCIÓN:
-from app.models.asset import Asset, Trade, CashJournal 
+from app.models.asset import Asset, CashJournal , Country, CorporateAction, Trades
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

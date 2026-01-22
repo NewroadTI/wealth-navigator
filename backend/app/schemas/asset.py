@@ -9,11 +9,25 @@ class CurrencyRead(BaseModel):
     class Config:
         from_attributes = True
 
+class CurrencyCreate(BaseModel):
+    code: str
+    name: str
+
+class CurrencyUpdate(BaseModel):
+    name: str
+
 class CountryRead(BaseModel):
     iso_code: str
     name: Optional[str] = None
     class Config:
         from_attributes = True
+
+class CountryCreate(BaseModel):
+    iso_code: str
+    name: str
+
+class CountryUpdate(BaseModel):
+    name: str
 
 # --- ASSET SCHEMAS ---
 class AssetBase(BaseModel):
@@ -233,6 +247,15 @@ class StockExchangeRead(BaseModel):
     class Config:
         from_attributes = True
 
+class StockExchangeCreate(BaseModel):
+    exchange_code: str
+    name: str
+    country_code: Optional[str] = None
+
+class StockExchangeUpdate(BaseModel):
+    name: Optional[str] = None
+    country_code: Optional[str] = None
+
 class MarketIndexRead(BaseModel):
     index_code: str
     name: str
@@ -240,6 +263,17 @@ class MarketIndexRead(BaseModel):
     exchange_code: Optional[str] = None
     class Config:
         from_attributes = True
+
+class MarketIndexCreate(BaseModel):
+    index_code: str
+    name: str
+    country_code: Optional[str] = None
+    exchange_code: Optional[str] = None
+
+class MarketIndexUpdate(BaseModel):
+    name: Optional[str] = None
+    country_code: Optional[str] = None
+    exchange_code: Optional[str] = None
 
 class IndustryRead(BaseModel):
     industry_code: str

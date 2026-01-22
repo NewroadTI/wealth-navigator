@@ -1,0 +1,384 @@
+hoy quiero insertar la data de mi primer usuario, toda la data historica que esta en este csv,  quiero hacer un script que consuma el csv y llene toda la info, para proximos imports .
+quiero que armes un script de python que considerando todas estas tablas consuma la data del csv y me genere un texto,json o algo para ver la data que se va insertar  a mi db
+
+
+
+primero el usuario, creemos un usuario y portfolio con su nombre 
+
+username, el nombre del csv
+email email generado ej. daniel@gmail.com
+password usuario_daniel
+full name
+phone 999999999
+
+
+
+class User(Base):
+    __tablename__ = "users"
+    user_id = Column(Integer, primary_key=True, index=True)
+    
+    username = Column(String, unique=True, nullable=False)
+    email = Column(String, unique=True, nullable=True, index=True)
+    password_hash = Column(String, nullable=False)
+    
+    full_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    
+    # Nuevos campos V3
+    tax_id = Column(String, unique=True, nullable=True) # DNI, NIF, SSN, etc.
+    entity_type = Column(String, default='INDIVIDUAL', nullable=True) # INDIVIDUAL, CORP, TRUST
+    
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    role_id = Column(Integer, ForeignKey("roles.role_id"))
+    
+    # Relaciones Portafolios
+    role = relationship("Role", back_populates="users")
+    owned_portfolios = relationship("Portfolio", back_populates="owner")
+    advisor_assignments = relationship("PortfolioAdvisor", back_populates="advisor")
+
+
+
+despues de eso para crear el portfolio
+
+owner id = daniel
+interface_code un codigo que identifique al usuario, puede ser port_daniel_cicirello
+name portafolio daniel cicirello
+type risk portfolio
+main currency USD
+residence country peru
+inception date today
+active status true
+
+
+ el portfolio se crea 1 por el nombre y los accounts se crean 9 , 9 por cada moneda, ejemplo:
+
+por su codigo de
+daniel cicirello
+account code de ibkr: U6177570
+entonces accounts en monedas del portfolio
+U6177570_USD
+U6177570_TWD
+U6177570_CNY
+U6177570_CNH
+U6177570_EUR
+... (LAS 9 MONEdas mas importantes)
+
+account code de pershing: JXD082952
+JXD082952_USD
+JXD082952_TWD
+... las mismas nodas de ibkr
+
+
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+    portfolio_id = Column(Integer, primary_key=True, index=True)
+    
+    owner_user_id = Column(Integer, ForeignKey("users.user_id"))
+    
+    interface_code = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
+    type = Column(String)
+    main_currency = Column(CHAR(3)) 
+    residence_country = Column(CHAR(2))
+    
+    inception_date = Column(Date)
+    active_status = Column(Boolean, default=True)
+    
+    owner = relationship("User", back_populates="owned_portfolios")
+    accounts = relationship("Account", back_populates="portfolio")
+    advisors = relationship("PortfolioAdvisor", back_populates="portfolio")
+
+
+
+
+Para "Historical Performance" -> AccountReturnSeries
+Fechas: Convierte el string de IBKR a una fecha real.
+
+202501 -> 2025-01-31
+
+2025 Q1 -> 2025-03-31
+
+2024 -> 2024-12-31
+
+Period Type:
+
+Si len es 6 (202501) -> Type 'M'
+
+Si tiene 'Q' -> Type 'Q'
+
+Si es YTD -> Type 'YTD'
+
+Si len es 4 (2024) -> Type 'Y'
+
+Para "Performance by Symbol" -> PerformanceAttribution
+Filas de Totales: Notarás filas como Total Bonds o Total Crypto.
+
+En estas, asset_id será None.
+
+En category_label guardas "Total Bonds".
+
+
+
+class PerformanceAttribution(Base):
+    __tablename__ = "performance_attribution"
+    attribution_id = Column(BigInteger, primary_key=True, index=True)
+    
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
+    
+    # asset_id es NULLABLE para soportar filas de totales como "Total Bonds", "Total Crypto"
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
+    
+    # --- Datos del CSV ---
+    # Si asset_id es Null, usamos esto para saber qué es (Ej: 'Total Bonds')
+    category_label = Column(String, nullable=True) 
+    
+    avg_weight = Column(Numeric,nullable=True)      # CSV: AvgWeight (Importante para atribución)
+    return_pct = Column(Numeric,nullable=True)      # CSV: Return
+    contribution_pct = Column(Numeric,nullable=True)# CSV: Contribution
+
+    realized_pnl = Column(Numeric,nullable=True)    # CSV: Realized_P&L
+    unrealized_pnl = Column(Numeric,nullable=True)  # CSV: Unrealized_P&L
+    
+    # Metadata extra
+    is_open_position = Column(Boolean, default=False, nullable=True) # CSV: Open (Yes/No)
+    sector_snapshot = Column(String, ForeignKey("industries.industry_code"), nullable=True)
+  # CSV: Sector (Guardar snapshot pq el sector del activo puede cambiar)
+
+    account = relationship("Account", back_populates="performance_attribution")
+    asset = relationship("Asset")
+
+
+
+
+
+class AccountReturnSeries(Base):
+    __tablename__ = "account_return_series"
+    
+    series_id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
+    
+    # Periodo del reporte
+    # Ej: period_type='M' (Month), 'Q' (Quarter), 'Y' (Year), 'YTD'
+    period_type = Column(String(3), nullable=False) 
+    
+    # Etiqueta original del reporte para display exacto
+    # Ej: '202501', '2025 Q1', '2024', 'YTD'
+    period_label = Column(String, nullable=False)
+    
+    # Fecha normalizada (Vital para ordenar gráficas)
+    # Si es '202501', guardas 2025-01-31. Si es 2025, guardas 2025-12-31.
+    end_date = Column(Date, nullable=False)
+    
+    return_pct = Column(Numeric, nullable=False) # El valor principal (ej. 9.16)
+    
+    # Opcional: Si el reporte te da valores monetarios del NAV inicial/final
+    starting_nav = Column(Numeric, nullable=True)
+    ending_nav = Column(Numeric, nullable=True)
+    
+    # Constraint para no duplicar datos del mismo mes/cuenta
+    # __table_args__ = (UniqueConstraint('account_id', 'period_type', 'period_label', name='uq_acct_period'),)
+
+    account = relationship("Account", back_populates="return_series")
+
+
+
+lo de trade summary si va en trades, pero tienes que parsear esos datos a los que corresponden en mi tabla trades
+
+
+class Trades(Base):
+    __tablename__ = "trades"
+    
+    # ID interno de tu sistema (Autoincremental)
+    transaction_id = Column(Integer, primary_key=True, index=True)
+    
+    account_id = Column(Integer, ForeignKey("accounts.account_id"))
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"))
+    
+    # --- IDENTIFICADORES IBKR (Clave para conciliación) ---
+    # "TransactionID": ID numérico único del movimiento (ej: 37183892878). 
+    # Es el MEJOR campo para evitar duplicados.
+    ib_transaction_id = Column(String, unique=True, nullable=True)
+    
+    # "IBExecID": String complejo (ej: 0001506d.695e...). 
+    # A veces es null en cancelaciones o movimientos internos.
+    ib_exec_id = Column(String, index=True, nullable=True) 
+    
+    # "TradeID": Agrupa varias ejecuciones parciales de una misma orden
+    ib_trade_id = Column(String, nullable=True)
+    
+    # "IBOrderID" / "BrokerageOrderID"
+    ib_order_id = Column(String, nullable=True)
+
+    # --- FECHAS ---
+    # "DateTime" o "TradeDate". Incluye hora si está disponible.
+    trade_date = Column(DateTime, nullable=False)
+    
+    # "SettleDateTarget": Cuando realmente se mueve el efectivo
+    settlement_date = Column(Date, nullable=True)
+    
+    # "ReportDate": Fecha de corte del reporte
+    report_date = Column(Date, nullable=True)
+
+    # --- CLASIFICACIÓN ---
+    # "TransactionType": ExchTrade, TradeCancel, FracShare, etc.
+    transaction_type = Column(String, nullable=True)
+    
+    # "Buy/Sell": BUY, SELL, SELL (Ca.)
+    side = Column(String, nullable=True)
+    
+    # "Exchange": NYSE, DARK, IDEALFX (Para Forex)
+    exchange = Column(String, nullable=True)
+
+    # --- ECONOMÍA ---
+    quantity = Column(Numeric, nullable=False)
+    price = Column(Numeric, nullable=False)       # "TradePrice"
+    
+    # Importes Monetarios
+    gross_amount = Column(Numeric, nullable=True) # "TradeMoney" (Cantidad * Precio)
+    net_amount = Column(Numeric, nullable=True)   # "NetCash" (Gross - Comisiones - Impuestos)
+    proceeds = Column(Numeric, nullable=True)     # "Proceeds" (Suele ser igual a TradeMoney en acciones)
+
+    # --- COSTOS Y PNL (Nuevos campos del reporte detallado) ---
+    commission = Column(Numeric, nullable=True)   # "IBCommission"
+    tax = Column(Numeric, nullable=True)          # "Taxes"
+    
+    # Datos Fiscales y de Rendimiento
+    cost_basis = Column(Numeric, nullable=True)   # "CostBasis" (Base de costo actualizada)
+    realized_pnl = Column(Numeric, nullable=True) # "FifoPnlRealized" (Ganancia/Pérdida realizada en esta venta)
+    mtm_pnl = Column(Numeric, nullable=True)      # "MtmPnl" (Marcado a mercado del día)
+
+    # --- EXTRAS ---
+    currency = Column(CHAR(3))                    # "CurrencyPrimary" o "IBCommissionCurrency"
+    description = Column(Text)                    # "Description"
+    notes = Column(Text, nullable=True)           # "Notes/Codes" (Ej: O, C, P para Open/Close)
+    
+    # Relaciones
+    account = relationship("Account", back_populates="trades")
+    asset = relationship("Asset")
+
+
+
+
+
+lo de deposit and withdrawals tambien entra, los campos iran en cash journal indicando el tipo, el account del usuario, la fecha, cantidad, moneda en este caso es usd, en descripcion  ira lo de descripcion del csv, en type ira type del csv, reference code esta vez ira null, lo mismo con asset iran null
+
+
+
+class CashJournal(Base):
+    __tablename__ = "cash_journal"
+    journal_id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.account_id"))
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
+    
+    date = Column(Date, nullable=False)
+    ex_date = Column(Date, nullable=True)      # Ex-Date (Fecha de corte del derecho)
+    type = Column(String, nullable=False) 
+    amount = Column(Numeric, nullable=False)
+    currency = Column(CHAR(3), ForeignKey("currencies.code")) 
+    
+    quantity = Column(Numeric, nullable=True)
+    rate_per_share = Column(Numeric, nullable=True)
+
+    description = Column(Text)
+    reference_code = Column(String, unique=True, nullable=True) # TransactionID único
+    extra_details = Column(JSONB, nullable=True)
+    account = relationship("Account", back_populates="cash_journal")
+    asset = relationship("Asset")
+
+
+
+
+en corporate actions tienes que parsear el asset que sale en los campos y ponerlos en el asset, tambien tiene que parsear ese formato de fecha y ponerlos en los campos que corresponden, pero lo mas importante es parsear el tipo de asset , y los ratios, que la descripcion te pueda dar en este formato:
+
+class CorporateAction(Base):
+    __tablename__ = "corporate_actions"
+    
+    # Identificadores principales
+    action_id = Column(Integer, primary_key=True, index=True)
+    ib_action_id = Column(String, unique=True, nullable=True)  # ActionID del tipo 2, puede ser NULL
+    transaction_id = Column(String, nullable=True)  # TransactionID del tipo 2, puede ser NULL
+    
+    # Relaciones obligatorias
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)  # Puede ser NULL si no hay activo
+    
+    # Campos del tipo 1
+    action_type = Column(String, nullable=True)  # Tipo normalizado: SPLIT, SPINOFF, MATURITY, RIGHTS, ACQUISITION, DELISTING
+    
+    # Fechas (pueden venir en diferentes formatos)
+    report_date = Column(Date, nullable=True)  # Fecha del reporte (tipo 2)
+    execution_date = Column(Date, nullable=True)  # Fecha de ejecución
+    
+    # Descripciones
+    description = Column(Text, nullable=True)  # Descripción completa
+    
+    # Campos de ratios (extraíbles de la descripción)
+    ratio_old = Column(Numeric(10, 6), nullable=True)
+    ratio_new = Column(Numeric(10, 6), nullable=True)
+    
+    # Ajustes
+    quantity_adjustment = Column(Numeric(20, 6), nullable=True)  # Cantidad ajustada
+    
+    # Campos del tipo 2
+    symbol = Column(String, nullable=True)  # Símbolo del activo
+    isin = Column(String, nullable=True)  # ISIN del activo
+    cusip = Column(String, nullable=True)  # CUSIP del activo
+    security_id = Column(String, nullable=True)  # SecurityID
+    security_id_type = Column(String, nullable=True)  # Tipo de SecurityID
+    
+    # Campos financieros del tipo 2
+    amount = Column(Numeric(20, 6), nullable=True)
+    proceeds = Column(Numeric(20, 6), nullable=True)
+    value = Column(Numeric(20, 6), nullable=True)
+    fifo_pnl_realized = Column(Numeric(20, 6), nullable=True)
+    mtm_pnl = Column(Numeric(20, 6), nullable=True)
+    
+    # Campos adicionales de metadatos
+    currency = Column(String, nullable=True)  # Moneda
+    
+    
+    # Relaciones
+    account = relationship("Account", back_populates="corporate_actions")
+    asset = relationship("Asset", back_populates="corporate_actions")
+
+
+
+
+
+
+
+
+todo lo que son dividends, fee summary e interest details debe ir en cash_journal:
+la de interest details debe ir en cash journal, debes parsear los datos de la descripcion para poner type del descripcion "accrued interest, bond coupon, hkd debit", debes parsear el asset, tambien en extra details pon el raw_rate.
+
+ en fee sumary tambien en cash_journal y como tipo pones fee y los datos como corresponden, date en date, amount en amount, description en description.
+
+
+class CashJournal(Base):
+    __tablename__ = "cash_journal"
+    journal_id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.account_id"))
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
+    
+    date = Column(Date, nullable=False)
+    ex_date = Column(Date, nullable=True)      # Ex-Date (Fecha de corte del derecho)
+    type = Column(String, nullable=False) 
+    amount = Column(Numeric, nullable=False)
+    currency = Column(CHAR(3), ForeignKey("currencies.code")) 
+    
+    quantity = Column(Numeric, nullable=True)
+    rate_per_share = Column(Numeric, nullable=True)
+
+    description = Column(Text)
+    reference_code = Column(String, unique=True, nullable=True) # TransactionID único
+    extra_details = Column(JSONB, nullable=True)
+    account = relationship("Account", back_populates="cash_journal")
+    asset = relationship("Asset")
+
+
+
+
+
+

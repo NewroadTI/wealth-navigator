@@ -1,0 +1,7710 @@
+{
+  "Trades": [
+    {
+      "Symbol": "CCL 6.65 01/15/28",
+      "Type": "BUY",
+      "Qty": 50000.0,
+      "Price": 1.0728
+    },
+    {
+      "Symbol": "INRSHM 5 3/4 04/03/28 3AD3",
+      "Type": "SELL",
+      "Qty": -30000.0,
+      "Price": 1.01
+    },
+    {
+      "Symbol": "PEMEX 6 1/2 03/13/27 QCG5",
+      "Type": "BUY",
+      "Qty": 40000.0,
+      "Price": 1.05498
+    },
+    {
+      "Symbol": "RCL 5 1/2 04/01/28 TAE3",
+      "Type": "BUY",
+      "Qty": 100000.0,
+      "Price": 1.0425
+    },
+    {
+      "Symbol": "BTC.USD-PAXOS",
+      "Type": "BUY",
+      "Qty": 0.67,
+      "Price": 36882.996662728
+    },
+    {
+      "Symbol": "2828",
+      "Type": "BUY",
+      "Qty": 4200.0,
+      "Price": 83.918095238
+    },
+    {
+      "Symbol": "3033",
+      "Type": "BUY",
+      "Qty": 5400.0,
+      "Price": 5.835
+    },
+    {
+      "Symbol": "BGRN",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 48.25
+    },
+    {
+      "Symbol": "BLOK",
+      "Type": "BUY",
+      "Qty": 11.0,
+      "Price": 44.84
+    },
+    {
+      "Symbol": "BNKU",
+      "Type": "BUY",
+      "Qty": 350.0,
+      "Price": 13.938971429
+    },
+    {
+      "Symbol": "CEFD",
+      "Type": "BUY",
+      "Qty": 1300.0,
+      "Price": 19.292307692
+    },
+    {
+      "Symbol": "ECH",
+      "Type": "BUY",
+      "Qty": 418.0,
+      "Price": 26.354784689
+    },
+    {
+      "Symbol": "EMB",
+      "Type": "BUY",
+      "Qty": 1080.0,
+      "Price": 85.55025
+    },
+    {
+      "Symbol": "EMLC",
+      "Type": "BUY",
+      "Qty": 2600.0,
+      "Price": 24.033919231
+    },
+    {
+      "Symbol": "FNGA",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 95.99
+    },
+    {
+      "Symbol": "FXI",
+      "Type": "BUY",
+      "Qty": 187.0,
+      "Price": 44.264117647
+    },
+    {
+      "Symbol": "GLD",
+      "Type": "BUY",
+      "Qty": 12.0,
+      "Price": 166.904
+    },
+    {
+      "Symbol": "IBIT",
+      "Type": "BUY",
+      "Qty": 3842.1035,
+      "Price": 38.650202675
+    },
+    {
+      "Symbol": "ICOL",
+      "Type": "BUY",
+      "Qty": 402.0,
+      "Price": 10.094477612
+    },
+    {
+      "Symbol": "IGOV",
+      "Type": "BUY",
+      "Qty": 1000.0,
+      "Price": 39.917
+    },
+    {
+      "Symbol": "IPAY.OLD",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 57.198
+    },
+    {
+      "Symbol": "JEPQ",
+      "Type": "BUY",
+      "Qty": 700.0,
+      "Price": 42.15
+    },
+    {
+      "Symbol": "JETS",
+      "Type": "BUY",
+      "Qty": 300.0,
+      "Price": 20.243333333
+    },
+    {
+      "Symbol": "KBWD",
+      "Type": "BUY",
+      "Qty": 592.0,
+      "Price": 15.688
+    },
+    {
+      "Symbol": "KWEB",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 25.05
+    },
+    {
+      "Symbol": "LABU.OLD",
+      "Type": "BUY",
+      "Qty": 1500.0,
+      "Price": 16.516666667
+    },
+    {
+      "Symbol": "MJ",
+      "Type": "BUY",
+      "Qty": 44.0,
+      "Price": 9.308
+    },
+    {
+      "Symbol": "QYLD",
+      "Type": "BUY",
+      "Qty": 2200.0,
+      "Price": 16.408909091
+    },
+    {
+      "Symbol": "RYLD",
+      "Type": "BUY",
+      "Qty": 2675.0,
+      "Price": 17.344093458
+    },
+    {
+      "Symbol": "SDIV",
+      "Type": "BUY",
+      "Qty": 1620.0,
+      "Price": 22.33517284
+    },
+    {
+      "Symbol": "SHV",
+      "Type": "BUY",
+      "Qty": 3292.0,
+      "Price": 110.211339611
+    },
+    {
+      "Symbol": "SLV",
+      "Type": "BUY",
+      "Qty": 50.0,
+      "Price": 20.945
+    },
+    {
+      "Symbol": "SPY",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 392.89
+    },
+    {
+      "Symbol": "TAN",
+      "Type": "BUY",
+      "Qty": 86.0,
+      "Price": 84.238372093
+    },
+    {
+      "Symbol": "TBF",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 18.855
+    },
+    {
+      "Symbol": "TMF",
+      "Type": "SELL",
+      "Qty": -100.0,
+      "Price": 53.1775
+    },
+    {
+      "Symbol": "TMF.OLD",
+      "Type": "BUY",
+      "Qty": 1000.0,
+      "Price": 6.295
+    },
+    {
+      "Symbol": "TMV",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 71.64
+    },
+    {
+      "Symbol": "TNA",
+      "Type": "BUY",
+      "Qty": 400.0,
+      "Price": 32.45975
+    },
+    {
+      "Symbol": "TYD",
+      "Type": "BUY",
+      "Qty": 600.0,
+      "Price": 28.68955
+    },
+    {
+      "Symbol": "UVXY",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 14.0
+    },
+    {
+      "Symbol": "VGLT",
+      "Type": "BUY",
+      "Qty": 47.0,
+      "Price": 86.984957447
+    },
+    {
+      "Symbol": "WIP",
+      "Type": "BUY",
+      "Qty": 1010.0,
+      "Price": 42.498118812
+    },
+    {
+      "Symbol": "XBTF",
+      "Type": "BUY",
+      "Qty": 323.0,
+      "Price": 40.336904025
+    },
+    {
+      "Symbol": "YINN",
+      "Type": "BUY",
+      "Qty": 400.0,
+      "Price": 49.49375
+    },
+    {
+      "Symbol": "YINN.OLD",
+      "Type": "BUY",
+      "Qty": 1000.0,
+      "Price": 9.8375
+    },
+    {
+      "Symbol": "USD.HKD",
+      "Type": "BUY",
+      "Qty": 49368.7203,
+      "Price": 7.849982331
+    },
+    {
+      "Symbol": "GBP.USD",
+      "Type": "BUY",
+      "Qty": 4.0,
+      "Price": 1.379275
+    },
+    {
+      "Symbol": "AAPL  211126C00160000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.2
+    },
+    {
+      "Symbol": "AAPL  211126C00170000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.65
+    },
+    {
+      "Symbol": "AAPL  211217P00172500",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.74
+    },
+    {
+      "Symbol": "AAPL  211217P00177500",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.65
+    },
+    {
+      "Symbol": "AAPL  221104C00155000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.49
+    },
+    {
+      "Symbol": "AAPL  221104P00145000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.88
+    },
+    {
+      "Symbol": "AAPL  230113C00132000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.74
+    },
+    {
+      "Symbol": "AAPL  230120C00135000",
+      "Type": "BUY",
+      "Qty": 6.0,
+      "Price": 2.721666667
+    },
+    {
+      "Symbol": "AAPL  230120C00136000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 0.2
+    },
+    {
+      "Symbol": "AAPL  230120P00140000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 9.53
+    },
+    {
+      "Symbol": "AAPL  230127C00146000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 0.33
+    },
+    {
+      "Symbol": "AAPL  230303C00144000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.15
+    },
+    {
+      "Symbol": "ABNB  230217C00130000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.93
+    },
+    {
+      "Symbol": "ABNB  240216C00180000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 0.36
+    },
+    {
+      "Symbol": "ADBE  221111C00340000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.49
+    },
+    {
+      "Symbol": "ADBE  240315C00670000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.04
+    },
+    {
+      "Symbol": "AMZN  230127C00102000",
+      "Type": "BUY",
+      "Qty": 4.0,
+      "Price": 0.4
+    },
+    {
+      "Symbol": "AMZN  230203C00100000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 4.8
+    },
+    {
+      "Symbol": "ARM   240216P00112000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 1.02
+    },
+    {
+      "Symbol": "ATVI  211217C00080000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 2.4
+    },
+    {
+      "Symbol": "ATVI  220218C00070000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 3.57
+    },
+    {
+      "Symbol": "BA    220408C00180000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.8
+    },
+    {
+      "Symbol": "BA    240517C00220000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 5.65
+    },
+    {
+      "Symbol": "BABA  211203P00120000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.7
+    },
+    {
+      "Symbol": "BABA  211210P00110000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.31
+    },
+    {
+      "Symbol": "BABA  221021C00100000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 3.47
+    },
+    {
+      "Symbol": "BABA  230120C00170000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 15.85
+    },
+    {
+      "Symbol": "BABA  230224C00097000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 3.15
+    },
+    {
+      "Symbol": "BABA  230428C00090000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.43
+    },
+    {
+      "Symbol": "BABA  240119C00140000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 33.0
+    },
+    {
+      "Symbol": "BABA  240119C00200000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 24.0
+    },
+    {
+      "Symbol": "BABA  240216C00073000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 1.05
+    },
+    {
+      "Symbol": "BABA  240216C00075000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 0.29
+    },
+    {
+      "Symbol": "BABA1 250620C00080000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 13.3
+    },
+    {
+      "Symbol": "BABA1 250620C00090000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 8.55
+    },
+    {
+      "Symbol": "BABA1 260116C00085000",
+      "Type": "BUY",
+      "Qty": 4.0,
+      "Price": 16.1
+    },
+    {
+      "Symbol": "BABA2 260116C00085000",
+      "Type": "BUY",
+      "Qty": 4.0,
+      "Price": 11.75
+    },
+    {
+      "Symbol": "BABA2 260116C00090000",
+      "Type": "BUY",
+      "Qty": 12.0,
+      "Price": 12.35
+    },
+    {
+      "Symbol": "BABA2 261218C00070000",
+      "Type": "BUY",
+      "Qty": 6.0,
+      "Price": 23.0
+    },
+    {
+      "Symbol": "BITO  240315C00030000",
+      "Type": "BUY",
+      "Qty": 13.0,
+      "Price": 1.699230769
+    },
+    {
+      "Symbol": "BITO  250117C00025000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 4.0
+    },
+    {
+      "Symbol": "BITO  250117C00030000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 5.78
+    },
+    {
+      "Symbol": "C     220121C00070000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.35
+    },
+    {
+      "Symbol": "C     220617C00052500",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.89
+    },
+    {
+      "Symbol": "C     250117C00045000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 7.85
+    },
+    {
+      "Symbol": "COUP  211210P00100000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.9
+    },
+    {
+      "Symbol": "DASH  230217P00055000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.01
+    },
+    {
+      "Symbol": "DASH  230217P00060000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.02
+    },
+    {
+      "Symbol": "EWZ   211217C00032000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 1.4
+    },
+    {
+      "Symbol": "EWZ   230120C00030000",
+      "Type": "BUY",
+      "Qty": 21.0,
+      "Price": 2.4
+    },
+    {
+      "Symbol": "FSLY  240216P00020000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 0.5
+    },
+    {
+      "Symbol": "FXI   250117C00027850",
+      "Type": "BUY",
+      "Qty": 8.0,
+      "Price": 2.8
+    },
+    {
+      "Symbol": "GOLD  240119C00015000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 5.75
+    },
+    {
+      "Symbol": "GOLD  250117C00015000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 2.5
+    },
+    {
+      "Symbol": "GOOGL 230127C00098000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 0.94
+    },
+    {
+      "Symbol": "GOOGL 230210C00100000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.22
+    },
+    {
+      "Symbol": "GOOGL 230217C00097000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 0.49
+    },
+    {
+      "Symbol": "GOOGL 230224C00092000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.27
+    },
+    {
+      "Symbol": "GOOGL 230303C00090000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.96
+    },
+    {
+      "Symbol": "HOOD  240216C00015000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 0.15
+    },
+    {
+      "Symbol": "IBKR  250919C00043750",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 11.48
+    },
+    {
+      "Symbol": "INTC  220715C00045000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.09
+    },
+    {
+      "Symbol": "INTC  261218C00015000",
+      "Type": "BUY",
+      "Qty": 15.0,
+      "Price": 12.04
+    },
+    {
+      "Symbol": "JD    250117C00040000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 10.15
+    },
+    {
+      "Symbol": "JETS  230120C00016860",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.1
+    },
+    {
+      "Symbol": "KOLD  220520C00007000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.75
+    },
+    {
+      "Symbol": "KWEB  220617C00040000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.01
+    },
+    {
+      "Symbol": "KWEB  260116C00025000",
+      "Type": "BUY",
+      "Qty": 30.0,
+      "Price": 4.253333333
+    },
+    {
+      "Symbol": "KWEB  270115C00025000",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 6.7
+    },
+    {
+      "Symbol": "LAZR  211119C00025000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.95
+    },
+    {
+      "Symbol": "LCID  211119C00070000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.56
+    },
+    {
+      "Symbol": "LCID  230120P00040000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 11.9
+    },
+    {
+      "Symbol": "LCID  230224C00010000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.77
+    },
+    {
+      "Symbol": "LUV   230609C00030500",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 0.44
+    },
+    {
+      "Symbol": "MDB   211210P00260000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.0
+    },
+    {
+      "Symbol": "META  220617C00250000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 9.62
+    },
+    {
+      "Symbol": "META  221111C00115000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.48
+    },
+    {
+      "Symbol": "META  230203C00200000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 0.18
+    },
+    {
+      "Symbol": "MMM   230623C00104000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 1.54
+    },
+    {
+      "Symbol": "MSFT  230120C00240000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 2.05
+    },
+    {
+      "Symbol": "MSFT  230203C00265000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.08
+    },
+    {
+      "Symbol": "MSFT  230303C00252500",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.6
+    },
+    {
+      "Symbol": "NEM   250117C00040000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 8.3
+    },
+    {
+      "Symbol": "NFLX  210917P00600000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 6.5
+    },
+    {
+      "Symbol": "NKE   250321C00100000",
+      "Type": "BUY",
+      "Qty": 12.0,
+      "Price": 0.92
+    },
+    {
+      "Symbol": "NKE   250321P00082500",
+      "Type": "BUY",
+      "Qty": 12.0,
+      "Price": 5.67
+    },
+    {
+      "Symbol": "NKE   270115C00090000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 13.35
+    },
+    {
+      "Symbol": "NOW   230127P00400000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.81
+    },
+    {
+      "Symbol": "NVDA  221118C00180000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.82
+    },
+    {
+      "Symbol": "NVDA  230120P00200000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 11.5
+    },
+    {
+      "Symbol": "NXPI  230203C00200000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.22
+    },
+    {
+      "Symbol": "OUST1 240119C00002500",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.02
+    },
+    {
+      "Symbol": "PFE   220617P00055000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 3.4
+    },
+    {
+      "Symbol": "PFE   260116C00020000",
+      "Type": "BUY",
+      "Qty": 4.0,
+      "Price": 7.2
+    },
+    {
+      "Symbol": "PSFE  220414C00005000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 1.15
+    },
+    {
+      "Symbol": "PSFE1 230120C00003000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.3
+    },
+    {
+      "Symbol": "PYPL  230217C00080000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 3.21
+    },
+    {
+      "Symbol": "PYPL  230224C00074000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.86
+    },
+    {
+      "Symbol": "PYPL  240119C00100000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 25.18
+    },
+    {
+      "Symbol": "PYPL  260116C00065000",
+      "Type": "BUY",
+      "Qty": 4.0,
+      "Price": 16.85
+    },
+    {
+      "Symbol": "PYPL  270115C00070000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 21.1
+    },
+    {
+      "Symbol": "QCOM  230203C00145000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.34
+    },
+    {
+      "Symbol": "QQQ   211020P00374000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.85
+    },
+    {
+      "Symbol": "QQQ   211112P00395000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.9
+    },
+    {
+      "Symbol": "QQQ   211201P00393000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.3
+    },
+    {
+      "Symbol": "QQQ   211215P00385000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.16
+    },
+    {
+      "Symbol": "QQQ   211217P00370000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 13.64
+    },
+    {
+      "Symbol": "QQQ   220304C00345000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 4.75
+    },
+    {
+      "Symbol": "QQQ   220309P00340000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 3.82
+    },
+    {
+      "Symbol": "QQQ   230125C00289000",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 0.08
+    },
+    {
+      "Symbol": "QQQ   230207C00303000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.1
+    },
+    {
+      "Symbol": "QQQ   230303C00290000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.81
+    },
+    {
+      "Symbol": "QQQ   230308C00298000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 0.72
+    },
+    {
+      "Symbol": "QQQ   240920P00419780",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 25.5
+    },
+    {
+      "Symbol": "RBLX  230120P00080000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 9.55
+    },
+    {
+      "Symbol": "SAP1  221216C00110000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 4.3
+    },
+    {
+      "Symbol": "SBUX  261218C00070000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 16.35
+    },
+    {
+      "Symbol": "SCHW  250117C00050000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 9.85
+    },
+    {
+      "Symbol": "SCHW  250117C00055000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 13.0
+    },
+    {
+      "Symbol": "SHOP  230217P00047000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.16
+    },
+    {
+      "Symbol": "SHOP  230217P00050000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.22
+    },
+    {
+      "Symbol": "SKLZ1 240119C00002500",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.5
+    },
+    {
+      "Symbol": "SPCE  230120C00020000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 5.2
+    },
+    {
+      "Symbol": "SPY   211203P00450000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 2.73
+    },
+    {
+      "Symbol": "SPY   211210P00460000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.05
+    },
+    {
+      "Symbol": "SPY   220509C00415000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 2.27
+    },
+    {
+      "Symbol": "SPY   220509P00402000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.68
+    },
+    {
+      "Symbol": "SPY   220617P00370000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 4.8
+    },
+    {
+      "Symbol": "SPY   220622P00360000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.98
+    },
+    {
+      "Symbol": "SPY   220701C00400000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.42
+    },
+    {
+      "Symbol": "SPY   220907C00395000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.66
+    },
+    {
+      "Symbol": "SPY   230127C00405000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 0.89
+    },
+    {
+      "Symbol": "SPY   230131P00403000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 0.78
+    },
+    {
+      "Symbol": "SPY   230207P00410000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.31
+    },
+    {
+      "Symbol": "SPY   230217C00405000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 1.01
+    },
+    {
+      "Symbol": "SPY   230217C00408000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 0.34
+    },
+    {
+      "Symbol": "SPY   230217P00406000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 0.65
+    },
+    {
+      "Symbol": "SPY   230307P00401000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 1.33
+    },
+    {
+      "Symbol": "SPY   230310C00395000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.61
+    },
+    {
+      "Symbol": "SPY   230509C00420000",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 0.19
+    },
+    {
+      "Symbol": "SPY   230609P00390000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 1.736666667
+    },
+    {
+      "Symbol": "SPY   230616C00442000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 0.08
+    },
+    {
+      "Symbol": "SPY   230616P00430000",
+      "Type": "BUY",
+      "Qty": 9.0,
+      "Price": 0.6
+    },
+    {
+      "Symbol": "SPY   241220C00380000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 62.65
+    },
+    {
+      "Symbol": "SQ    230224C00080000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.43
+    },
+    {
+      "Symbol": "SQ    250117C00070000",
+      "Type": "BUY",
+      "Qty": 8.0,
+      "Price": 4.1
+    },
+    {
+      "Symbol": "SQ    250117P00060000",
+      "Type": "BUY",
+      "Qty": 8.0,
+      "Price": 8.04
+    },
+    {
+      "Symbol": "STLA  270115C00008000",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 5.794
+    },
+    {
+      "Symbol": "TLRY  220408C00009000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.99
+    },
+    {
+      "Symbol": "TLRY  220408P00007000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.23
+    },
+    {
+      "Symbol": "TLT   260116C00070000",
+      "Type": "BUY",
+      "Qty": 6.0,
+      "Price": 21.47
+    },
+    {
+      "Symbol": "TLT   260116C00100000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 6.06
+    },
+    {
+      "Symbol": "TLT   270115C00080000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 17.4
+    },
+    {
+      "Symbol": "TLT   270115C00090000",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 9.5
+    },
+    {
+      "Symbol": "TLT   270115C00095000",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 10.1
+    },
+    {
+      "Symbol": "TSLA  221104C00240000",
+      "Type": "BUY",
+      "Qty": 3.0,
+      "Price": 0.66
+    },
+    {
+      "Symbol": "TSLA  221104P00200000",
+      "Type": "BUY",
+      "Qty": 6.0,
+      "Price": 0.28
+    },
+    {
+      "Symbol": "TSLA  221118C00200000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.35
+    },
+    {
+      "Symbol": "TSLA  221202P00175000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.07
+    },
+    {
+      "Symbol": "TSLA  221216C00160000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.88
+    },
+    {
+      "Symbol": "TSLA  221223C00120000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 3.5
+    },
+    {
+      "Symbol": "TSLA  221230C00116000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 3.63
+    },
+    {
+      "Symbol": "TSLA  230217C00200000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.3
+    },
+    {
+      "Symbol": "TSLA  230217C00207500",
+      "Type": "BUY",
+      "Qty": 5.0,
+      "Price": 0.374
+    },
+    {
+      "Symbol": "TSLA  230310C00182500",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 2.54
+    },
+    {
+      "Symbol": "TTD   220617P00092000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 10.6
+    },
+    {
+      "Symbol": "USB   250117C00035000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 6.0
+    },
+    {
+      "Symbol": "UVXY  211119C00014000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.22
+    },
+    {
+      "Symbol": "UVXY  211203C00017000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.98
+    },
+    {
+      "Symbol": "UVXY  211217C00015000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.4
+    },
+    {
+      "Symbol": "UVXY  211223C00015000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.54
+    },
+    {
+      "Symbol": "UVXY  211231C00016000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.37
+    },
+    {
+      "Symbol": "UVXY  220114C00011000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 0.92
+    },
+    {
+      "Symbol": "UVXY  220114C00012000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.52
+    },
+    {
+      "Symbol": "UVXY  220211C00014000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.11
+    },
+    {
+      "Symbol": "UVXY  220325C00015000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.06
+    },
+    {
+      "Symbol": "UVXY  220708C00013000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.06
+    },
+    {
+      "Symbol": "WBA   240328C00021500",
+      "Type": "BUY",
+      "Qty": 7.0,
+      "Price": 0.56
+    },
+    {
+      "Symbol": "XYZ   270115C00070000",
+      "Type": "BUY",
+      "Qty": 6.0,
+      "Price": 16.9
+    },
+    {
+      "Symbol": "YINN1 230120C00007000",
+      "Type": "BUY",
+      "Qty": 2.0,
+      "Price": 1.5
+    },
+    {
+      "Symbol": "YINN1 230120C00010000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.05
+    },
+    {
+      "Symbol": "ZM    211203P00160000",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 1.01
+    },
+    {
+      "Symbol": "9988",
+      "Type": "BUY",
+      "Qty": 500.0,
+      "Price": 121.8
+    },
+    {
+      "Symbol": "ABEV",
+      "Type": "BUY",
+      "Qty": 4407.0,
+      "Price": 3.059167234
+    },
+    {
+      "Symbol": "ABNB",
+      "Type": "BUY",
+      "Qty": 50.0,
+      "Price": 120.71
+    },
+    {
+      "Symbol": "ACB.OLD",
+      "Type": "BUY",
+      "Qty": 215.0,
+      "Price": 6.995160465
+    },
+    {
+      "Symbol": "ADBE",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 471.61
+    },
+    {
+      "Symbol": "AI",
+      "Type": "BUY",
+      "Qty": 150.0,
+      "Price": 40.415
+    },
+    {
+      "Symbol": "AMZN",
+      "Type": "BUY",
+      "Qty": 101.0,
+      "Price": 126.151485149
+    },
+    {
+      "Symbol": "ATVI",
+      "Type": "BUY",
+      "Qty": 77.0,
+      "Price": 65.9
+    },
+    {
+      "Symbol": "AVAL",
+      "Type": "BUY",
+      "Qty": 500.0,
+      "Price": 5.1
+    },
+    {
+      "Symbol": "AVK",
+      "Type": "BUY",
+      "Qty": 825.0,
+      "Price": 11.246454545
+    },
+    {
+      "Symbol": "BA",
+      "Type": "BUY",
+      "Qty": 60.0,
+      "Price": 195.038333333
+    },
+    {
+      "Symbol": "BABA",
+      "Type": "BUY",
+      "Qty": 666.0,
+      "Price": 107.698723724
+    },
+    {
+      "Symbol": "BAC",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 29.185
+    },
+    {
+      "Symbol": "BAP",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 110.4
+    },
+    {
+      "Symbol": "BBD",
+      "Type": "BUY",
+      "Qty": 2000.0,
+      "Price": 2.4765
+    },
+    {
+      "Symbol": "BBN",
+      "Type": "BUY",
+      "Qty": 10600.0,
+      "Price": 17.693428113
+    },
+    {
+      "Symbol": "BCAT",
+      "Type": "BUY",
+      "Qty": 600.0,
+      "Price": 15.525
+    },
+    {
+      "Symbol": "BKT",
+      "Type": "BUY",
+      "Qty": 2480.0,
+      "Price": 12.579596774
+    },
+    {
+      "Symbol": "BLW",
+      "Type": "BUY",
+      "Qty": 4400.0,
+      "Price": 12.961436364
+    },
+    {
+      "Symbol": "BMY",
+      "Type": "BUY",
+      "Qty": 50.0,
+      "Price": 57.265
+    },
+    {
+      "Symbol": "BPCR",
+      "Type": "BUY",
+      "Qty": 40000.0,
+      "Price": 0.982
+    },
+    {
+      "Symbol": "BTI",
+      "Type": "BUY",
+      "Qty": 266.0,
+      "Price": 37.5
+    },
+    {
+      "Symbol": "BYND",
+      "Type": "BUY",
+      "Qty": 11.0,
+      "Price": 97.87
+    },
+    {
+      "Symbol": "C",
+      "Type": "BUY",
+      "Qty": 65.0,
+      "Price": 50.992476923
+    },
+    {
+      "Symbol": "CAT",
+      "Type": "BUY",
+      "Qty": 31.0,
+      "Price": 210.670645161
+    },
+    {
+      "Symbol": "CBDBY",
+      "Type": "BUY",
+      "Qty": 5025.0,
+      "Price": 4.57366209
+    },
+    {
+      "Symbol": "CCL",
+      "Type": "BUY",
+      "Qty": 550.0,
+      "Price": 11.602727273
+    },
+    {
+      "Symbol": "CHW",
+      "Type": "BUY",
+      "Qty": 200.0,
+      "Price": 6.6
+    },
+    {
+      "Symbol": "CIG",
+      "Type": "BUY",
+      "Qty": 5000.0,
+      "Price": 2.2
+    },
+    {
+      "Symbol": "CNK",
+      "Type": "BUY",
+      "Qty": 280.0,
+      "Price": 14.893214286
+    },
+    {
+      "Symbol": "CRM",
+      "Type": "BUY",
+      "Qty": 16.0,
+      "Price": 188.63625
+    },
+    {
+      "Symbol": "CRSR",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 23.955
+    },
+    {
+      "Symbol": "DIS",
+      "Type": "BUY",
+      "Qty": 70.0,
+      "Price": 100.415428571
+    },
+    {
+      "Symbol": "DPZ",
+      "Type": "BUY",
+      "Qty": 15.0,
+      "Price": 355.12
+    },
+    {
+      "Symbol": "DSL",
+      "Type": "BUY",
+      "Qty": 735.0,
+      "Price": 12.65937415
+    },
+    {
+      "Symbol": "EAD",
+      "Type": "BUY",
+      "Qty": 1360.0,
+      "Price": 6.857132353
+    },
+    {
+      "Symbol": "EBR",
+      "Type": "BUY",
+      "Qty": 200.0,
+      "Price": 5.53
+    },
+    {
+      "Symbol": "ENIAY",
+      "Type": "BUY",
+      "Qty": 500.0,
+      "Price": 5.59
+    },
+    {
+      "Symbol": "ERC",
+      "Type": "BUY",
+      "Qty": 200.0,
+      "Price": 10.22
+    },
+    {
+      "Symbol": "ETY",
+      "Type": "BUY",
+      "Qty": 640.0,
+      "Price": 14.538
+    },
+    {
+      "Symbol": "GBAB",
+      "Type": "BUY",
+      "Qty": 9260.0,
+      "Price": 17.025096112
+    },
+    {
+      "Symbol": "GDO",
+      "Type": "BUY",
+      "Qty": 10402.0,
+      "Price": 13.113280763
+    },
+    {
+      "Symbol": "GHY",
+      "Type": "BUY",
+      "Qty": 735.0,
+      "Price": 12.636231293
+    },
+    {
+      "Symbol": "GOLD.OLD",
+      "Type": "BUY",
+      "Qty": 250.0,
+      "Price": 18.05
+    },
+    {
+      "Symbol": "GOOGL",
+      "Type": "BUY",
+      "Qty": 50.0,
+      "Price": 99.2761
+    },
+    {
+      "Symbol": "GRFS",
+      "Type": "BUY",
+      "Qty": 900.0,
+      "Price": 11.259288889
+    },
+    {
+      "Symbol": "HIX",
+      "Type": "BUY",
+      "Qty": 11200.0,
+      "Price": 5.0601375
+    },
+    {
+      "Symbol": "HMC",
+      "Type": "BUY",
+      "Qty": 50.0,
+      "Price": 26.015
+    },
+    {
+      "Symbol": "HUYA",
+      "Type": "BUY",
+      "Qty": 1050.0,
+      "Price": 8.900809524
+    },
+    {
+      "Symbol": "ING",
+      "Type": "BUY",
+      "Qty": 200.0,
+      "Price": 10.2725
+    },
+    {
+      "Symbol": "INTC",
+      "Type": "BUY",
+      "Qty": 430.0,
+      "Price": 31.346162791
+    },
+    {
+      "Symbol": "ITUB",
+      "Type": "BUY",
+      "Qty": 8922.0,
+      "Price": 4.474996189
+    },
+    {
+      "Symbol": "JD",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 54.46
+    },
+    {
+      "Symbol": "KGC",
+      "Type": "BUY",
+      "Qty": 500.0,
+      "Price": 5.45
+    },
+    {
+      "Symbol": "KMB",
+      "Type": "BUY",
+      "Qty": 25.0,
+      "Price": 126.1
+    },
+    {
+      "Symbol": "LMT",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 340.4
+    },
+    {
+      "Symbol": "LUV",
+      "Type": "BUY",
+      "Qty": 150.0,
+      "Price": 33.667
+    },
+    {
+      "Symbol": "LVS",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 34.3395
+    },
+    {
+      "Symbol": "META",
+      "Type": "BUY",
+      "Qty": 64.0,
+      "Price": 141.829375
+    },
+    {
+      "Symbol": "MMM",
+      "Type": "BUY",
+      "Qty": 160.0,
+      "Price": 116.952
+    },
+    {
+      "Symbol": "MRK",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 73.432
+    },
+    {
+      "Symbol": "NEM",
+      "Type": "BUY",
+      "Qty": 244.0,
+      "Price": 46.819262295
+    },
+    {
+      "Symbol": "NKE",
+      "Type": "BUY",
+      "Qty": 1300.0,
+      "Price": 82.137692308
+    },
+    {
+      "Symbol": "NU",
+      "Type": "BUY",
+      "Qty": 300.0,
+      "Price": 4.940333333
+    },
+    {
+      "Symbol": "OPEN",
+      "Type": "BUY",
+      "Qty": 300.0,
+      "Price": 10.137966667
+    },
+    {
+      "Symbol": "ORANY",
+      "Type": "BUY",
+      "Qty": 1200.0,
+      "Price": 10.859633333
+    },
+    {
+      "Symbol": "PAGS",
+      "Type": "BUY",
+      "Qty": 1000.0,
+      "Price": 9.394852
+    },
+    {
+      "Symbol": "PDD",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 67.035
+    },
+    {
+      "Symbol": "PFE",
+      "Type": "BUY",
+      "Qty": 120.0,
+      "Price": 43.458
+    },
+    {
+      "Symbol": "PHG",
+      "Type": "BUY",
+      "Qty": 70.0,
+      "Price": 31.2073
+    },
+    {
+      "Symbol": "PML",
+      "Type": "BUY",
+      "Qty": 3000.0,
+      "Price": 9.46806
+    },
+    {
+      "Symbol": "PYPL",
+      "Type": "BUY",
+      "Qty": 480.0,
+      "Price": 70.7986875
+    },
+    {
+      "Symbol": "QIWI",
+      "Type": "BUY",
+      "Qty": 500.0,
+      "Price": 7.5
+    },
+    {
+      "Symbol": "SAP",
+      "Type": "BUY",
+      "Qty": 120.0,
+      "Price": 103.598333333
+    },
+    {
+      "Symbol": "SBS",
+      "Type": "BUY",
+      "Qty": 400.0,
+      "Price": 6.33
+    },
+    {
+      "Symbol": "SKLZ",
+      "Type": "BUY",
+      "Qty": 1400.0,
+      "Price": 6.818571429
+    },
+    {
+      "Symbol": "STM",
+      "Type": "BUY",
+      "Qty": 120.0,
+      "Price": 43.1973225
+    },
+    {
+      "Symbol": "SWK",
+      "Type": "BUY",
+      "Qty": 20.0,
+      "Price": 134.21
+    },
+    {
+      "Symbol": "TDOC",
+      "Type": "BUY",
+      "Qty": 32.0,
+      "Price": 87.20421875
+    },
+    {
+      "Symbol": "TEN",
+      "Type": "BUY",
+      "Qty": 100.0,
+      "Price": 10.321
+    },
+    {
+      "Symbol": "TLRY",
+      "Type": "BUY",
+      "Qty": 700.0,
+      "Price": 11.382142857
+    },
+    {
+      "Symbol": "TSLA",
+      "Type": "BUY",
+      "Qty": 1.0,
+      "Price": 332.635
+    },
+    {
+      "Symbol": "UGP",
+      "Type": "BUY",
+      "Qty": 2000.0,
+      "Price": 2.509935
+    },
+    {
+      "Symbol": "UL",
+      "Type": "BUY",
+      "Qty": 65.0,
+      "Price": 45.49
+    },
+    {
+      "Symbol": "V",
+      "Type": "BUY",
+      "Qty": 10.0,
+      "Price": 195.46
+    },
+    {
+      "Symbol": "VLT",
+      "Type": "BUY",
+      "Qty": 820.0,
+      "Price": 11.349756098
+    },
+    {
+      "Symbol": "VZ",
+      "Type": "BUY",
+      "Qty": 120.0,
+      "Price": 52.0
+    },
+    {
+      "Symbol": "WBA",
+      "Type": "BUY",
+      "Qty": 1356.0865,
+      "Price": 31.089992559
+    },
+    {
+      "Symbol": "WPM",
+      "Type": "BUY",
+      "Qty": 340.0,
+      "Price": 43.089117647
+    },
+    {
+      "Symbol": "XP",
+      "Type": "BUY",
+      "Qty": 4539.0,
+      "Price": 20.257601013
+    },
+    {
+      "Symbol": "XYZ",
+      "Type": "BUY",
+      "Qty": 800.0,
+      "Price": 59.85875
+    }
+  ],
+  "CashJournal": [
+    {
+      "Date": "2021-06-30",
+      "Type": "DIVIDEND",
+      "Amount": 718.22,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-07-07",
+      "Type": "DIVIDEND",
+      "Amount": 6.19,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-09-17",
+      "Type": "DIVIDEND",
+      "Amount": 700.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-11-12",
+      "Type": "DIVIDEND",
+      "Amount": 2.9,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-11-16",
+      "Type": "DIVIDEND",
+      "Amount": 191.98,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-11-19",
+      "Type": "DIVIDEND",
+      "Amount": 0.16,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-12-01",
+      "Type": "DIVIDEND",
+      "Amount": 17.38,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-12-02",
+      "Type": "DIVIDEND",
+      "Amount": 1260.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-12-13",
+      "Type": "DIVIDEND",
+      "Amount": 3.45,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-12-27",
+      "Type": "DIVIDEND",
+      "Amount": 28.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-12-28",
+      "Type": "DIVIDEND",
+      "Amount": 14.14,
+      "Desc": "Short Term Capital Gain"
+    },
+    {
+      "Date": "2021-12-30",
+      "Type": "DIVIDEND",
+      "Amount": 101.32,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-01-05",
+      "Type": "DIVIDEND",
+      "Amount": 4.42,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-01-06",
+      "Type": "DIVIDEND",
+      "Amount": 41.66,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-01-06",
+      "Type": "DIVIDEND",
+      "Amount": 11.82,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-01-07",
+      "Type": "DIVIDEND",
+      "Amount": 13.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-01-13",
+      "Type": "DIVIDEND",
+      "Amount": 9.95,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-02-02",
+      "Type": "DIVIDEND",
+      "Amount": 2250.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-02-08",
+      "Type": "DIVIDEND",
+      "Amount": 11.46,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-02-11",
+      "Type": "DIVIDEND",
+      "Amount": 21.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-02-11",
+      "Type": "DIVIDEND",
+      "Amount": 10.71,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-02-14",
+      "Type": "DIVIDEND",
+      "Amount": 194.15,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-03-08",
+      "Type": "DIVIDEND",
+      "Amount": 11.6,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-03-14",
+      "Type": "DIVIDEND",
+      "Amount": 29.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-03-21",
+      "Type": "DIVIDEND",
+      "Amount": 167.42,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-03-24",
+      "Type": "DIVIDEND",
+      "Amount": 15.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-05-16",
+      "Type": "DIVIDEND",
+      "Amount": 43.14,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-05-25",
+      "Type": "DIVIDEND",
+      "Amount": 24.35,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-05-27",
+      "Type": "DIVIDEND",
+      "Amount": 22.95,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-06-01",
+      "Type": "DIVIDEND",
+      "Amount": 1260.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-06-08",
+      "Type": "DIVIDEND",
+      "Amount": 63.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-06-10",
+      "Type": "DIVIDEND",
+      "Amount": 47.75,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-06-13",
+      "Type": "DIVIDEND",
+      "Amount": 14.9,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-06-16",
+      "Type": "DIVIDEND",
+      "Amount": 29.61,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-06-21",
+      "Type": "DIVIDEND",
+      "Amount": 15.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-06-24",
+      "Type": "DIVIDEND",
+      "Amount": 3.08,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-07-28",
+      "Type": "DIVIDEND",
+      "Amount": 615.2937,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-07-29",
+      "Type": "DIVIDEND",
+      "Amount": 213.74,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-07-29",
+      "Type": "DIVIDEND",
+      "Amount": 235.44,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-07-29",
+      "Type": "DIVIDEND",
+      "Amount": 202.79,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-08-01",
+      "Type": "DIVIDEND",
+      "Amount": 232.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-08-05",
+      "Type": "DIVIDEND",
+      "Amount": 124.4,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-08-05",
+      "Type": "DIVIDEND",
+      "Amount": 158.34,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-08-31",
+      "Type": "DIVIDEND",
+      "Amount": 235.44,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-08-31",
+      "Type": "DIVIDEND",
+      "Amount": 202.78,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-08-31",
+      "Type": "DIVIDEND",
+      "Amount": 213.74,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-09-08",
+      "Type": "DIVIDEND",
+      "Amount": 112.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-09-08",
+      "Type": "DIVIDEND",
+      "Amount": 10.46,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-09-08",
+      "Type": "DIVIDEND",
+      "Amount": 157.56,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-09-20",
+      "Type": "DIVIDEND",
+      "Amount": 7.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-09-30",
+      "Type": "DIVIDEND",
+      "Amount": 213.74,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-03",
+      "Type": "DIVIDEND",
+      "Amount": 15.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-03",
+      "Type": "DIVIDEND",
+      "Amount": 132.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-03",
+      "Type": "DIVIDEND",
+      "Amount": 232.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-07",
+      "Type": "DIVIDEND",
+      "Amount": 175.83,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-07",
+      "Type": "DIVIDEND",
+      "Amount": 11.66,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-07",
+      "Type": "DIVIDEND",
+      "Amount": 133.45,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-07",
+      "Type": "DIVIDEND",
+      "Amount": 152.88,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-20",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-10-31",
+      "Type": "DIVIDEND",
+      "Amount": 213.74,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-01",
+      "Type": "DIVIDEND",
+      "Amount": 232.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-01",
+      "Type": "DIVIDEND",
+      "Amount": 132.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-07",
+      "Type": "DIVIDEND",
+      "Amount": 153.4,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-07",
+      "Type": "DIVIDEND",
+      "Amount": 160.81,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-07",
+      "Type": "DIVIDEND",
+      "Amount": 12.51,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-07",
+      "Type": "DIVIDEND",
+      "Amount": 137.36,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-18",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-11-30",
+      "Type": "DIVIDEND",
+      "Amount": 213.74,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-01",
+      "Type": "DIVIDEND",
+      "Amount": 132.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-01",
+      "Type": "DIVIDEND",
+      "Amount": 232.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-01",
+      "Type": "DIVIDEND",
+      "Amount": 1260.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-07",
+      "Type": "DIVIDEND",
+      "Amount": 122.17,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-07",
+      "Type": "DIVIDEND",
+      "Amount": 13.9,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-07",
+      "Type": "DIVIDEND",
+      "Amount": 146.12,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-07",
+      "Type": "DIVIDEND",
+      "Amount": 216.36,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-12",
+      "Type": "DIVIDEND",
+      "Amount": 43.72,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-19",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-21",
+      "Type": "DIVIDEND",
+      "Amount": 13.4,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-21",
+      "Type": "DIVIDEND",
+      "Amount": 122.36,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-23",
+      "Type": "DIVIDEND",
+      "Amount": 213.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-30",
+      "Type": "DIVIDEND",
+      "Amount": 213.74,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-30",
+      "Type": "DIVIDEND",
+      "Amount": 132.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-30",
+      "Type": "DIVIDEND",
+      "Amount": 232.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2022-12-30",
+      "Type": "DIVIDEND",
+      "Amount": 157.69,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-01-13",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 203.52,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 35.83,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-02-01",
+      "Type": "DIVIDEND",
+      "Amount": 2250.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-02-01",
+      "Type": "DIVIDEND",
+      "Amount": 132.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-02-01",
+      "Type": "DIVIDEND",
+      "Amount": 232.3,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-02-07",
+      "Type": "DIVIDEND",
+      "Amount": 13.04,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-02-17",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-02-28",
+      "Type": "DIVIDEND",
+      "Amount": 102.9,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-01",
+      "Type": "DIVIDEND",
+      "Amount": 118.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-01",
+      "Type": "DIVIDEND",
+      "Amount": 65.7,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-01",
+      "Type": "DIVIDEND",
+      "Amount": 127.26,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-07",
+      "Type": "DIVIDEND",
+      "Amount": 12.9,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-10",
+      "Type": "DIVIDEND",
+      "Amount": 0.04,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-20",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-28",
+      "Type": "DIVIDEND",
+      "Amount": 88.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-28",
+      "Type": "DIVIDEND",
+      "Amount": 168.96,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-30",
+      "Type": "DIVIDEND",
+      "Amount": 18.15,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 98.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 154.35,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 125.73,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-03",
+      "Type": "DIVIDEND",
+      "Amount": 118.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-03",
+      "Type": "DIVIDEND",
+      "Amount": 242.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-06",
+      "Type": "DIVIDEND",
+      "Amount": 15.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-14",
+      "Type": "DIVIDEND",
+      "Amount": 115.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-20",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-28",
+      "Type": "DIVIDEND",
+      "Amount": 188.59,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-28",
+      "Type": "DIVIDEND",
+      "Amount": 196.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-04-28",
+      "Type": "DIVIDEND",
+      "Amount": 154.35,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-01",
+      "Type": "DIVIDEND",
+      "Amount": 147.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-01",
+      "Type": "DIVIDEND",
+      "Amount": 242.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-02",
+      "Type": "DIVIDEND",
+      "Amount": 182.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-02",
+      "Type": "DIVIDEND",
+      "Amount": 173.01,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-05",
+      "Type": "DIVIDEND",
+      "Amount": 119.26,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-11",
+      "Type": "DIVIDEND",
+      "Amount": 107.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-18",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 168.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 201.25,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 154.35,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 196.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 188.59,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-01",
+      "Type": "DIVIDEND",
+      "Amount": 220.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-01",
+      "Type": "DIVIDEND",
+      "Amount": 242.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-01",
+      "Type": "DIVIDEND",
+      "Amount": 22.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-07",
+      "Type": "DIVIDEND",
+      "Amount": 47.21,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-09",
+      "Type": "DIVIDEND",
+      "Amount": 49.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-12",
+      "Type": "DIVIDEND",
+      "Amount": 0.04,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-13",
+      "Type": "DIVIDEND",
+      "Amount": 161.25,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-15",
+      "Type": "DIVIDEND",
+      "Amount": 40.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-16",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-28",
+      "Type": "DIVIDEND",
+      "Amount": 228.62,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-28",
+      "Type": "DIVIDEND",
+      "Amount": 65.6,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-30",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-30",
+      "Type": "DIVIDEND",
+      "Amount": 196.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-06-30",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "DIVIDEND",
+      "Amount": 242.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "DIVIDEND",
+      "Amount": 220.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-12",
+      "Type": "DIVIDEND",
+      "Amount": 27.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-14",
+      "Type": "DIVIDEND",
+      "Amount": 161.25,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-20",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-24",
+      "Type": "DIVIDEND",
+      "Amount": 224.73,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-31",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-31",
+      "Type": "DIVIDEND",
+      "Amount": 196.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-07-31",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-01",
+      "Type": "DIVIDEND",
+      "Amount": 242.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-01",
+      "Type": "DIVIDEND",
+      "Amount": 220.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-01",
+      "Type": "DIVIDEND",
+      "Amount": 224.63,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-11",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-17",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-21",
+      "Type": "DIVIDEND",
+      "Amount": 188.19,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-29",
+      "Type": "DIVIDEND",
+      "Amount": 217.63,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-31",
+      "Type": "DIVIDEND",
+      "Amount": 171.86,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-31",
+      "Type": "DIVIDEND",
+      "Amount": 196.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-08-31",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-01",
+      "Type": "DIVIDEND",
+      "Amount": 220.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-01",
+      "Type": "DIVIDEND",
+      "Amount": 242.1,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-05",
+      "Type": "DIVIDEND",
+      "Amount": 49.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-12",
+      "Type": "DIVIDEND",
+      "Amount": 0.04,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-14",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-18",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-21",
+      "Type": "DIVIDEND",
+      "Amount": 40.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-21",
+      "Type": "DIVIDEND",
+      "Amount": 185.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-26",
+      "Type": "DIVIDEND",
+      "Amount": 50.58,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-26",
+      "Type": "DIVIDEND",
+      "Amount": 50.15,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-26",
+      "Type": "DIVIDEND",
+      "Amount": 215.77,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-29",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-29",
+      "Type": "DIVIDEND",
+      "Amount": 196.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-09-29",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-02",
+      "Type": "DIVIDEND",
+      "Amount": 318.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-02",
+      "Type": "DIVIDEND",
+      "Amount": 244.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-13",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-19",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-23",
+      "Type": "DIVIDEND",
+      "Amount": 235.26,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-31",
+      "Type": "DIVIDEND",
+      "Amount": 202.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-31",
+      "Type": "DIVIDEND",
+      "Amount": 215.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-31",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-10-31",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-01",
+      "Type": "DIVIDEND",
+      "Amount": 244.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-01",
+      "Type": "DIVIDEND",
+      "Amount": 318.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-13",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-20",
+      "Type": "DIVIDEND",
+      "Amount": 167.58,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-20",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-29",
+      "Type": "DIVIDEND",
+      "Amount": 209.75,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-30",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-30",
+      "Type": "DIVIDEND",
+      "Amount": 215.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-30",
+      "Type": "DIVIDEND",
+      "Amount": 226.06,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-11-30",
+      "Type": "DIVIDEND",
+      "Amount": 0.25,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2023-12-01",
+      "Type": "DIVIDEND",
+      "Amount": 318.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-01",
+      "Type": "DIVIDEND",
+      "Amount": 244.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-04",
+      "Type": "DIVIDEND",
+      "Amount": 49.2,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-12",
+      "Type": "DIVIDEND",
+      "Amount": 0.04,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-13",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-18",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-20",
+      "Type": "DIVIDEND",
+      "Amount": 171.86,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-21",
+      "Type": "DIVIDEND",
+      "Amount": 164.52,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-22",
+      "Type": "DIVIDEND",
+      "Amount": 40.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-29",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-29",
+      "Type": "DIVIDEND",
+      "Amount": 244.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-29",
+      "Type": "DIVIDEND",
+      "Amount": 318.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-29",
+      "Type": "DIVIDEND",
+      "Amount": 24.86,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2023-12-29",
+      "Type": "DIVIDEND",
+      "Amount": 87.82,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-01-08",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-01-24",
+      "Type": "DIVIDEND",
+      "Amount": 105.12,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-01-30",
+      "Type": "DIVIDEND",
+      "Amount": 140.59,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 163.45,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 125.41,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-02-01",
+      "Type": "DIVIDEND",
+      "Amount": 318.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-02-01",
+      "Type": "DIVIDEND",
+      "Amount": 122.4,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-02-13",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-02-20",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-02-21",
+      "Type": "DIVIDEND",
+      "Amount": 64.84,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-02-29",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-02-29",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-01",
+      "Type": "DIVIDEND",
+      "Amount": 244.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-01",
+      "Type": "DIVIDEND",
+      "Amount": 318.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-12",
+      "Type": "DIVIDEND",
+      "Amount": 0.02,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-13",
+      "Type": "DIVIDEND",
+      "Amount": 157.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-20",
+      "Type": "DIVIDEND",
+      "Amount": 76.72,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-21",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-26",
+      "Type": "DIVIDEND",
+      "Amount": 1.06,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-03-26",
+      "Type": "DIVIDEND",
+      "Amount": 8.18,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-26",
+      "Type": "DIVIDEND",
+      "Amount": 15.99,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-28",
+      "Type": "DIVIDEND",
+      "Amount": 25.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-28",
+      "Type": "DIVIDEND",
+      "Amount": 171.86,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-03-29",
+      "Type": "DIVIDEND",
+      "Amount": 15.46,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-03-29",
+      "Type": "DIVIDEND",
+      "Amount": 210.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-01",
+      "Type": "DIVIDEND",
+      "Amount": 244.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-01",
+      "Type": "DIVIDEND",
+      "Amount": 303.75,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-01",
+      "Type": "DIVIDEND",
+      "Amount": 14.75,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-04-11",
+      "Type": "DIVIDEND",
+      "Amount": 142.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-19",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-22",
+      "Type": "DIVIDEND",
+      "Amount": 100.72,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-30",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-30",
+      "Type": "DIVIDEND",
+      "Amount": 224.93,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-04-30",
+      "Type": "DIVIDEND",
+      "Amount": 1.38,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-05-01",
+      "Type": "DIVIDEND",
+      "Amount": 244.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-05-01",
+      "Type": "DIVIDEND",
+      "Amount": 3.53,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-05-01",
+      "Type": "DIVIDEND",
+      "Amount": 314.97,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-05-13",
+      "Type": "DIVIDEND",
+      "Amount": 142.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-05-21",
+      "Type": "DIVIDEND",
+      "Amount": 5.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-05-21",
+      "Type": "DIVIDEND",
+      "Amount": 73.08,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 171.86,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 7.8,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-05-31",
+      "Type": "DIVIDEND",
+      "Amount": 218.52,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-06-03",
+      "Type": "DIVIDEND",
+      "Amount": 317.32,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-06-03",
+      "Type": "DIVIDEND",
+      "Amount": 1.18,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-06-03",
+      "Type": "DIVIDEND",
+      "Amount": 244.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-06-12",
+      "Type": "DIVIDEND",
+      "Amount": 180.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-06-21",
+      "Type": "DIVIDEND",
+      "Amount": 76.48,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-06-28",
+      "Type": "DIVIDEND",
+      "Amount": 171.86,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-06-28",
+      "Type": "DIVIDEND",
+      "Amount": 20.87,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-06-28",
+      "Type": "DIVIDEND",
+      "Amount": 205.44,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-07-01",
+      "Type": "DIVIDEND",
+      "Amount": 292.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-07-01",
+      "Type": "DIVIDEND",
+      "Amount": 316.83,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-07-01",
+      "Type": "DIVIDEND",
+      "Amount": 1.67,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-07-11",
+      "Type": "DIVIDEND",
+      "Amount": 180.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-07-31",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-07-31",
+      "Type": "DIVIDEND",
+      "Amount": 202.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-07-31",
+      "Type": "DIVIDEND",
+      "Amount": 23.51,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-08-01",
+      "Type": "DIVIDEND",
+      "Amount": 292.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-08-01",
+      "Type": "DIVIDEND",
+      "Amount": 306.69,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-08-01",
+      "Type": "DIVIDEND",
+      "Amount": 11.81,
+      "Desc": "Payment In Lieu"
+    },
+    {
+      "Date": "2024-08-12",
+      "Type": "DIVIDEND",
+      "Amount": 180.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-08-30",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-08-30",
+      "Type": "DIVIDEND",
+      "Amount": 171.87,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-09-03",
+      "Type": "DIVIDEND",
+      "Amount": 318.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-09-03",
+      "Type": "DIVIDEND",
+      "Amount": 292.8,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-09-12",
+      "Type": "DIVIDEND",
+      "Amount": 180.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-09-30",
+      "Type": "DIVIDEND",
+      "Amount": 171.86,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-09-30",
+      "Type": "DIVIDEND",
+      "Amount": 226.31,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-13",
+      "Type": "DIVIDEND",
+      "Amount": 80.64,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-25",
+      "Type": "DIVIDEND",
+      "Amount": 95.34,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-29",
+      "Type": "DIVIDEND",
+      "Amount": 80.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-29",
+      "Type": "DIVIDEND",
+      "Amount": 79.05,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-29",
+      "Type": "DIVIDEND",
+      "Amount": 96.69,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-29",
+      "Type": "DIVIDEND",
+      "Amount": 70.41,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-29",
+      "Type": "DIVIDEND",
+      "Amount": 77.18,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-11-29",
+      "Type": "DIVIDEND",
+      "Amount": 63.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-02",
+      "Type": "DIVIDEND",
+      "Amount": 95.16,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-02",
+      "Type": "DIVIDEND",
+      "Amount": 71.67,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-11",
+      "Type": "DIVIDEND",
+      "Amount": 82.32,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-31",
+      "Type": "DIVIDEND",
+      "Amount": 63.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-31",
+      "Type": "DIVIDEND",
+      "Amount": 80.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-31",
+      "Type": "DIVIDEND",
+      "Amount": 70.41,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-31",
+      "Type": "DIVIDEND",
+      "Amount": 77.18,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-31",
+      "Type": "DIVIDEND",
+      "Amount": 79.05,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-31",
+      "Type": "DIVIDEND",
+      "Amount": 96.69,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2024-12-31",
+      "Type": "DIVIDEND",
+      "Amount": 95.16,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-02",
+      "Type": "DIVIDEND",
+      "Amount": 72.16,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-07",
+      "Type": "DIVIDEND",
+      "Amount": 95.68,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-07",
+      "Type": "DIVIDEND",
+      "Amount": 82.32,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-09",
+      "Type": "DIVIDEND",
+      "Amount": 77.18,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-28",
+      "Type": "DIVIDEND",
+      "Amount": 96.71,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 80.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 63.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 79.05,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 70.41,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-01-31",
+      "Type": "DIVIDEND",
+      "Amount": 96.69,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-03",
+      "Type": "DIVIDEND",
+      "Amount": 95.16,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-03",
+      "Type": "DIVIDEND",
+      "Amount": 72.5,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-12",
+      "Type": "DIVIDEND",
+      "Amount": 81.06,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-28",
+      "Type": "DIVIDEND",
+      "Amount": 77.18,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-28",
+      "Type": "DIVIDEND",
+      "Amount": 70.41,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-28",
+      "Type": "DIVIDEND",
+      "Amount": 86.59,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-28",
+      "Type": "DIVIDEND",
+      "Amount": 80.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-28",
+      "Type": "DIVIDEND",
+      "Amount": 79.05,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-02-28",
+      "Type": "DIVIDEND",
+      "Amount": 63.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-03",
+      "Type": "DIVIDEND",
+      "Amount": 72.62,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-03",
+      "Type": "DIVIDEND",
+      "Amount": 93.55,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-12",
+      "Type": "DIVIDEND",
+      "Amount": 84.0,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-28",
+      "Type": "DIVIDEND",
+      "Amount": 84.22,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 63.49,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 70.41,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 77.18,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 172.34,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 88.38,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-03-31",
+      "Type": "DIVIDEND",
+      "Amount": 80.85,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-04-01",
+      "Type": "DIVIDEND",
+      "Amount": 72.71,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2025-04-10",
+      "Type": "DIVIDEND",
+      "Amount": 81.9,
+      "Desc": "Dividend Payment"
+    },
+    {
+      "Date": "2021-05-12",
+      "Type": "DEPOSIT",
+      "Amount": 66225.0,
+      "Desc": "Cash Receipts / Electronic Fund Transfers "
+    },
+    {
+      "Date": "2021-05-14",
+      "Type": "ACATIN",
+      "Amount": 32362.5,
+      "Desc": "Banort 5 3/4 10/04/31 (BANORT 5 3/4 10/04/31 8AC3) Quantity: 30,000"
+    },
+    {
+      "Date": "2021-05-14",
+      "Type": "ACATIN",
+      "Amount": 30465.0,
+      "Desc": "Gnbsud 6 1/2 04/03/27 (GNBSUD 6 1/2 04/03/27) Quantity: 30,000"
+    },
+    {
+      "Date": "2021-05-14",
+      "Type": "ACATIN",
+      "Amount": 30750.0,
+      "Desc": "Orazen 5 5/8 04/28/27 (ORAZEN 5 5/8 04/28/27) Quantity: 30,000"
+    },
+    {
+      "Date": "2021-05-14",
+      "Type": "ACATIN",
+      "Amount": 30639.0,
+      "Desc": "Bcolo 4 7/8 10/18/27 (BCOLO 4 7/8 10/18/27) Quantity: 30,000"
+    },
+    {
+      "Date": "2021-05-14",
+      "Type": "ACATIN",
+      "Amount": 30604.5,
+      "Desc": "Inrshm 5 3/4 04/03/28 (INRSHM 5 3/4 04/03/28 3AD3) Quantity: 30,000"
+    },
+    {
+      "Date": "2021-05-14",
+      "Type": "ACATIN",
+      "Amount": 31284.0,
+      "Desc": "Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: 30,000"
+    },
+    {
+      "Date": "2021-05-14",
+      "Type": "ACATIN",
+      "Amount": 29909.23,
+      "Desc": "Termoc 7 7/8 01/30/29 (TERMOC 7 7/8 01/30/29 FAB6) Quantity: 30,000"
+    },
+    {
+      "Date": "2021-05-17",
+      "Type": "DEPOSIT",
+      "Amount": 30000.0,
+      "Desc": "Cash Receipts / Electronic Fund Transfers "
+    },
+    {
+      "Date": "2021-05-19",
+      "Type": "ACATIN",
+      "Amount": 39727.69,
+      "Desc": "Biopharma Credit Plc (BPCR) Quantity: 41,041"
+    },
+    {
+      "Date": "2021-05-24",
+      "Type": "DEPOSIT",
+      "Amount": 40000.0,
+      "Desc": "Cash Receipts / Electronic Fund Transfers "
+    },
+    {
+      "Date": "2023-02-06",
+      "Type": "ACATOUT",
+      "Amount": -28800.0,
+      "Desc": "Banort 5 3/4 10/04/31 (BANORT 5 3/4 10/04/31 8AC3) Quantity: -30,000"
+    },
+    {
+      "Date": "2023-02-06",
+      "Type": "ACATOUT",
+      "Amount": -28500.0,
+      "Desc": "Gnbsud 7.051 04/03/27 (GNBSUD 6 1/2 04/03/27) Quantity: -30,000"
+    },
+    {
+      "Date": "2023-02-06",
+      "Type": "ACATOUT",
+      "Amount": -27366.3,
+      "Desc": "Orsape 5 5/8 04/28/27 (ORSAPE 5 5/8 04/28/27) Quantity: -30,000"
+    },
+    {
+      "Date": "2023-02-06",
+      "Type": "ACATOUT",
+      "Amount": -30397.5,
+      "Desc": "Bcolo 7.139 10/18/27 (BCOLO 4 7/8 10/18/27) Quantity: -30,000"
+    },
+    {
+      "Date": "2023-02-06",
+      "Type": "ACATOUT",
+      "Amount": -25348.45,
+      "Desc": "Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: -30,000"
+    },
+    {
+      "Date": "2023-02-06",
+      "Type": "ACATOUT",
+      "Amount": -22145.63,
+      "Desc": "Termoc 7 7/8 01/30/29 (TERMOC 7 7/8 01/30/29 FAB6) Quantity: -30,000"
+    },
+    {
+      "Date": "2023-02-15",
+      "Type": "TRANSFER",
+      "Amount": 0.07,
+      "Desc": "Adjustment: Other (orf Adjustment Credit) "
+    },
+    {
+      "Date": "2023-11-14",
+      "Type": "TRNSFROUT",
+      "Amount": -3000.0,
+      "Desc": "Transfer From U6177570 To U13349959 "
+    },
+    {
+      "Date": "2023-11-14",
+      "Type": "TRNSFROUT",
+      "Amount": -29000.0,
+      "Desc": "Transfer From U6177570 To U13349959 "
+    },
+    {
+      "Date": "2023-11-27",
+      "Type": "TRNSFROUT",
+      "Amount": -24770.0,
+      "Desc": "Transfer From U6177570 To U6177570-P "
+    },
+    {
+      "Date": "2023-11-27",
+      "Type": "TRNSFRIN",
+      "Amount": 37000.0,
+      "Desc": "Transfer From U13349959 To U6177570 "
+    },
+    {
+      "Date": "2023-11-27",
+      "Type": "TRNSFRIN",
+      "Amount": 24770.0,
+      "Desc": "Transfer From U6177570 To U6177570-P "
+    },
+    {
+      "Date": "2024-02-14",
+      "Type": "WITHDRAWAL",
+      "Amount": -36000.0,
+      "Desc": "Disbursement Initiated By Daniel E Cicirello Cook "
+    },
+    {
+      "Date": "2024-02-15",
+      "Type": "TRNSFROUT",
+      "Amount": -360.0,
+      "Desc": "Transfer From U6177570 To U13349959 "
+    },
+    {
+      "Date": "2024-08-01",
+      "Type": "TRNSFRIN",
+      "Amount": 37778.0,
+      "Desc": "Transfer From U6177570-P To U6177570 "
+    },
+    {
+      "Date": "2024-08-01",
+      "Type": "TRNSFROUT",
+      "Amount": -37778.0,
+      "Desc": "Transfer From U6177570-P To U6177570 "
+    },
+    {
+      "Date": "2024-12-19",
+      "Type": "TRANSFER",
+      "Amount": 0.41,
+      "Desc": "Adjustment: Commission (consolidated Audit Trail Fee Refund) "
+    },
+    {
+      "Date": "2025-03-14",
+      "Type": "ACATIN",
+      "Amount": 91813.84,
+      "Desc": "Ishares Bitcoin Trust Etf (IBIT) Quantity: 2,017"
+    },
+    {
+      "Date": "2025-04-10",
+      "Type": "ACATOUT",
+      "Amount": -92898.6,
+      "Desc": "Ishares Short Treasury Bond (SHV) Quantity: -843"
+    },
+    {
+      "Date": "2025-04-29",
+      "Type": "WITHDRAWAL",
+      "Amount": -50500.0,
+      "Desc": "Disbursement Initiated By Daniel E Cicirello Cook "
+    },
+    {
+      "Date": "2025-05-15",
+      "Type": "ACATOUT",
+      "Amount": -70540.8,
+      "Desc": "Ishares Short Treasury Bond (SHV) Quantity: -640"
+    },
+    {
+      "Date": "2025-10-21",
+      "Type": "ACATIN",
+      "Amount": 3642.21,
+      "Desc": "Ishares Short Treasury Bond (SHV) Quantity: 33"
+    },
+    {
+      "Date": "2025-10-21",
+      "Type": "ACATIN",
+      "Amount": 105093.1,
+      "Desc": "Ishares Bitcoin Trust Etf (IBIT) Quantity: 1,670"
+    },
+    {
+      "Date": "2025-12-22",
+      "Type": "DEPOSIT",
+      "Amount": 120400.0,
+      "Desc": "Cash Receipts / Electronic Fund Transfers "
+    },
+    {
+      "Date": "2021-06-01",
+      "Type": "INTEREST",
+      "Amount": 956.25,
+      "Desc": "Bond Coupon Payment HNTOIL 6 3/8 06/01/28"
+    },
+    {
+      "Date": "2021-06-10",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 340.21,
+      "Desc": "Accrued Interest Received INRSHM 5 3/4 04/03/28"
+    },
+    {
+      "Date": "2021-06-30",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -284.17,
+      "Desc": "Accrued Interest Paid RCL 5 1/2 04/01/28"
+    },
+    {
+      "Date": "2021-07-01",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -444.58,
+      "Desc": "Accrued Interest Paid RCL 5 1/2 04/01/28"
+    },
+    {
+      "Date": "2021-07-19",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -5.54,
+      "Desc": "Accrued Interest Paid CCL 6.65 01/15/28"
+    },
+    {
+      "Date": "2021-07-19",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -11.08,
+      "Desc": "Accrued Interest Paid CCL 6.65 01/15/28"
+    },
+    {
+      "Date": "2021-07-22",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -40.64,
+      "Desc": "Accrued Interest Paid CCL 6.65 01/15/28"
+    },
+    {
+      "Date": "2021-07-22",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 893.75,
+      "Desc": "Accrued Interest Received RCL 5 1/2 04/01/28"
+    },
+    {
+      "Date": "2021-07-22",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -30.48,
+      "Desc": "Accrued Interest Paid CCL 6.65 01/15/28"
+    },
+    {
+      "Date": "2021-07-27",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -916.67,
+      "Desc": "Accrued Interest Paid RCL 5 1/2 04/01/28"
+    },
+    {
+      "Date": "2021-07-30",
+      "Type": "INTEREST",
+      "Amount": 1092.66,
+      "Desc": "Bond Coupon Payment TERMOC 7 7/8 01/30/29 FAB6"
+    },
+    {
+      "Date": "2021-08-05",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": -1054.44,
+      "Desc": "Accrued Interest Paid PEMEX 6 1/2 03/13/27"
+    },
+    {
+      "Date": "2021-08-31",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 1220.56,
+      "Desc": "Accrued Interest Received PEMEX 6 1/2 03/13/27"
+    },
+    {
+      "Date": "2021-09-02",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 96.06,
+      "Desc": "Accrued Interest Received CCL 6.65 01/15/28"
+    },
+    {
+      "Date": "2021-09-03",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 29.37,
+      "Desc": "Accrued Interest Received CCL 6.65 01/15/28"
+    },
+    {
+      "Date": "2021-10-01",
+      "Type": "INTEREST",
+      "Amount": 1390.28,
+      "Desc": "Bond Coupon Payment RCL 5 1/2 04/01/28 TAE3"
+    },
+    {
+      "Date": "2021-10-03",
+      "Type": "INTEREST",
+      "Amount": 975.0,
+      "Desc": "Bond Coupon Payment GNBSUD 6 1/2 04/03/27"
+    },
+    {
+      "Date": "2021-10-04",
+      "Type": "INTEREST",
+      "Amount": 862.5,
+      "Desc": "Bond Coupon Payment BANORT 5 3/4 10/04/31 8AC3"
+    },
+    {
+      "Date": "2021-10-18",
+      "Type": "INTEREST",
+      "Amount": 731.25,
+      "Desc": "Bond Coupon Payment BCOLO 4 7/8 10/18/27"
+    },
+    {
+      "Date": "2021-10-28",
+      "Type": "INTEREST",
+      "Amount": 843.75,
+      "Desc": "Bond Coupon Payment ORAZEN 5 5/8 04/28/27"
+    },
+    {
+      "Date": "2021-11-05",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 779.16,
+      "Desc": "Accrued Interest Received CCL 6.65 01/15/28"
+    },
+    {
+      "Date": "2021-12-01",
+      "Type": "INTEREST",
+      "Amount": 956.25,
+      "Desc": "Bond Coupon Payment HNTOIL 6 3/8 06/01/28"
+    },
+    {
+      "Date": "2021-12-28",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 54.39,
+      "Desc": "Accrued Interest Received RCL 5 1/2 04/01/28"
+    },
+    {
+      "Date": "2021-12-30",
+      "Type": "ACCRUED_INTEREST",
+      "Amount": 646.56,
+      "Desc": "Accrued Interest Received RCL 5 1/2 04/01/28"
+    },
+    {
+      "Date": "2022-01-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -15.7400672,
+      "Desc": "HKD Debit Interest Paid for December 2021"
+    },
+    {
+      "Date": "2022-01-31",
+      "Type": "INTEREST",
+      "Amount": 1092.66,
+      "Desc": "Bond Coupon Payment TERMOC 7 7/8 01/30/29 FAB6"
+    },
+    {
+      "Date": "2022-02-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -0.9482848,
+      "Desc": "HKD Debit Interest Paid for January 2022"
+    },
+    {
+      "Date": "2022-03-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -0.0358232,
+      "Desc": "HKD Debit Interest Paid for February 2022"
+    },
+    {
+      "Date": "2022-04-03",
+      "Type": "INTEREST",
+      "Amount": 975.0,
+      "Desc": "Bond Coupon Payment GNBSUD 6 1/2 04/03/27"
+    },
+    {
+      "Date": "2022-04-04",
+      "Type": "INTEREST",
+      "Amount": 862.5,
+      "Desc": "Bond Coupon Payment BANORT 5 3/4 10/04/31 8AC3"
+    },
+    {
+      "Date": "2022-04-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -0.0395684,
+      "Desc": "HKD Debit Interest Paid for March 2022"
+    },
+    {
+      "Date": "2022-04-18",
+      "Type": "INTEREST",
+      "Amount": 731.25,
+      "Desc": "Bond Coupon Payment BCOLO 4 7/8 10/18/27"
+    },
+    {
+      "Date": "2022-04-28",
+      "Type": "INTEREST",
+      "Amount": 843.75,
+      "Desc": "Bond Coupon Payment ORAZEN 5 5/8 04/28/27"
+    },
+    {
+      "Date": "2022-05-04",
+      "Type": "INTEREST",
+      "Amount": -0.2,
+      "Desc": "USD Net Stock Interest Paid for April 2022"
+    },
+    {
+      "Date": "2022-05-04",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -0.038223,
+      "Desc": "HKD Debit Interest Paid for April 2022"
+    },
+    {
+      "Date": "2022-06-01",
+      "Type": "INTEREST",
+      "Amount": 916.09,
+      "Desc": "Bond Coupon Payment HNTOIL 6 3/8 06/01/28"
+    },
+    {
+      "Date": "2022-06-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -0.0395188,
+      "Desc": "HKD Debit Interest Paid for May 2022"
+    },
+    {
+      "Date": "2022-06-03",
+      "Type": "INTEREST",
+      "Amount": 25.32,
+      "Desc": "USD Credit Interest Received for May 2022"
+    },
+    {
+      "Date": "2022-06-03",
+      "Type": "INTEREST",
+      "Amount": -0.52,
+      "Desc": "USD Net Stock Interest Paid for May 2022"
+    },
+    {
+      "Date": "2022-07-06",
+      "Type": "INTEREST",
+      "Amount": 56.23,
+      "Desc": "USD Credit Interest Received for June 2022"
+    },
+    {
+      "Date": "2022-07-06",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -0.0369576,
+      "Desc": "HKD Debit Interest Paid for June 2022"
+    },
+    {
+      "Date": "2022-07-30",
+      "Type": "INTEREST",
+      "Amount": 1004.06,
+      "Desc": "Bond Coupon Payment TERMOC 7 7/8 01/30/29 FAB6"
+    },
+    {
+      "Date": "2022-08-03",
+      "Type": "INTEREST",
+      "Amount": 47.37,
+      "Desc": "USD Credit Interest Received for July 2022"
+    },
+    {
+      "Date": "2022-08-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -10.15,
+      "Desc": "USD Debit Interest Paid for July 2022"
+    },
+    {
+      "Date": "2022-08-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -0.0025478,
+      "Desc": "HKD Debit Interest Paid for July 2022"
+    },
+    {
+      "Date": "2022-09-06",
+      "Type": "INTEREST",
+      "Amount": 91.46,
+      "Desc": "USD Credit Interest Received for August 2022"
+    },
+    {
+      "Date": "2022-10-03",
+      "Type": "INTEREST",
+      "Amount": 975.0,
+      "Desc": "Bond Coupon Payment GNBSUD 6 1/2 04/03/27"
+    },
+    {
+      "Date": "2022-10-03",
+      "Type": "INTEREST",
+      "Amount": -975.0,
+      "Desc": "Bond Coupon Payment GNBSUD 6 1/2 04/03/27"
+    },
+    {
+      "Date": "2022-10-03",
+      "Type": "INTEREST",
+      "Amount": 1057.65,
+      "Desc": "Bond Coupon Payment GNBSUD 6 1/2 04/03/27"
+    },
+    {
+      "Date": "2022-10-04",
+      "Type": "INTEREST",
+      "Amount": 862.5,
+      "Desc": "Bond Coupon Payment BANORT 5 3/4 10/04/31 8AC3"
+    },
+    {
+      "Date": "2022-10-05",
+      "Type": "INTEREST",
+      "Amount": 11.9,
+      "Desc": "USD Credit Interest Received for September 2022"
+    },
+    {
+      "Date": "2022-10-18",
+      "Type": "INTEREST",
+      "Amount": 731.25,
+      "Desc": "Bond Coupon Payment BCOLO 4 7/8 10/18/27"
+    },
+    {
+      "Date": "2022-10-28",
+      "Type": "INTEREST",
+      "Amount": 843.75,
+      "Desc": "Bond Coupon Payment ORSAPE 5 5/8 04/28/27"
+    },
+    {
+      "Date": "2022-12-01",
+      "Type": "INTEREST",
+      "Amount": 875.93,
+      "Desc": "Bond Coupon Payment HNTOIL 6 3/8 06/01/28"
+    },
+    {
+      "Date": "2022-12-05",
+      "Type": "INTEREST",
+      "Amount": 5.71,
+      "Desc": "USD Credit Interest Received for November 2022"
+    },
+    {
+      "Date": "2023-01-05",
+      "Type": "INTEREST",
+      "Amount": 128.91,
+      "Desc": "USD Credit Interest Received for December 2022"
+    },
+    {
+      "Date": "2023-01-30",
+      "Type": "INTEREST",
+      "Amount": 1004.06,
+      "Desc": "Bond Coupon Payment TERMOC 7 7/8 01/30/29 FAB6"
+    },
+    {
+      "Date": "2023-02-03",
+      "Type": "INTEREST",
+      "Amount": 176.86,
+      "Desc": "USD Credit Interest Received for January 2023"
+    },
+    {
+      "Date": "2023-03-03",
+      "Type": "INTEREST",
+      "Amount": 417.74,
+      "Desc": "USD Credit Interest Received for February 2023"
+    },
+    {
+      "Date": "2023-04-05",
+      "Type": "INTEREST",
+      "Amount": 243.65,
+      "Desc": "USD Credit Interest Received for March 2023"
+    },
+    {
+      "Date": "2023-05-03",
+      "Type": "INTEREST",
+      "Amount": 60.28,
+      "Desc": "USD Credit Interest Received for April 2023"
+    },
+    {
+      "Date": "2023-06-05",
+      "Type": "INTEREST",
+      "Amount": 6.85,
+      "Desc": "USD Credit Interest Received for May 2023"
+    },
+    {
+      "Date": "2023-07-06",
+      "Type": "INTEREST",
+      "Amount": 4.49,
+      "Desc": "USD Credit Interest Received for June 2023"
+    },
+    {
+      "Date": "2023-08-03",
+      "Type": "INTEREST",
+      "Amount": 38.97,
+      "Desc": "USD Credit Interest Received for July 2023"
+    },
+    {
+      "Date": "2023-12-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -10.94,
+      "Desc": "USD Debit Interest Paid for November 2023"
+    },
+    {
+      "Date": "2024-04-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -186.63,
+      "Desc": "USD Debit Interest Paid for March 2024"
+    },
+    {
+      "Date": "2024-05-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -205.12,
+      "Desc": "USD Debit Interest Paid for April 2024"
+    },
+    {
+      "Date": "2024-06-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -206.04,
+      "Desc": "USD Debit Interest Paid for May 2024"
+    },
+    {
+      "Date": "2024-07-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -188.48,
+      "Desc": "USD Debit Interest Paid for June 2024"
+    },
+    {
+      "Date": "2024-08-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -213.95,
+      "Desc": "USD Debit Interest Paid for July 2024"
+    },
+    {
+      "Date": "2024-09-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -35.93,
+      "Desc": "USD Debit Interest Paid for August 2024"
+    },
+    {
+      "Date": "2025-05-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -18.56,
+      "Desc": "USD Debit Interest Paid for April 2025"
+    },
+    {
+      "Date": "2025-06-04",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -513.4,
+      "Desc": "USD Debit Interest Paid for May 2025"
+    },
+    {
+      "Date": "2025-07-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -679.21,
+      "Desc": "USD Debit Interest Paid for June 2025"
+    },
+    {
+      "Date": "2025-08-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -705.93,
+      "Desc": "USD Debit Interest Paid for July 2025"
+    },
+    {
+      "Date": "2025-09-04",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -709.7,
+      "Desc": "USD Debit Interest Paid for August 2025"
+    },
+    {
+      "Date": "2025-10-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -680.26,
+      "Desc": "USD Debit Interest Paid for September 2025"
+    },
+    {
+      "Date": "2025-11-05",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -687.19,
+      "Desc": "USD Debit Interest Paid for October 2025"
+    },
+    {
+      "Date": "2025-12-03",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -634.15,
+      "Desc": "USD Debit Interest Paid for November 2025"
+    },
+    {
+      "Date": "2026-01-06",
+      "Type": "DEBIT_INTEREST",
+      "Amount": -438.17,
+      "Desc": "USD Debit Interest Paid for December 2025"
+    },
+    {
+      "Date": "2021-09-03",
+      "Type": "FEE",
+      "Amount": -0.06,
+      "Desc": "D******68:global Snapshot Pnp For Aug 2021 "
+    },
+    {
+      "Date": "2021-09-03",
+      "Type": "FEE",
+      "Amount": 0.06,
+      "Desc": "D******68:global Snapshot Pnp For Aug 2021 "
+    },
+    {
+      "Date": "2022-02-28",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Feb 2022 "
+    },
+    {
+      "Date": "2022-02-28",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cboe One Add-on For Feb 2022 "
+    },
+    {
+      "Date": "2022-02-28",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Feb 2022 "
+    },
+    {
+      "Date": "2022-03-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Mar 2022 "
+    },
+    {
+      "Date": "2022-03-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cboe One Add-on For Feb 2022 "
+    },
+    {
+      "Date": "2022-03-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cboe One Add-on For Mar 2022 "
+    },
+    {
+      "Date": "2022-03-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Feb 2022 "
+    },
+    {
+      "Date": "2022-03-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Mar 2022 "
+    },
+    {
+      "Date": "2022-03-15",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "Cancel[d******68:cboe One Add-on] For Mar 2022 "
+    },
+    {
+      "Date": "2022-04-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Apr 2022 "
+    },
+    {
+      "Date": "2022-04-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Apr 2022 "
+    },
+    {
+      "Date": "2022-04-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Mar 2022 "
+    },
+    {
+      "Date": "2022-05-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For May 2022 "
+    },
+    {
+      "Date": "2022-05-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Apr 2022 "
+    },
+    {
+      "Date": "2022-05-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For May 2022 "
+    },
+    {
+      "Date": "2022-06-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Jun 2022 "
+    },
+    {
+      "Date": "2022-06-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jun 2022 "
+    },
+    {
+      "Date": "2022-07-05",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Jul 2022 "
+    },
+    {
+      "Date": "2022-07-05",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jul 2022 "
+    },
+    {
+      "Date": "2022-08-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Aug 2022 "
+    },
+    {
+      "Date": "2022-08-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Aug 2022 "
+    },
+    {
+      "Date": "2022-08-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jul 2022 "
+    },
+    {
+      "Date": "2022-09-05",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Sep 2022 "
+    },
+    {
+      "Date": "2022-09-05",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Aug 2022 "
+    },
+    {
+      "Date": "2022-09-05",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Sep 2022 "
+    },
+    {
+      "Date": "2022-10-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Oct 2022 "
+    },
+    {
+      "Date": "2022-10-04",
+      "Type": "FEE",
+      "Amount": -19.0,
+      "Desc": "D******68:quote Booster Packs P For Sep 2022 "
+    },
+    {
+      "Date": "2022-10-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Oct 2022 "
+    },
+    {
+      "Date": "2022-10-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Sep 2022 "
+    },
+    {
+      "Date": "2022-11-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Nov 2022 "
+    },
+    {
+      "Date": "2022-11-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Oct 2022 "
+    },
+    {
+      "Date": "2022-11-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Nov 2022 "
+    },
+    {
+      "Date": "2022-12-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Dec 2022 "
+    },
+    {
+      "Date": "2022-12-02",
+      "Type": "FEE",
+      "Amount": -0.24,
+      "Desc": "D******68:global Snapshot Pnp For Nov 2022 "
+    },
+    {
+      "Date": "2022-12-02",
+      "Type": "FEE",
+      "Amount": 0.24,
+      "Desc": "D******68:global Snapshot Pnp For Nov 2022 "
+    },
+    {
+      "Date": "2022-12-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Nov 2022 "
+    },
+    {
+      "Date": "2022-12-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Dec 2022 "
+    },
+    {
+      "Date": "2022-12-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Nov 2022 "
+    },
+    {
+      "Date": "2023-01-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Jan 2023 "
+    },
+    {
+      "Date": "2023-01-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Dec 2022 "
+    },
+    {
+      "Date": "2023-01-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Dec 2022 "
+    },
+    {
+      "Date": "2023-01-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jan 2023 "
+    },
+    {
+      "Date": "2023-02-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Feb 2023 "
+    },
+    {
+      "Date": "2023-02-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Jan 2023 "
+    },
+    {
+      "Date": "2023-02-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Feb 2023 "
+    },
+    {
+      "Date": "2023-02-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jan 2023 "
+    },
+    {
+      "Date": "2023-02-07",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-03-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Mar 2023 "
+    },
+    {
+      "Date": "2023-03-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-03-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-03-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Feb 2023 "
+    },
+    {
+      "Date": "2023-03-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Feb 2023 "
+    },
+    {
+      "Date": "2023-03-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Mar 2023 "
+    },
+    {
+      "Date": "2023-04-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Apr 2023 "
+    },
+    {
+      "Date": "2023-04-04",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-04-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-04-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Mar 2023 "
+    },
+    {
+      "Date": "2023-04-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Apr 2023 "
+    },
+    {
+      "Date": "2023-04-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Mar 2023 "
+    },
+    {
+      "Date": "2023-05-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For May 2023 "
+    },
+    {
+      "Date": "2023-05-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-05-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-05-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Apr 2023 "
+    },
+    {
+      "Date": "2023-05-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For May 2023 "
+    },
+    {
+      "Date": "2023-06-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Jun 2023 "
+    },
+    {
+      "Date": "2023-06-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-06-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-06-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For May 2023 "
+    },
+    {
+      "Date": "2023-06-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jun 2023 "
+    },
+    {
+      "Date": "2023-06-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For May 2023 "
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Jul 2023 "
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Jun 2023 "
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jul 2023 "
+    },
+    {
+      "Date": "2023-07-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jun 2023 "
+    },
+    {
+      "Date": "2023-08-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Aug 2023 "
+    },
+    {
+      "Date": "2023-08-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-08-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-08-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Jul 2023 "
+    },
+    {
+      "Date": "2023-08-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Aug 2023 "
+    },
+    {
+      "Date": "2023-08-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Jul 2023 "
+    },
+    {
+      "Date": "2023-09-06",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Sep 2023 "
+    },
+    {
+      "Date": "2023-09-06",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-09-06",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-09-06",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Aug 2023 "
+    },
+    {
+      "Date": "2023-09-06",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Aug 2023 "
+    },
+    {
+      "Date": "2023-09-06",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Sep 2023 "
+    },
+    {
+      "Date": "2023-10-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Oct 2023 "
+    },
+    {
+      "Date": "2023-10-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-10-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Sep 2023 "
+    },
+    {
+      "Date": "2023-10-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Oct 2023 "
+    },
+    {
+      "Date": "2023-11-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Nov 2023 "
+    },
+    {
+      "Date": "2023-11-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-11-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-11-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Oct 2023 "
+    },
+    {
+      "Date": "2023-11-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Nov 2023 "
+    },
+    {
+      "Date": "2023-12-05",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Dec 2023 "
+    },
+    {
+      "Date": "2023-12-05",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-12-05",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2023-12-05",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "D******68:quote Booster Packs P For Nov 2023 "
+    },
+    {
+      "Date": "2023-12-05",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Dec 2023 "
+    },
+    {
+      "Date": "2023-12-05",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Nov 2023 "
+    },
+    {
+      "Date": "2024-01-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Jan 2024 "
+    },
+    {
+      "Date": "2024-01-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-01-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-01-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Dec 2023 "
+    },
+    {
+      "Date": "2024-01-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Dec 2023 "
+    },
+    {
+      "Date": "2024-01-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jan 2024 "
+    },
+    {
+      "Date": "2024-02-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-02-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Jan 2024 "
+    },
+    {
+      "Date": "2024-02-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Feb 2024 "
+    },
+    {
+      "Date": "2024-02-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jan 2024 "
+    },
+    {
+      "Date": "2024-02-05",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Feb 2024 "
+    },
+    {
+      "Date": "2024-02-05",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-03-05",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Mar 2024 "
+    },
+    {
+      "Date": "2024-03-05",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-03-05",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-03-05",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Feb 2024 "
+    },
+    {
+      "Date": "2024-03-05",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Feb 2024 "
+    },
+    {
+      "Date": "2024-03-05",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Mar 2024 "
+    },
+    {
+      "Date": "2024-04-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Apr 2024 "
+    },
+    {
+      "Date": "2024-04-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Apr 2024 "
+    },
+    {
+      "Date": "2024-04-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-04-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-04-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Mar 2024 "
+    },
+    {
+      "Date": "2024-04-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Mar 2024 "
+    },
+    {
+      "Date": "2024-05-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For May 2024 "
+    },
+    {
+      "Date": "2024-05-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-05-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-05-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Apr 2024 "
+    },
+    {
+      "Date": "2024-05-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Apr 2024 "
+    },
+    {
+      "Date": "2024-05-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For May 2024 "
+    },
+    {
+      "Date": "2024-06-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Jun 2024 "
+    },
+    {
+      "Date": "2024-06-04",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-06-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-06-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For May 2024 "
+    },
+    {
+      "Date": "2024-06-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jun 2024 "
+    },
+    {
+      "Date": "2024-06-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For May 2024 "
+    },
+    {
+      "Date": "2024-07-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Jul 2024 "
+    },
+    {
+      "Date": "2024-07-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-07-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-07-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Jun 2024 "
+    },
+    {
+      "Date": "2024-07-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jul 2024 "
+    },
+    {
+      "Date": "2024-07-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jun 2024 "
+    },
+    {
+      "Date": "2024-08-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Aug 2024 "
+    },
+    {
+      "Date": "2024-08-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-08-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-08-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Jul 2024 "
+    },
+    {
+      "Date": "2024-08-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Aug 2024 "
+    },
+    {
+      "Date": "2024-08-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jul 2024 "
+    },
+    {
+      "Date": "2024-09-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Sep 2024 "
+    },
+    {
+      "Date": "2024-09-04",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-09-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-09-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Aug 2024 "
+    },
+    {
+      "Date": "2024-09-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Aug 2024 "
+    },
+    {
+      "Date": "2024-09-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Sep 2024 "
+    },
+    {
+      "Date": "2024-10-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Oct 2024 "
+    },
+    {
+      "Date": "2024-10-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-10-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-10-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Sep 2024 "
+    },
+    {
+      "Date": "2024-10-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Oct 2024 "
+    },
+    {
+      "Date": "2024-10-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Sep 2024 "
+    },
+    {
+      "Date": "2024-11-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Nov 2024 "
+    },
+    {
+      "Date": "2024-11-04",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-11-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-11-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Oct 2024 "
+    },
+    {
+      "Date": "2024-11-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Nov 2024 "
+    },
+    {
+      "Date": "2024-11-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Oct 2024 "
+    },
+    {
+      "Date": "2024-12-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Dec 2024 "
+    },
+    {
+      "Date": "2024-12-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-12-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2024-12-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Nov 2024 "
+    },
+    {
+      "Date": "2024-12-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Dec 2024 "
+    },
+    {
+      "Date": "2024-12-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Nov 2024 "
+    },
+    {
+      "Date": "2025-01-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Jan 2025 "
+    },
+    {
+      "Date": "2025-01-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-01-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-01-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Dec 2024 "
+    },
+    {
+      "Date": "2025-01-03",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Dec 2024 "
+    },
+    {
+      "Date": "2025-01-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jan 2025 "
+    },
+    {
+      "Date": "2025-02-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Feb 2025 "
+    },
+    {
+      "Date": "2025-02-04",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-02-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-02-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Jan 2025 "
+    },
+    {
+      "Date": "2025-02-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Feb 2025 "
+    },
+    {
+      "Date": "2025-02-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jan 2025 "
+    },
+    {
+      "Date": "2025-03-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Mar 2025 "
+    },
+    {
+      "Date": "2025-03-04",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-03-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-03-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Feb 2025 "
+    },
+    {
+      "Date": "2025-03-04",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Feb 2025 "
+    },
+    {
+      "Date": "2025-03-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Mar 2025 "
+    },
+    {
+      "Date": "2025-04-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Apr 2025 "
+    },
+    {
+      "Date": "2025-04-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-04-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Mar 2025 "
+    },
+    {
+      "Date": "2025-04-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Apr 2025 "
+    },
+    {
+      "Date": "2025-05-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For May 2025 "
+    },
+    {
+      "Date": "2025-05-02",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-05-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-05-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Apr 2025 "
+    },
+    {
+      "Date": "2025-05-02",
+      "Type": "FEE",
+      "Amount": 10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Apr 2025 "
+    },
+    {
+      "Date": "2025-05-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For May 2025 "
+    },
+    {
+      "Date": "2025-06-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Jun 2025 "
+    },
+    {
+      "Date": "2025-06-03",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-06-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-06-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For May 2025 "
+    },
+    {
+      "Date": "2025-06-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jun 2025 "
+    },
+    {
+      "Date": "2025-07-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Jul 2025 "
+    },
+    {
+      "Date": "2025-07-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-07-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Jun 2025 "
+    },
+    {
+      "Date": "2025-07-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jul 2025 "
+    },
+    {
+      "Date": "2025-08-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Aug 2025 "
+    },
+    {
+      "Date": "2025-08-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-08-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Jul 2025 "
+    },
+    {
+      "Date": "2025-08-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Aug 2025 "
+    },
+    {
+      "Date": "2025-09-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Aug 2025 "
+    },
+    {
+      "Date": "2025-09-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Sep 2025 "
+    },
+    {
+      "Date": "2025-09-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Sep 2025 "
+    },
+    {
+      "Date": "2025-09-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-10-03",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Sep 2025 "
+    },
+    {
+      "Date": "2025-10-03",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Oct 2025 "
+    },
+    {
+      "Date": "2025-10-03",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2025-10-03",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Oct 2025 "
+    },
+    {
+      "Date": "2025-11-04",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Oct 2025 "
+    },
+    {
+      "Date": "2025-11-04",
+      "Type": "FEE",
+      "Amount": 1.0,
+      "Desc": "Cancel[d******68:cusip "
+    },
+    {
+      "Date": "2025-11-04",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "D******68:abcopranp For Nov 2025 "
+    },
+    {
+      "Date": "2025-11-04",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "D******68:cusip "
+    },
+    {
+      "Date": "2025-11-04",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "D******68:snapshotvaluenonpro For Nov 2025 "
+    },
+    {
+      "Date": "2025-12-02",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Dec 2025 "
+    },
+    {
+      "Date": "2025-12-02",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2025-12-02",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Nov 2025 "
+    },
+    {
+      "Date": "2025-12-02",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Dec 2025 "
+    },
+    {
+      "Date": "2026-01-05",
+      "Type": "FEE",
+      "Amount": -4.5,
+      "Desc": "C*********91:abcopranp For Jan 2026 "
+    },
+    {
+      "Date": "2026-01-05",
+      "Type": "FEE",
+      "Amount": -1.0,
+      "Desc": "C*********91:cusip "
+    },
+    {
+      "Date": "2026-01-05",
+      "Type": "FEE",
+      "Amount": -30.0,
+      "Desc": "C*********91:quote Booster Packs P For Dec 2025 "
+    },
+    {
+      "Date": "2026-01-05",
+      "Type": "FEE",
+      "Amount": -10.0,
+      "Desc": "C*********91:snapshotvaluenonpro For Jan 2026 "
+    }
+  ],
+  "CorporateActions": [
+    {
+      "Date": "2021-10-01",
+      "Type": "Spinoff",
+      "Desc": "ITUB(US4655621062) SPINOFF  230878461 FOR 10000000000"
+    },
+    {
+      "Date": "2022-04-13",
+      "Type": "Spinoff",
+      "Desc": "HNTOIL 6 3/8 06/01/28(P5300PAB9) SPINOFF  1 FOR 1"
+    },
+    {
+      "Date": "2022-05-03",
+      "Type": "Maturity",
+      "Desc": "(USP53CONAA48) BOND MATURITY FOR USD 0.00000001 PER BOND"
+    },
+    {
+      "Date": "2022-06-03",
+      "Type": "Split",
+      "Desc": "AMZN(US0231351067) SPLIT 20 FOR 1"
+    },
+    {
+      "Date": "2023-12-01",
+      "Type": "Split",
+      "Desc": "TMF(US25459W5408) SPLIT 1 FOR 10"
+    },
+    {
+      "Date": "2023-12-01",
+      "Type": "Split",
+      "Desc": "TMF(US25459W5408) SPLIT 1 FOR 10"
+    },
+    {
+      "Date": "2024-01-25",
+      "Type": "Rights",
+      "Desc": "HIX(US95766J1025) SUBSCRIBABLE RIGHTS ISSUE  1 FOR 1"
+    },
+    {
+      "Date": "2024-01-25",
+      "Type": "Rights",
+      "Desc": "HIX(US95766J1025) SUBSCRIBABLE RIGHTS ISSUE  1 FOR 1"
+    },
+    {
+      "Date": "2024-02-07",
+      "Type": "Acquisition",
+      "Desc": "XBTF(US92189Y3036) MERGED(Acquisition) FOR USD 39.7507548 PER SHARE"
+    },
+    {
+      "Date": "2024-03-07",
+      "Type": "Delisting",
+      "Desc": "(US95766J1280) DELISTED"
+    }
+  ],
+  "Performance": [
+    {
+      "Symbol": "BANORT 5 3/4 10/04/31 8AC3",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "BCOLO 6.909 10/18/27",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "CCL 6.65 01/15/28",
+      "PnL": -488.31
+    },
+    {
+      "Symbol": "CONTRA REGS HUNT OIL C D06/01/18 06.375% JD28 - CO",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "GNBSUD 7.051 04/03/27",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "HNTOIL 6 3/8 06/01/28",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "INRSHM 5 3/4 04/03/28 3AD3",
+      "PnL": -320.25
+    },
+    {
+      "Symbol": "ORSAPE 5 5/8 04/28/27",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "PEMEX 6 1/2 03/13/27 QCG5",
+      "PnL": -30.15
+    },
+    {
+      "Symbol": "RCL 5 1/2 04/01/28 TAE3",
+      "PnL": -2412.75
+    },
+    {
+      "Symbol": "TERMOC 7 7/8 01/30/29 FAB6",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "Total Bonds",
+      "PnL": -3251.46
+    },
+    {
+      "Symbol": "BTC.USD-PAXOS",
+      "PnL": 13008.9
+    },
+    {
+      "Symbol": "Total Crypto",
+      "PnL": 13008.9
+    },
+    {
+      "Symbol": "2828",
+      "PnL": -5911.09
+    },
+    {
+      "Symbol": "3033",
+      "PnL": -924.24
+    },
+    {
+      "Symbol": "BGRN",
+      "PnL": -134.05
+    },
+    {
+      "Symbol": "BLOK",
+      "PnL": 36.44
+    },
+    {
+      "Symbol": "BNKU",
+      "PnL": 400.45
+    },
+    {
+      "Symbol": "CEFD",
+      "PnL": -347.62
+    },
+    {
+      "Symbol": "ECH",
+      "PnL": 288.59
+    },
+    {
+      "Symbol": "EMB",
+      "PnL": 2114.24
+    },
+    {
+      "Symbol": "EMLC",
+      "PnL": 3050.13
+    },
+    {
+      "Symbol": "FNGA",
+      "PnL": 299.46
+    },
+    {
+      "Symbol": "FXI",
+      "PnL": -100.32
+    },
+    {
+      "Symbol": "GLD",
+      "PnL": 44.48
+    },
+    {
+      "Symbol": "IBIT",
+      "PnL": 2417.14
+    },
+    {
+      "Symbol": "ICOL",
+      "PnL": -30.36
+    },
+    {
+      "Symbol": "IGOV",
+      "PnL": 497.24
+    },
+    {
+      "Symbol": "IPAY.OLD",
+      "PnL": -331.78
+    },
+    {
+      "Symbol": "JEPQ",
+      "PnL": 603.35
+    },
+    {
+      "Symbol": "JETS",
+      "PnL": 271.93
+    },
+    {
+      "Symbol": "KBWD",
+      "PnL": -1003.42
+    },
+    {
+      "Symbol": "KWEB",
+      "PnL": 744.97
+    },
+    {
+      "Symbol": "LABU.OLD",
+      "PnL": -4961.81
+    },
+    {
+      "Symbol": "MJ",
+      "PnL": -147.92
+    },
+    {
+      "Symbol": "QYLD",
+      "PnL": 1734.17
+    },
+    {
+      "Symbol": "RYLD",
+      "PnL": -1360.08
+    },
+    {
+      "Symbol": "SDIV",
+      "PnL": 167.1
+    },
+    {
+      "Symbol": "SHV",
+      "PnL": -59.14
+    },
+    {
+      "Symbol": "SLV",
+      "PnL": 154.49
+    },
+    {
+      "Symbol": "SPY",
+      "PnL": 0.19
+    },
+    {
+      "Symbol": "TAN",
+      "PnL": 141.95
+    },
+    {
+      "Symbol": "TBF",
+      "PnL": 116.94
+    },
+    {
+      "Symbol": "TMF",
+      "PnL": -1032.26
+    },
+    {
+      "Symbol": "TMF.OLD",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "TMV",
+      "PnL": 294.39
+    },
+    {
+      "Symbol": "TNA",
+      "PnL": 168.34
+    },
+    {
+      "Symbol": "TYD",
+      "PnL": -1153.89
+    },
+    {
+      "Symbol": "UVXY",
+      "PnL": 323.43
+    },
+    {
+      "Symbol": "VGLT",
+      "PnL": 43.4
+    },
+    {
+      "Symbol": "WIP",
+      "PnL": 500.48
+    },
+    {
+      "Symbol": "XBTF",
+      "PnL": -207.95
+    },
+    {
+      "Symbol": "YINN",
+      "PnL": 673.56
+    },
+    {
+      "Symbol": "YINN.OLD",
+      "PnL": 473.33
+    },
+    {
+      "Symbol": "Total ETFs",
+      "PnL": -2145.73
+    },
+    {
+      "Symbol": "AAPL  211126C00160000",
+      "PnL": -20.6
+    },
+    {
+      "Symbol": "AAPL  211126C00170000",
+      "PnL": -66.5
+    },
+    {
+      "Symbol": "AAPL  211217P00172500",
+      "PnL": -154.51
+    },
+    {
+      "Symbol": "AAPL  211217P00177500",
+      "PnL": 260.58
+    },
+    {
+      "Symbol": "AAPL  221104C00155000",
+      "PnL": -50.5
+    },
+    {
+      "Symbol": "AAPL  221104P00145000",
+      "PnL": 395.41
+    },
+    {
+      "Symbol": "AAPL  230113C00132000",
+      "PnL": -41.08
+    },
+    {
+      "Symbol": "AAPL  230120C00135000",
+      "PnL": -500.77
+    },
+    {
+      "Symbol": "AAPL  230120C00136000",
+      "PnL": 371.6
+    },
+    {
+      "Symbol": "AAPL  230120P00140000",
+      "PnL": 310.28
+    },
+    {
+      "Symbol": "AAPL  230127C00146000",
+      "PnL": 218.8
+    },
+    {
+      "Symbol": "AAPL  230303C00144000",
+      "PnL": 142.9
+    },
+    {
+      "Symbol": "ABNB  230217C00130000",
+      "PnL": 410.14
+    },
+    {
+      "Symbol": "ABNB  240216C00180000",
+      "PnL": -391.47
+    },
+    {
+      "Symbol": "ADBE  221111C00340000",
+      "PnL": 68.92
+    },
+    {
+      "Symbol": "ADBE  240315C00670000",
+      "PnL": -222.89
+    },
+    {
+      "Symbol": "AMZN  230127C00102000",
+      "PnL": 72.64
+    },
+    {
+      "Symbol": "AMZN  230203C00100000",
+      "PnL": 109.91
+    },
+    {
+      "Symbol": "ARM   240216P00112000",
+      "PnL": -322.34
+    },
+    {
+      "Symbol": "ATVI  211217C00080000",
+      "PnL": 223.06
+    },
+    {
+      "Symbol": "ATVI  220218C00070000",
+      "PnL": -34.89
+    },
+    {
+      "Symbol": "BA    220408C00180000",
+      "PnL": -180.75
+    },
+    {
+      "Symbol": "BA    240517C00220000",
+      "PnL": -592.07
+    },
+    {
+      "Symbol": "BABA  211203P00120000",
+      "PnL": 68.95
+    },
+    {
+      "Symbol": "BABA  211210P00110000",
+      "PnL": 363.93
+    },
+    {
+      "Symbol": "BABA  221021C00100000",
+      "PnL": -5.81
+    },
+    {
+      "Symbol": "BABA  230120C00170000",
+      "PnL": -688.05
+    },
+    {
+      "Symbol": "BABA  230224C00097000",
+      "PnL": -11.86
+    },
+    {
+      "Symbol": "BABA  230428C00090000",
+      "PnL": -244.05
+    },
+    {
+      "Symbol": "BABA  240119C00140000",
+      "PnL": -2011.5
+    },
+    {
+      "Symbol": "BABA  240119C00200000",
+      "PnL": -303.55
+    },
+    {
+      "Symbol": "BABA  240216C00073000",
+      "PnL": -103.47
+    },
+    {
+      "Symbol": "BABA  240216C00075000",
+      "PnL": -25.62
+    },
+    {
+      "Symbol": "BABA1 250620C00080000",
+      "PnL": 1513.67
+    },
+    {
+      "Symbol": "BABA1 250620C00090000",
+      "PnL": 948.81
+    },
+    {
+      "Symbol": "BABA1 260116C00085000",
+      "PnL": -1794.7
+    },
+    {
+      "Symbol": "BABA2 260116C00085000",
+      "PnL": 267.01
+    },
+    {
+      "Symbol": "BABA2 260116C00090000",
+      "PnL": 7913.57
+    },
+    {
+      "Symbol": "BABA2 261218C00070000",
+      "PnL": 742.67
+    },
+    {
+      "Symbol": "BITO  240315C00030000",
+      "PnL": 372.61
+    },
+    {
+      "Symbol": "BITO  250117C00025000",
+      "PnL": 701.93
+    },
+    {
+      "Symbol": "BITO  250117C00030000",
+      "PnL": -3158.09
+    },
+    {
+      "Symbol": "C     220121C00070000",
+      "PnL": -229.84
+    },
+    {
+      "Symbol": "C     220617C00052500",
+      "PnL": -289.75
+    },
+    {
+      "Symbol": "C     250117C00045000",
+      "PnL": 455.98
+    },
+    {
+      "Symbol": "COUP  211210P00100000",
+      "PnL": -91.87
+    },
+    {
+      "Symbol": "DASH  230217P00055000",
+      "PnL": 28.92
+    },
+    {
+      "Symbol": "DASH  230217P00060000",
+      "PnL": -94.53
+    },
+    {
+      "Symbol": "EWZ   211217C00032000",
+      "PnL": -338.56
+    },
+    {
+      "Symbol": "EWZ   230120C00030000",
+      "PnL": 3200.68
+    },
+    {
+      "Symbol": "FSLY  240216P00020000",
+      "PnL": 239.91
+    },
+    {
+      "Symbol": "FXI   250117C00027850",
+      "PnL": 1112.81
+    },
+    {
+      "Symbol": "GOLD  240119C00015000",
+      "PnL": -309.96
+    },
+    {
+      "Symbol": "GOLD  250117C00015000",
+      "PnL": 298.4
+    },
+    {
+      "Symbol": "GOOGL 230127C00098000",
+      "PnL": 42.11
+    },
+    {
+      "Symbol": "GOOGL 230210C00100000",
+      "PnL": -223.05
+    },
+    {
+      "Symbol": "GOOGL 230217C00097000",
+      "PnL": 85.47
+    },
+    {
+      "Symbol": "GOOGL 230224C00092000",
+      "PnL": -128.05
+    },
+    {
+      "Symbol": "GOOGL 230303C00090000",
+      "PnL": 127.1
+    },
+    {
+      "Symbol": "HOOD  240216C00015000",
+      "PnL": -56.55
+    },
+    {
+      "Symbol": "IBKR  250919C00043750",
+      "PnL": 845.33
+    },
+    {
+      "Symbol": "INTC  220715C00045000",
+      "PnL": 49.32
+    },
+    {
+      "Symbol": "INTC  261218C00015000",
+      "PnL": -3370.03
+    },
+    {
+      "Symbol": "JD    250117C00040000",
+      "PnL": -828.41
+    },
+    {
+      "Symbol": "JETS  230120C00016860",
+      "PnL": 8.31
+    },
+    {
+      "Symbol": "KOLD  220520C00007000",
+      "PnL": 122.2
+    },
+    {
+      "Symbol": "KWEB  220617C00040000",
+      "PnL": 77.64
+    },
+    {
+      "Symbol": "KWEB  260116C00025000",
+      "PnL": 2176.45
+    },
+    {
+      "Symbol": "KWEB  270115C00025000",
+      "PnL": 3322.6
+    },
+    {
+      "Symbol": "LAZR  211119C00025000",
+      "PnL": -59.19
+    },
+    {
+      "Symbol": "LCID  211119C00070000",
+      "PnL": 21.75
+    },
+    {
+      "Symbol": "LCID  230120P00040000",
+      "PnL": 158.55
+    },
+    {
+      "Symbol": "LCID  230224C00010000",
+      "PnL": -77.85
+    },
+    {
+      "Symbol": "LUV   230609C00030500",
+      "PnL": -22.0
+    },
+    {
+      "Symbol": "MDB   211210P00260000",
+      "PnL": -200.27
+    },
+    {
+      "Symbol": "META  220617C00250000",
+      "PnL": 937.18
+    },
+    {
+      "Symbol": "META  221111C00115000",
+      "PnL": -49.04
+    },
+    {
+      "Symbol": "META  230203C00200000",
+      "PnL": -186.89
+    },
+    {
+      "Symbol": "MMM   230623C00104000",
+      "PnL": -8.7
+    },
+    {
+      "Symbol": "MSFT  230120C00240000",
+      "PnL": 116.13
+    },
+    {
+      "Symbol": "MSFT  230203C00265000",
+      "PnL": 117.19
+    },
+    {
+      "Symbol": "MSFT  230303C00252500",
+      "PnL": 116.9
+    },
+    {
+      "Symbol": "NEM   250117C00040000",
+      "PnL": 203.39
+    },
+    {
+      "Symbol": "NFLX  210917P00600000",
+      "PnL": 159.89
+    },
+    {
+      "Symbol": "NKE   250321C00100000",
+      "PnL": 676.06
+    },
+    {
+      "Symbol": "NKE   250321P00082500",
+      "PnL": 3036.87
+    },
+    {
+      "Symbol": "NKE   270115C00090000",
+      "PnL": -3723.26
+    },
+    {
+      "Symbol": "NOW   230127P00400000",
+      "PnL": -181.98
+    },
+    {
+      "Symbol": "NVDA  221118C00180000",
+      "PnL": -83.54
+    },
+    {
+      "Symbol": "NVDA  230120P00200000",
+      "PnL": 128.55
+    },
+    {
+      "Symbol": "NXPI  230203C00200000",
+      "PnL": -19.93
+    },
+    {
+      "Symbol": "OUST1 240119C00002500",
+      "PnL": 32.6
+    },
+    {
+      "Symbol": "PFE   220617P00055000",
+      "PnL": 137.93
+    },
+    {
+      "Symbol": "PFE   260116C00020000",
+      "PnL": 468.47
+    },
+    {
+      "Symbol": "PSFE  220414C00005000",
+      "PnL": -202.03
+    },
+    {
+      "Symbol": "PSFE1 230120C00003000",
+      "PnL": -59.25
+    },
+    {
+      "Symbol": "PYPL  230217C00080000",
+      "PnL": -69.11
+    },
+    {
+      "Symbol": "PYPL  230224C00074000",
+      "PnL": 4.9
+    },
+    {
+      "Symbol": "PYPL  240119C00100000",
+      "PnL": -2040.59
+    },
+    {
+      "Symbol": "PYPL  260116C00065000",
+      "PnL": -1608.59
+    },
+    {
+      "Symbol": "PYPL  270115C00070000",
+      "PnL": -6010.54
+    },
+    {
+      "Symbol": "QCOM  230203C00145000",
+      "PnL": -269.34
+    },
+    {
+      "Symbol": "QQQ   211020P00374000",
+      "PnL": -44.08
+    },
+    {
+      "Symbol": "QQQ   211112P00395000",
+      "PnL": -2.5
+    },
+    {
+      "Symbol": "QQQ   211201P00393000",
+      "PnL": 29.95
+    },
+    {
+      "Symbol": "QQQ   211215P00385000",
+      "PnL": -117.02
+    },
+    {
+      "Symbol": "QQQ   211217P00370000",
+      "PnL": 534.3
+    },
+    {
+      "Symbol": "QQQ   220304C00345000",
+      "PnL": -18.68
+    },
+    {
+      "Symbol": "QQQ   220309P00340000",
+      "PnL": 8.9
+    },
+    {
+      "Symbol": "QQQ   230125C00289000",
+      "PnL": -145.68
+    },
+    {
+      "Symbol": "QQQ   230207C00303000",
+      "PnL": 174.89
+    },
+    {
+      "Symbol": "QQQ   230303C00290000",
+      "PnL": 282.53
+    },
+    {
+      "Symbol": "QQQ   230308C00298000",
+      "PnL": -293.85
+    },
+    {
+      "Symbol": "QQQ   240920P00419780",
+      "PnL": -1513.59
+    },
+    {
+      "Symbol": "RBLX  230120P00080000",
+      "PnL": 273.55
+    },
+    {
+      "Symbol": "SAP1  221216C00110000",
+      "PnL": 72.6
+    },
+    {
+      "Symbol": "SBUX  261218C00070000",
+      "PnL": 1538.76
+    },
+    {
+      "Symbol": "SCHW  250117C00050000",
+      "PnL": 453.14
+    },
+    {
+      "Symbol": "SCHW  250117C00055000",
+      "PnL": -129.36
+    },
+    {
+      "Symbol": "SHOP  230217P00047000",
+      "PnL": -168.75
+    },
+    {
+      "Symbol": "SHOP  230217P00050000",
+      "PnL": 336.24
+    },
+    {
+      "Symbol": "SKLZ1 240119C00002500",
+      "PnL": 106.88
+    },
+    {
+      "Symbol": "SPCE  230120C00020000",
+      "PnL": -170.63
+    },
+    {
+      "Symbol": "SPY   211203P00450000",
+      "PnL": 285.41
+    },
+    {
+      "Symbol": "SPY   211210P00460000",
+      "PnL": -106.28
+    },
+    {
+      "Symbol": "SPY   220509C00415000",
+      "PnL": -20.74
+    },
+    {
+      "Symbol": "SPY   220509P00402000",
+      "PnL": -5.6
+    },
+    {
+      "Symbol": "SPY   220617P00370000",
+      "PnL": 70.43
+    },
+    {
+      "Symbol": "SPY   220622P00360000",
+      "PnL": -299.05
+    },
+    {
+      "Symbol": "SPY   220701C00400000",
+      "PnL": -143.36
+    },
+    {
+      "Symbol": "SPY   220907C00395000",
+      "PnL": 0.28
+    },
+    {
+      "Symbol": "SPY   230127C00405000",
+      "PnL": -6.87
+    },
+    {
+      "Symbol": "SPY   230131P00403000",
+      "PnL": -342.44
+    },
+    {
+      "Symbol": "SPY   230207P00410000",
+      "PnL": 203.43
+    },
+    {
+      "Symbol": "SPY   230217C00405000",
+      "PnL": -26.94
+    },
+    {
+      "Symbol": "SPY   230217C00408000",
+      "PnL": -49.41
+    },
+    {
+      "Symbol": "SPY   230217P00406000",
+      "PnL": -20.41
+    },
+    {
+      "Symbol": "SPY   230307P00401000",
+      "PnL": 154.82
+    },
+    {
+      "Symbol": "SPY   230310C00395000",
+      "PnL": -321.18
+    },
+    {
+      "Symbol": "SPY   230509C00420000",
+      "PnL": -73.61
+    },
+    {
+      "Symbol": "SPY   230609P00390000",
+      "PnL": -523.78
+    },
+    {
+      "Symbol": "SPY   230616C00442000",
+      "PnL": -30.88
+    },
+    {
+      "Symbol": "SPY   230616P00430000",
+      "PnL": -48.5
+    },
+    {
+      "Symbol": "SPY   241220C00380000",
+      "PnL": 463.12
+    },
+    {
+      "Symbol": "SQ    230224C00080000",
+      "PnL": -144.05
+    },
+    {
+      "Symbol": "SQ    250117C00070000",
+      "PnL": 1040.81
+    },
+    {
+      "Symbol": "SQ    250117P00060000",
+      "PnL": 800.73
+    },
+    {
+      "Symbol": "STLA  270115C00008000",
+      "PnL": -356.06
+    },
+    {
+      "Symbol": "TLRY  220408C00009000",
+      "PnL": -99.7
+    },
+    {
+      "Symbol": "TLRY  220408P00007000",
+      "PnL": 15.25
+    },
+    {
+      "Symbol": "TLT   260116C00070000",
+      "PnL": 2662.67
+    },
+    {
+      "Symbol": "TLT   260116C00100000",
+      "PnL": -319.46
+    },
+    {
+      "Symbol": "TLT   270115C00080000",
+      "PnL": -2584.46
+    },
+    {
+      "Symbol": "TLT   270115C00090000",
+      "PnL": -862.29
+    },
+    {
+      "Symbol": "TLT   270115C00095000",
+      "PnL": -4753.78
+    },
+    {
+      "Symbol": "TSLA  221104C00240000",
+      "PnL": -199.46
+    },
+    {
+      "Symbol": "TSLA  221104P00200000",
+      "PnL": 109.77
+    },
+    {
+      "Symbol": "TSLA  221118C00200000",
+      "PnL": -136.04
+    },
+    {
+      "Symbol": "TSLA  221202P00175000",
+      "PnL": -108.04
+    },
+    {
+      "Symbol": "TSLA  221216C00160000",
+      "PnL": -289.04
+    },
+    {
+      "Symbol": "TSLA  221223C00120000",
+      "PnL": 498.32
+    },
+    {
+      "Symbol": "TSLA  221230C00116000",
+      "PnL": -49.67
+    },
+    {
+      "Symbol": "TSLA  230217C00200000",
+      "PnL": 102.89
+    },
+    {
+      "Symbol": "TSLA  230217C00207500",
+      "PnL": 62.38
+    },
+    {
+      "Symbol": "TSLA  230310C00182500",
+      "PnL": -16.1
+    },
+    {
+      "Symbol": "TTD   220617P00092000",
+      "PnL": 250.95
+    },
+    {
+      "Symbol": "USB   250117C00035000",
+      "PnL": -163.25
+    },
+    {
+      "Symbol": "UVXY  211119C00014000",
+      "PnL": 88.37
+    },
+    {
+      "Symbol": "UVXY  211203C00017000",
+      "PnL": 99.46
+    },
+    {
+      "Symbol": "UVXY  211217C00015000",
+      "PnL": 39.32
+    },
+    {
+      "Symbol": "UVXY  211223C00015000",
+      "PnL": 183.46
+    },
+    {
+      "Symbol": "UVXY  211231C00016000",
+      "PnL": -138.52
+    },
+    {
+      "Symbol": "UVXY  220114C00011000",
+      "PnL": -5.09
+    },
+    {
+      "Symbol": "UVXY  220114C00012000",
+      "PnL": -124.09
+    },
+    {
+      "Symbol": "UVXY  220211C00014000",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "UVXY  220325C00015000",
+      "PnL": -106.99
+    },
+    {
+      "Symbol": "UVXY  220708C00013000",
+      "PnL": -107.48
+    },
+    {
+      "Symbol": "WBA   240328C00021500",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "XYZ   270115C00070000",
+      "PnL": -3371.6
+    },
+    {
+      "Symbol": "YINN1 230120C00007000",
+      "PnL": -300.4
+    },
+    {
+      "Symbol": "YINN1 230120C00010000",
+      "PnL": -105.55
+    },
+    {
+      "Symbol": "ZM    211203P00160000",
+      "PnL": -101.96
+    },
+    {
+      "Symbol": "Total Options",
+      "PnL": -5893.46
+    },
+    {
+      "Symbol": "9988",
+      "PnL": -1139.2
+    },
+    {
+      "Symbol": "ABEV",
+      "PnL": 242.98
+    },
+    {
+      "Symbol": "ABNB",
+      "PnL": 622.84
+    },
+    {
+      "Symbol": "ACB.OLD",
+      "PnL": 208.48
+    },
+    {
+      "Symbol": "ADBE",
+      "PnL": 126.48
+    },
+    {
+      "Symbol": "AI",
+      "PnL": 359.6
+    },
+    {
+      "Symbol": "AMZN",
+      "PnL": -527.2
+    },
+    {
+      "Symbol": "ATVI",
+      "PnL": 287.48
+    },
+    {
+      "Symbol": "AVAL",
+      "PnL": 129.33
+    },
+    {
+      "Symbol": "AVK",
+      "PnL": 681.27
+    },
+    {
+      "Symbol": "BA",
+      "PnL": -300.42
+    },
+    {
+      "Symbol": "BABA",
+      "PnL": 888.03
+    },
+    {
+      "Symbol": "BAC",
+      "PnL": -158.54
+    },
+    {
+      "Symbol": "BAP",
+      "PnL": 193.99
+    },
+    {
+      "Symbol": "BBD",
+      "PnL": 352.59
+    },
+    {
+      "Symbol": "BBN",
+      "PnL": 5438.83
+    },
+    {
+      "Symbol": "BCAT",
+      "PnL": -711.34
+    },
+    {
+      "Symbol": "BKT",
+      "PnL": -601.35
+    },
+    {
+      "Symbol": "BLW",
+      "PnL": 2434.23
+    },
+    {
+      "Symbol": "BMY",
+      "PnL": 102.23
+    },
+    {
+      "Symbol": "BPCR",
+      "PnL": 908.44
+    },
+    {
+      "Symbol": "BTI",
+      "PnL": -224.85
+    },
+    {
+      "Symbol": "BYND",
+      "PnL": -298.52
+    },
+    {
+      "Symbol": "C",
+      "PnL": -267.79
+    },
+    {
+      "Symbol": "CAT",
+      "PnL": 364.4
+    },
+    {
+      "Symbol": "CBDBY",
+      "PnL": 504.61
+    },
+    {
+      "Symbol": "CCL",
+      "PnL": 581.78
+    },
+    {
+      "Symbol": "CHW",
+      "PnL": -66.5
+    },
+    {
+      "Symbol": "CIG",
+      "PnL": 609.29
+    },
+    {
+      "Symbol": "CNK",
+      "PnL": 217.76
+    },
+    {
+      "Symbol": "CRM",
+      "PnL": -211.65
+    },
+    {
+      "Symbol": "CRSR",
+      "PnL": 226.47
+    },
+    {
+      "Symbol": "DIS",
+      "PnL": -178.69
+    },
+    {
+      "Symbol": "DPZ",
+      "PnL": -747.84
+    },
+    {
+      "Symbol": "DSL",
+      "PnL": -262.37
+    },
+    {
+      "Symbol": "EAD",
+      "PnL": -257.04
+    },
+    {
+      "Symbol": "EBR",
+      "PnL": 130.51
+    },
+    {
+      "Symbol": "ENIAY",
+      "PnL": 162.42
+    },
+    {
+      "Symbol": "ERC",
+      "PnL": -47.12
+    },
+    {
+      "Symbol": "ETY",
+      "PnL": -508.86
+    },
+    {
+      "Symbol": "GBAB",
+      "PnL": 815.01
+    },
+    {
+      "Symbol": "GDO",
+      "PnL": 2020.99
+    },
+    {
+      "Symbol": "GHY",
+      "PnL": 344.49
+    },
+    {
+      "Symbol": "GOLD.OLD",
+      "PnL": 510.34
+    },
+    {
+      "Symbol": "GOOGL",
+      "PnL": -497.51
+    },
+    {
+      "Symbol": "GRFS",
+      "PnL": 713.74
+    },
+    {
+      "Symbol": "HIX",
+      "PnL": -3816.84
+    },
+    {
+      "Symbol": "HIX RT",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "HMC",
+      "PnL": -94.28
+    },
+    {
+      "Symbol": "HUYA",
+      "PnL": 470.72
+    },
+    {
+      "Symbol": "ING",
+      "PnL": -138.57
+    },
+    {
+      "Symbol": "INTC",
+      "PnL": 971.54
+    },
+    {
+      "Symbol": "ITUB",
+      "PnL": -2.06
+    },
+    {
+      "Symbol": "JD",
+      "PnL": 206.19
+    },
+    {
+      "Symbol": "KGC",
+      "PnL": 87.42
+    },
+    {
+      "Symbol": "KMB",
+      "PnL": 347.98
+    },
+    {
+      "Symbol": "LMT",
+      "PnL": 180.18
+    },
+    {
+      "Symbol": "LUV",
+      "PnL": 743.65
+    },
+    {
+      "Symbol": "LVS",
+      "PnL": 423.29
+    },
+    {
+      "Symbol": "META",
+      "PnL": 344.8
+    },
+    {
+      "Symbol": "MMM",
+      "PnL": 333.32
+    },
+    {
+      "Symbol": "MRK",
+      "PnL": 129.35
+    },
+    {
+      "Symbol": "NEM",
+      "PnL": -263.79
+    },
+    {
+      "Symbol": "NKE",
+      "PnL": -5744.59
+    },
+    {
+      "Symbol": "NU",
+      "PnL": -288.07
+    },
+    {
+      "Symbol": "OPEN",
+      "PnL": -754.46
+    },
+    {
+      "Symbol": "ORANY",
+      "PnL": 239.71
+    },
+    {
+      "Symbol": "PAGS",
+      "PnL": 794.37
+    },
+    {
+      "Symbol": "PDD",
+      "PnL": -194.71
+    },
+    {
+      "Symbol": "PFE",
+      "PnL": -2078.16
+    },
+    {
+      "Symbol": "PHG",
+      "PnL": -676.3
+    },
+    {
+      "Symbol": "PML",
+      "PnL": -1586.63
+    },
+    {
+      "Symbol": "PYPL",
+      "PnL": -310.73
+    },
+    {
+      "Symbol": "QIWI",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "SAP",
+      "PnL": -927.21
+    },
+    {
+      "Symbol": "SBS",
+      "PnL": 725.93
+    },
+    {
+      "Symbol": "SKLZ",
+      "PnL": 915.14
+    },
+    {
+      "Symbol": "STM",
+      "PnL": 136.46
+    },
+    {
+      "Symbol": "SWK",
+      "PnL": -480.05
+    },
+    {
+      "Symbol": "TDOC",
+      "PnL": -804.34
+    },
+    {
+      "Symbol": "TEN",
+      "PnL": 215.88
+    },
+    {
+      "Symbol": "TLRY",
+      "PnL": -538.53
+    },
+    {
+      "Symbol": "TSLA",
+      "PnL": -20.8
+    },
+    {
+      "Symbol": "UGP",
+      "PnL": 404.11
+    },
+    {
+      "Symbol": "UL",
+      "PnL": 39.2
+    },
+    {
+      "Symbol": "V",
+      "PnL": 121.39
+    },
+    {
+      "Symbol": "VLT",
+      "PnL": -403.66
+    },
+    {
+      "Symbol": "VZ",
+      "PnL": 280.49
+    },
+    {
+      "Symbol": "WBA",
+      "PnL": -1340.4
+    },
+    {
+      "Symbol": "WPM",
+      "PnL": 569.94
+    },
+    {
+      "Symbol": "XP",
+      "PnL": 55.19
+    },
+    {
+      "Symbol": "XYZ",
+      "PnL": -2254.19
+    },
+    {
+      "Symbol": "Total Stocks",
+      "PnL": -810.25
+    },
+    {
+      "Symbol": "GBP",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "HKD",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "USD",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "Fees",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "Total Cash",
+      "PnL": 0.0
+    },
+    {
+      "Symbol": "Total",
+      "PnL": 907.99
+    }
+  ],
+  "History": [
+    {
+      "Label": "2025",
+      "Return": -8.702209624
+    },
+    {
+      "Label": "2024",
+      "Return": 20.59588686
+    },
+    {
+      "Label": "2023",
+      "Return": 10.133461117
+    },
+    {
+      "Label": "2022",
+      "Return": -0.365937663
+    },
+    {
+      "Label": "202501",
+      "Return": 9.166573608
+    },
+    {
+      "Label": "202502",
+      "Return": -11.391185688
+    },
+    {
+      "Label": "202503",
+      "Return": -4.079444723
+    },
+    {
+      "Label": "202504",
+      "Return": 13.360472689
+    },
+    {
+      "Label": "202505",
+      "Return": 13.493921151
+    },
+    {
+      "Label": "202506",
+      "Return": 4.259675589
+    },
+    {
+      "Label": "202507",
+      "Return": 12.600689687
+    },
+    {
+      "Label": "202508",
+      "Return": -11.282177553
+    },
+    {
+      "Label": "202509",
+      "Return": 8.670599269
+    },
+    {
+      "Label": "202510",
+      "Return": -6.407808977
+    },
+    {
+      "Label": "202511",
+      "Return": -23.680682913
+    },
+    {
+      "Label": "202512",
+      "Return": -5.399532345
+    },
+    {
+      "Label": "202401",
+      "Return": -1.467777932
+    },
+    {
+      "Label": "202402",
+      "Return": 2.837743489
+    },
+    {
+      "Label": "202403",
+      "Return": 4.223675955
+    },
+    {
+      "Label": "202404",
+      "Return": -9.217726327
+    },
+    {
+      "Label": "202405",
+      "Return": 6.691502858
+    },
+    {
+      "Label": "202406",
+      "Return": -4.313566777
+    },
+    {
+      "Label": "202407",
+      "Return": 6.597010918
+    },
+    {
+      "Label": "202408",
+      "Return": -2.382647349
+    },
+    {
+      "Label": "202409",
+      "Return": 5.527919132
+    },
+    {
+      "Label": "202410",
+      "Return": 2.216798141
+    },
+    {
+      "Label": "202411",
+      "Return": 17.339716381
+    },
+    {
+      "Label": "202412",
+      "Return": -6.449243239
+    },
+    {
+      "Label": "202301",
+      "Return": 4.514203197
+    },
+    {
+      "Label": "202302",
+      "Return": -2.225167645
+    },
+    {
+      "Label": "202303",
+      "Return": 1.025050915
+    },
+    {
+      "Label": "202304",
+      "Return": 0.467570985
+    },
+    {
+      "Label": "202305",
+      "Return": -2.71937198
+    },
+    {
+      "Label": "202306",
+      "Return": 3.345940398
+    },
+    {
+      "Label": "202307",
+      "Return": 2.331373188
+    },
+    {
+      "Label": "202308",
+      "Return": -2.975568637
+    },
+    {
+      "Label": "202309",
+      "Return": -4.136642916
+    },
+    {
+      "Label": "202310",
+      "Return": -4.440400056
+    },
+    {
+      "Label": "202311",
+      "Return": 8.633448449
+    },
+    {
+      "Label": "202312",
+      "Return": 6.896059404
+    },
+    {
+      "Label": "202201",
+      "Return": 1.410975657
+    },
+    {
+      "Label": "202202",
+      "Return": -1.481543073
+    },
+    {
+      "Label": "202203",
+      "Return": 0.364680763
+    },
+    {
+      "Label": "202204",
+      "Return": -3.080358522
+    },
+    {
+      "Label": "202205",
+      "Return": 0.14435747
+    },
+    {
+      "Label": "202206",
+      "Return": -1.706733461
+    },
+    {
+      "Label": "202207",
+      "Return": 2.325917359
+    },
+    {
+      "Label": "202208",
+      "Return": 1.630773581
+    },
+    {
+      "Label": "202209",
+      "Return": -6.625582659
+    },
+    {
+      "Label": "202210",
+      "Return": -0.471971013
+    },
+    {
+      "Label": "202211",
+      "Return": 7.852909538
+    },
+    {
+      "Label": "202212",
+      "Return": -0.081417327
+    },
+    {
+      "Label": "202106",
+      "Return": 0.996841302
+    },
+    {
+      "Label": "202107",
+      "Return": -0.657992409
+    },
+    {
+      "Label": "202108",
+      "Return": 1.316354598
+    },
+    {
+      "Label": "202109",
+      "Return": -0.705640776
+    },
+    {
+      "Label": "202110",
+      "Return": 0.176916534
+    },
+    {
+      "Label": "202111",
+      "Return": -1.662440531
+    },
+    {
+      "Label": "202112",
+      "Return": 1.079000177
+    },
+    {
+      "Label": "2025 Q1",
+      "Return": -7.214889599
+    },
+    {
+      "Label": "2025 Q2",
+      "Return": 34.137626769
+    },
+    {
+      "Label": "2025 Q3",
+      "Return": 8.558538094
+    },
+    {
+      "Label": "2025 Q4",
+      "Return": -32.427906659
+    },
+    {
+      "Label": "2024 Q1",
+      "Return": 5.60809341
+    },
+    {
+      "Label": "2024 Q2",
+      "Return": -7.32101806
+    },
+    {
+      "Label": "2024 Q3",
+      "Return": 9.809376828
+    },
+    {
+      "Label": "2024 Q4",
+      "Return": 12.205620582
+    },
+    {
+      "Label": "2023 Q1",
+      "Return": 3.236072009
+    },
+    {
+      "Label": "2023 Q2",
+      "Return": 1.005655054
+    },
+    {
+      "Label": "2023 Q3",
+      "Return": -4.820692253
+    },
+    {
+      "Label": "2023 Q4",
+      "Return": 10.968466546
+    },
+    {
+      "Label": "2022 Q1",
+      "Return": 0.272875556
+    },
+    {
+      "Label": "2022 Q2",
+      "Return": -4.596995634
+    },
+    {
+      "Label": "2022 Q3",
+      "Return": -2.895628215
+    },
+    {
+      "Label": "2022 Q4",
+      "Return": 7.256478555
+    },
+    {
+      "Label": "2021 Q3",
+      "Return": -0.060524653
+    },
+    {
+      "Label": "2021 Q4",
+      "Return": -0.425525493
+    }
+  ]
+}

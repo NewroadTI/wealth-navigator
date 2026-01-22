@@ -5,8 +5,8 @@ import logging
 sys.path.append(".")
 
 from app.db.session import SessionLocal
-from app.models.asset import AssetClass, AssetSubClass
-from app.models.portfolio import Account, Portfolio
+from app.models.asset import AssetClass, AssetSubClass, Country, CorporateAction, Trades
+from app.models.portfolio import Account, Portfolio 
 from app.models.user import User
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
