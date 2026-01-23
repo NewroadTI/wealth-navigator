@@ -1,384 +1,507 @@
-hoy quiero insertar la data de mi primer usuario, toda la data historica que esta en este csv,  quiero hacer un script que consuma el csv y llene toda la info, para proximos imports .
-quiero que armes un script de python que considerando todas estas tablas consuma la data del csv y me genere un texto,json o algo para ver la data que se va insertar  a mi db
+import sys
+import os
+import re
+import json
+import logging
+import pandas as pd
+import uuid
+from datetime import datetime
+from decimal import Decimal
 
+# Configuración de ruta
+sys.path.append("seed_data")
+sys.path.append(".")
 
+try:
+    from app.db.session import SessionLocal
+    from app.models.user import User
+    from app.models.portfolio import Portfolio, Account, AccountReturnSeries
+    from app.models.asset import Asset, Trades, CashJournal, CorporateAction, PerformanceAttribution
+except ImportError:
+    print("⚠️ Error importando modelos. Ejecuta desde la raíz del proyecto.")
+    sys.exit(1)
 
-primero el usuario, creemos un usuario y portfolio con su nombre 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-username, el nombre del csv
-email email generado ej. daniel@gmail.com
-password usuario_daniel
-full name
-phone 999999999
+# --- CONFIGURACIÓN ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SPLIT_DIR = os.path.join(BASE_DIR, "inceptioncsvs")
+if not os.path.exists(SPLIT_DIR):
+    SPLIT_DIR = "seed_data/inceptioncsvs"
 
+JSON_OUTPUT_FILE = os.path.join(BASE_DIR, "insertion_summary.json")
 
+# --- DATOS DEL USUARIO ---
+USER_DATA = {
+    "username": "Daniel E Cicirello Cook",
+    "email": "daniel@gmail.com",
+    "password": "usuario_daniel",
+    "full_name": "Daniel E Cicirello Cook",
+    "phone": "999999999"
+}
 
-class User(Base):
-    __tablename__ = "users"
-    user_id = Column(Integer, primary_key=True, index=True)
+PORTFOLIO_DATA = {
+    "interface_code": "port_daniel_cicirello",
+    "name": "Portafolio Daniel Cicirello",
+    "type": "risk portfolio",
+    "main_currency": "USD",
+    "residence_country": "PE",
+    "inception_date": datetime.today().date()
+}
+
+IBKR_ACCOUNT_CODE = "U6177570"
+CURRENCY_MAP = {
+    "United States Dollar": "USD", "Hong Kong Dollar": "HKD", "Great British Pound": "GBP",
+    "Euro": "EUR", "Canadian Dollar": "CAD", "Swiss Franc": "CHF",
+    "Japanese Yen": "JPY", "Australian Dollar": "AUD", "Chinese Renminbi": "CNH",
+    "USD": "USD", "HKD": "HKD", "GBP": "GBP", "EUR": "EUR"
+}
+MONEDAS = list(set(CURRENCY_MAP.values()))
+
+# --- ACUMULADORES ---
+inserted_records = {
+    "Trades": [],
+    "CashJournal": [],
+    "CorporateActions": [],
+    "Performance": [],
+    "History": []
+}
+
+stats = {"CSV_Rows": 0, "DB_Inserted": 0}
+
+# LISTA PARA GUARDAR ERRORES/SKIPS
+skipped_log = []
+
+# --- HELPERS ---
+def parse_decimal(val):
+    if pd.isna(val) or str(val).strip() in ["", "-", "nan", "None"]: return None
+    try:
+        clean = str(val).replace(",", "").replace("$", "").replace(" ", "").strip()
+        if clean.startswith("<"): return None 
+        return Decimal(clean)
+    except: return None
+
+def validate_numeric_limit(val, precision=10, scale=6):
+    if val is None: return None
+    limit = Decimal(10**(precision - scale)) 
+    if abs(val) >= limit:
+        return None 
+    return val
+
+def parse_date(val):
+    if pd.isna(val) or str(val).strip() == "": return None
+    s = str(val).strip()
+    try:
+        if re.match(r"^\d{8}$", s): return datetime.strptime(s, "%Y%m%d").date()
+        if "/" in s:
+            try: return datetime.strptime(s, "%m/%d/%y").date()
+            except: return datetime.strptime(s, "%m/%d/%Y").date()
+        if "-" in s: return datetime.strptime(s, "%Y-%m-%d").date()
+    except: pass
+    return None
+
+def get_currency_code(raw_val):
+    if not raw_val or pd.isna(raw_val): return "USD"
+    clean = str(raw_val).strip()
+    return CURRENCY_MAP.get(clean, "USD")
+
+asset_cache = {}
+def get_asset_id(db, symbol):
+    if not symbol or pd.isna(symbol): return None
+    s = str(symbol).strip()
+    if s in asset_cache: return asset_cache[s]
+    asset = db.query(Asset).filter(Asset.symbol == s).first()
+    if not asset:
+        clean = s.split()[0].strip()
+        asset = db.query(Asset).filter(Asset.symbol == clean).first()
+    aid = asset.asset_id if asset else None
+    if aid: asset_cache[s] = aid
+    return aid
+
+# --- MÓDULOS ---
+
+def setup_user_and_accounts(db):
+    logger.info("👤 Configurando Usuario y Cuentas...")
+    user = db.query(User).filter(User.username == USER_DATA["username"]).first()
+    if not user:
+        u_data = USER_DATA.copy()
+        pwd = u_data.pop("password")
+        user = User(**u_data, password_hash=pwd, is_active=True)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    port = db.query(Portfolio).filter(Portfolio.interface_code == PORTFOLIO_DATA["interface_code"]).first()
+    if not port:
+        port = Portfolio(owner_user_id=user.user_id, **PORTFOLIO_DATA)
+        db.add(port)
+        db.commit()
+        db.refresh(port)
+
+    acct_map = {}
+    for curr in MONEDAS:
+        code = f"{IBKR_ACCOUNT_CODE}_{curr}"
+        acc = db.query(Account).filter(Account.account_code == code).first()
+        if not acc:
+            acc = Account(portfolio_id=port.portfolio_id, account_code=code, currency=curr, institution="IBKR")
+            db.add(acc)
+            db.commit()
+            db.refresh(acc)
+        acct_map[curr] = acc.account_id
+    return acct_map
+
+def import_trades(db, acct_map):
+    fpath = os.path.join(SPLIT_DIR, "Trade_Summary_0.csv")
+    if not os.path.exists(fpath): return
+
+    logger.info(f"🛒 Importando Trades...")
+    df = pd.read_csv(fpath)
+    count = 0
+    stats["CSV_Rows"] += len(df)
+
+    for i, row in df.iterrows():
+        # Trades rara vez falla, pero por si acaso
+        qty_buy = parse_decimal(row.get('Quantity Bought'))
+        qty_sell = parse_decimal(row.get('Quantity Sold'))
+        final_qty = qty_buy if qty_buy else (qty_sell if qty_sell else 0)
+        
+        # Validacion simple: Si no hay qty, es raro
+        if final_qty == 0:
+            skipped_log.append({"File": "Trade_Summary", "Row": i+2, "Reason": "Cantidad 0 o nula", "Data": row.to_dict()})
+            # No hacemos continue aqui porque tu logica original no lo hacía, pero es bueno saberlo
+
+        is_buy = True if qty_buy else False
+        price = parse_decimal(row.get('Average Price Bought')) if is_buy else parse_decimal(row.get('Average Price Sold'))
+        proceeds = parse_decimal(row.get('Proceeds Bought')) if is_buy else parse_decimal(row.get('Proceeds Sold'))
+        
+        curr_code = get_currency_code(row.get('Currency'))
+        acct_id = acct_map.get(curr_code, acct_map['USD'])
+        
+        symbol = row.get('Symbol')
+        t = Trades(
+            account_id=acct_id,
+            asset_id=get_asset_id(db, symbol),
+            trade_date=datetime.now(),
+            quantity=abs(final_qty),
+            price=abs(price) if price else 0,
+            gross_amount=proceeds,
+            currency=curr_code,
+            transaction_type="BUY" if is_buy else "SELL",
+            description=row.get('Description'),
+            ib_order_id=f"LOAD_{uuid.uuid4().hex[:8]}"
+        )
+        db.add(t)
+        count += 1
+        inserted_records["Trades"].append({"Symbol": symbol, "Type": "BUY" if is_buy else "SELL"})
+
+    db.commit()
+    stats["DB_Inserted"] += count
+    logger.info(f"✅ {count} Trades insertados.")
+
+def import_cash_journal(db, acct_map):
+    files = [
+        ("Dividends_0.csv", "DIVIDEND", "PayDate", "Amount", "Note"),
+        ("Deposits_And_Withdrawals_0.csv", "TRANSFER", "Date", "Amount", "Description"),
+        ("Interest_Details_0.csv", "INTEREST", "Date", "Amount", "Description"),
+        ("Fee_Summary_0.csv", "FEE", "Date", "Amount", "Description")
+    ]
     
-    username = Column(String, unique=True, nullable=False)
-    email = Column(String, unique=True, nullable=True, index=True)
-    password_hash = Column(String, nullable=False)
+    total = 0
     
-    full_name = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
+    for fname, t_def, d_col, a_col, desc_col in files:
+        fpath = os.path.join(SPLIT_DIR, fname)
+        if not os.path.exists(fpath): continue
+        
+        logger.info(f"💰 Procesando {fname}...")
+        df = pd.read_csv(fpath)
+        stats["CSV_Rows"] += len(df)
+        
+        for i, row in df.iterrows():
+            d = parse_date(row.get(d_col))
+            
+            # --- DETECCIÓN DE ERROR DE FECHA ---
+            if not d:
+                skipped_log.append({
+                    "File": fname, 
+                    "Row": i + 2, 
+                    "Reason": f"Fecha inválida o vacía en columna '{d_col}'", 
+                    "Data": row.to_dict()
+                })
+                continue
+            # -----------------------------------
+
+            desc = str(row.get(desc_col, ""))
+            final_type = t_def
+            
+            if fname == "Interest_Details_0.csv":
+                if "Accrued" in desc: final_type = "ACCRUED_INTEREST"
+                elif "Debit" in desc: final_type = "DEBIT_INTEREST"
+            
+            if fname == "Deposits_And_Withdrawals_0.csv":
+                raw_t = row.get('Type')
+                
+                # Verificamos si es un valor nulo/NA de Pandas o la cadena "NA"
+                is_na = pd.isna(raw_t) or str(raw_t).strip().upper() in ['NA', 'NAN', '']
+                
+                if is_na:
+                    # Solo si es NA, lo marcamos como ADJUSTMENT (o el valor que prefieras para registros sin tipo)
+                    final_type = "NA"
+                elif raw_t:
+                    # Si tiene un valor (como DEPOSIT, WITHDRAWAL, etc), lo usamos tal cual
+                    final_type = str(raw_t).upper()
+
+            curr_code = "USD"
+            if "HKD" in desc: curr_code = "HKD"
+            if "GBP" in desc: curr_code = "GBP"
+            if "EUR" in desc: curr_code = "EUR"
+
+            asset_id = None
+            if 'Symbol' in row and pd.notna(row['Symbol']):
+                asset_id = get_asset_id(db, row['Symbol'])
+            
+            if not asset_id and desc:
+                matches = re.findall(r'\((.*?)\)', desc)
+                for candidate in matches:
+                    candidate = candidate.strip()
+                    found = get_asset_id(db, candidate)
+                    if found:
+                        asset_id = found
+                        break
+                    first_word = candidate.split(' ')[0]
+                    if first_word and first_word != candidate:
+                        found = get_asset_id(db, first_word)
+                        if found:
+                            asset_id = found
+                            break
+
+            amount = parse_decimal(row.get(a_col)) or 0
+            
+            cj = CashJournal(
+                account_id=acct_map.get(curr_code, acct_map["USD"]),
+                asset_id=asset_id,
+                date=d,
+                type=final_type,
+                amount=amount,
+                currency=curr_code,
+                description=desc,
+                reference_code=f"{final_type[:3]}_{uuid.uuid4().hex[:8]}"
+            )
+            db.add(cj)
+            total += 1
+            inserted_records["CashJournal"].append({"Date": str(d), "Type": final_type, "Amount": float(amount)})
+            
+        db.commit()
     
-    # Nuevos campos V3
-    tax_id = Column(String, unique=True, nullable=True) # DNI, NIF, SSN, etc.
-    entity_type = Column(String, default='INDIVIDUAL', nullable=True) # INDIVIDUAL, CORP, TRUST
+    stats["DB_Inserted"] += total
+    logger.info(f"✅ {total} movimientos de caja insertados.")
+
+def import_corporate_actions(db, acct_map):
+    fpath = os.path.join(SPLIT_DIR, "Corporate_Actions_0.csv")
+    if not os.path.exists(fpath): return
     
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    logger.info(f"📢 Importando Corporate Actions...")
+    df = pd.read_csv(fpath)
+    stats["CSV_Rows"] += len(df)
+    count = 0
     
-    role_id = Column(Integer, ForeignKey("roles.role_id"))
+    for i, row in df.iterrows():
+        d = parse_date(row.get('Date'))
+        
+        # --- DETECCIÓN DE ERROR DE FECHA ---
+        if not d: 
+            skipped_log.append({
+                "File": "Corporate_Actions_0.csv", 
+                "Row": i + 2, 
+                "Reason": "Fecha inválida", 
+                "Data": row.to_dict()
+            })
+            continue
+        # -----------------------------------
+
+        desc = str(row.get('Description', ""))
+        r_new, r_old = None, None
+        match = re.search(r'(\d+(?:\.\d+)?)\s+FOR\s+(\d+(?:\.\d+)?)', desc)
+        if match:
+            r_new = validate_numeric_limit(Decimal(match.group(1)))
+            r_old = validate_numeric_limit(Decimal(match.group(2)))
+
+        ca = CorporateAction(
+            account_id=acct_map["USD"],
+            report_date=d,
+            execution_date=d,
+            action_type=row.get('Type'),
+            description=desc,
+            quantity_adjustment=parse_decimal(row.get('Quantity')),
+            ratio_old=r_old,
+            ratio_new=r_new,
+            ib_action_id=f"CA_{uuid.uuid4().hex[:8]}"
+        )
+        db.add(ca)
+        count += 1
+        inserted_records["CorporateActions"].append({"Date": str(d), "Type": row.get('Type')})
+
+    db.commit()
+    stats["DB_Inserted"] += count
+    logger.info(f"✅ {count} Corporate Actions insertadas.")
+
+def import_history(db, acct_map):
+    hist_files = [f for f in os.listdir(SPLIT_DIR) if f.startswith("Historical_Performance")]
+    count = 0
+    for fname in hist_files:
+        fpath = os.path.join(SPLIT_DIR, fname)
+        try: df = pd.read_csv(fpath)
+        except: continue
+        stats["CSV_Rows"] += len(df)
+        
+        for i, row in df.iterrows():
+            label, p_type = None, 'M'
+            for col in ['Month', 'Quarter', 'Year']:
+                if col in row and pd.notna(row[col]):
+                    label = str(row[col])
+                    if col == 'Quarter': p_type = 'Q'
+                    if col == 'Year': p_type = 'Y'
+                    break
+            
+            # --- DETECCIÓN DE YTD O SIN ETIQUETA ---
+            if not label or label == "YTD":
+                skipped_log.append({
+                    "File": fname, 
+                    "Row": i + 2, 
+                    "Reason": f"Registro Histórico Ignorado (Label: {label})", 
+                    "Data": row.to_dict()
+                })
+                continue
+            # ---------------------------------------
+            
+            ret = parse_decimal(row.get('AccountReturn'))
+            
+            # --- DETECCIÓN DE RETORNO NULO ---
+            if ret is None:
+                skipped_log.append({
+                    "File": fname, 
+                    "Row": i + 2, 
+                    "Reason": "Valor de Retorno Nulo", 
+                    "Data": row.to_dict()
+                })
+                continue
+            # ---------------------------------
+
+            end_d = datetime.today().date()
+            try:
+                if p_type == 'M': 
+                    dt = datetime.strptime(label, "%Y%m")
+                    nxt = dt.replace(year=dt.year+1, month=1) if dt.month==12 else dt.replace(month=dt.month+1)
+                    end_d = (nxt - pd.Timedelta(days=1)).date()
+                elif p_type == 'Q': 
+                    y, q = label.split(' Q')
+                    m = int(q)*3
+                    end_d = datetime(int(y), m, 1) 
+                elif p_type == 'Y': 
+                    end_d = datetime(int(label), 12, 31).date()
+            except: pass
+
+            ars = AccountReturnSeries(
+                account_id=acct_map["USD"],
+                period_type=p_type,
+                period_label=label,
+                end_date=end_d,
+                return_pct=ret
+            )
+            db.add(ars)
+            count += 1
+            inserted_records["History"].append({"Label": label, "Return": float(ret)})
+            
+    db.commit()
+    stats["DB_Inserted"] += count
+    logger.info(f"✅ {count} registros históricos insertados.")
+
+def import_performance(db, acct_map):
+    fpath = os.path.join(SPLIT_DIR, "Performance_by_Symbol_0.csv")
+    if not os.path.exists(fpath): return
     
-    # Relaciones Portafolios
-    role = relationship("Role", back_populates="users")
-    owned_portfolios = relationship("Portfolio", back_populates="owner")
-    advisor_assignments = relationship("PortfolioAdvisor", back_populates="advisor")
-
-
-
-despues de eso para crear el portfolio
-
-owner id = daniel
-interface_code un codigo que identifique al usuario, puede ser port_daniel_cicirello
-name portafolio daniel cicirello
-type risk portfolio
-main currency USD
-residence country peru
-inception date today
-active status true
-
-
- el portfolio se crea 1 por el nombre y los accounts se crean 9 , 9 por cada moneda, ejemplo:
-
-por su codigo de
-daniel cicirello
-account code de ibkr: U6177570
-entonces accounts en monedas del portfolio
-U6177570_USD
-U6177570_TWD
-U6177570_CNY
-U6177570_CNH
-U6177570_EUR
-... (LAS 9 MONEdas mas importantes)
-
-account code de pershing: JXD082952
-JXD082952_USD
-JXD082952_TWD
-... las mismas nodas de ibkr
-
-
-class Portfolio(Base):
-    __tablename__ = "portfolios"
-    portfolio_id = Column(Integer, primary_key=True, index=True)
-    
-    owner_user_id = Column(Integer, ForeignKey("users.user_id"))
-    
-    interface_code = Column(String, unique=True, nullable=False)
-    name = Column(String, nullable=False)
-    type = Column(String)
-    main_currency = Column(CHAR(3)) 
-    residence_country = Column(CHAR(2))
-    
-    inception_date = Column(Date)
-    active_status = Column(Boolean, default=True)
-    
-    owner = relationship("User", back_populates="owned_portfolios")
-    accounts = relationship("Account", back_populates="portfolio")
-    advisors = relationship("PortfolioAdvisor", back_populates="portfolio")
-
-
-
-
-Para "Historical Performance" -> AccountReturnSeries
-Fechas: Convierte el string de IBKR a una fecha real.
-
-202501 -> 2025-01-31
-
-2025 Q1 -> 2025-03-31
-
-2024 -> 2024-12-31
-
-Period Type:
-
-Si len es 6 (202501) -> Type 'M'
-
-Si tiene 'Q' -> Type 'Q'
-
-Si es YTD -> Type 'YTD'
-
-Si len es 4 (2024) -> Type 'Y'
-
-Para "Performance by Symbol" -> PerformanceAttribution
-Filas de Totales: Notarás filas como Total Bonds o Total Crypto.
-
-En estas, asset_id será None.
-
-En category_label guardas "Total Bonds".
-
-
-
-class PerformanceAttribution(Base):
-    __tablename__ = "performance_attribution"
-    attribution_id = Column(BigInteger, primary_key=True, index=True)
-    
-    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
-    
-    # asset_id es NULLABLE para soportar filas de totales como "Total Bonds", "Total Crypto"
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
-    
-    # --- Datos del CSV ---
-    # Si asset_id es Null, usamos esto para saber qué es (Ej: 'Total Bonds')
-    category_label = Column(String, nullable=True) 
-    
-    avg_weight = Column(Numeric,nullable=True)      # CSV: AvgWeight (Importante para atribución)
-    return_pct = Column(Numeric,nullable=True)      # CSV: Return
-    contribution_pct = Column(Numeric,nullable=True)# CSV: Contribution
-
-    realized_pnl = Column(Numeric,nullable=True)    # CSV: Realized_P&L
-    unrealized_pnl = Column(Numeric,nullable=True)  # CSV: Unrealized_P&L
-    
-    # Metadata extra
-    is_open_position = Column(Boolean, default=False, nullable=True) # CSV: Open (Yes/No)
-    sector_snapshot = Column(String, ForeignKey("industries.industry_code"), nullable=True)
-  # CSV: Sector (Guardar snapshot pq el sector del activo puede cambiar)
-
-    account = relationship("Account", back_populates="performance_attribution")
-    asset = relationship("Asset")
-
-
-
-
-
-class AccountReturnSeries(Base):
-    __tablename__ = "account_return_series"
-    
-    series_id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
-    
-    # Periodo del reporte
-    # Ej: period_type='M' (Month), 'Q' (Quarter), 'Y' (Year), 'YTD'
-    period_type = Column(String(3), nullable=False) 
-    
-    # Etiqueta original del reporte para display exacto
-    # Ej: '202501', '2025 Q1', '2024', 'YTD'
-    period_label = Column(String, nullable=False)
-    
-    # Fecha normalizada (Vital para ordenar gráficas)
-    # Si es '202501', guardas 2025-01-31. Si es 2025, guardas 2025-12-31.
-    end_date = Column(Date, nullable=False)
-    
-    return_pct = Column(Numeric, nullable=False) # El valor principal (ej. 9.16)
-    
-    # Opcional: Si el reporte te da valores monetarios del NAV inicial/final
-    starting_nav = Column(Numeric, nullable=True)
-    ending_nav = Column(Numeric, nullable=True)
-    
-    # Constraint para no duplicar datos del mismo mes/cuenta
-    # __table_args__ = (UniqueConstraint('account_id', 'period_type', 'period_label', name='uq_acct_period'),)
-
-    account = relationship("Account", back_populates="return_series")
-
-
-
-lo de trade summary si va en trades, pero tienes que parsear esos datos a los que corresponden en mi tabla trades
-
-
-class Trades(Base):
-    __tablename__ = "trades"
-    
-    # ID interno de tu sistema (Autoincremental)
-    transaction_id = Column(Integer, primary_key=True, index=True)
-    
-    account_id = Column(Integer, ForeignKey("accounts.account_id"))
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"))
-    
-    # --- IDENTIFICADORES IBKR (Clave para conciliación) ---
-    # "TransactionID": ID numérico único del movimiento (ej: 37183892878). 
-    # Es el MEJOR campo para evitar duplicados.
-    ib_transaction_id = Column(String, unique=True, nullable=True)
-    
-    # "IBExecID": String complejo (ej: 0001506d.695e...). 
-    # A veces es null en cancelaciones o movimientos internos.
-    ib_exec_id = Column(String, index=True, nullable=True) 
-    
-    # "TradeID": Agrupa varias ejecuciones parciales de una misma orden
-    ib_trade_id = Column(String, nullable=True)
-    
-    # "IBOrderID" / "BrokerageOrderID"
-    ib_order_id = Column(String, nullable=True)
-
-    # --- FECHAS ---
-    # "DateTime" o "TradeDate". Incluye hora si está disponible.
-    trade_date = Column(DateTime, nullable=False)
-    
-    # "SettleDateTarget": Cuando realmente se mueve el efectivo
-    settlement_date = Column(Date, nullable=True)
-    
-    # "ReportDate": Fecha de corte del reporte
-    report_date = Column(Date, nullable=True)
-
-    # --- CLASIFICACIÓN ---
-    # "TransactionType": ExchTrade, TradeCancel, FracShare, etc.
-    transaction_type = Column(String, nullable=True)
-    
-    # "Buy/Sell": BUY, SELL, SELL (Ca.)
-    side = Column(String, nullable=True)
-    
-    # "Exchange": NYSE, DARK, IDEALFX (Para Forex)
-    exchange = Column(String, nullable=True)
-
-    # --- ECONOMÍA ---
-    quantity = Column(Numeric, nullable=False)
-    price = Column(Numeric, nullable=False)       # "TradePrice"
-    
-    # Importes Monetarios
-    gross_amount = Column(Numeric, nullable=True) # "TradeMoney" (Cantidad * Precio)
-    net_amount = Column(Numeric, nullable=True)   # "NetCash" (Gross - Comisiones - Impuestos)
-    proceeds = Column(Numeric, nullable=True)     # "Proceeds" (Suele ser igual a TradeMoney en acciones)
-
-    # --- COSTOS Y PNL (Nuevos campos del reporte detallado) ---
-    commission = Column(Numeric, nullable=True)   # "IBCommission"
-    tax = Column(Numeric, nullable=True)          # "Taxes"
-    
-    # Datos Fiscales y de Rendimiento
-    cost_basis = Column(Numeric, nullable=True)   # "CostBasis" (Base de costo actualizada)
-    realized_pnl = Column(Numeric, nullable=True) # "FifoPnlRealized" (Ganancia/Pérdida realizada en esta venta)
-    mtm_pnl = Column(Numeric, nullable=True)      # "MtmPnl" (Marcado a mercado del día)
-
-    # --- EXTRAS ---
-    currency = Column(CHAR(3))                    # "CurrencyPrimary" o "IBCommissionCurrency"
-    description = Column(Text)                    # "Description"
-    notes = Column(Text, nullable=True)           # "Notes/Codes" (Ej: O, C, P para Open/Close)
-    
-    # Relaciones
-    account = relationship("Account", back_populates="trades")
-    asset = relationship("Asset")
-
-
-
-
-
-lo de deposit and withdrawals tambien entra, los campos iran en cash journal indicando el tipo, el account del usuario, la fecha, cantidad, moneda en este caso es usd, en descripcion  ira lo de descripcion del csv, en type ira type del csv, reference code esta vez ira null, lo mismo con asset iran null
-
-
-
-class CashJournal(Base):
-    __tablename__ = "cash_journal"
-    journal_id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(Integer, ForeignKey("accounts.account_id"))
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
-    
-    date = Column(Date, nullable=False)
-    ex_date = Column(Date, nullable=True)      # Ex-Date (Fecha de corte del derecho)
-    type = Column(String, nullable=False) 
-    amount = Column(Numeric, nullable=False)
-    currency = Column(CHAR(3), ForeignKey("currencies.code")) 
-    
-    quantity = Column(Numeric, nullable=True)
-    rate_per_share = Column(Numeric, nullable=True)
-
-    description = Column(Text)
-    reference_code = Column(String, unique=True, nullable=True) # TransactionID único
-    extra_details = Column(JSONB, nullable=True)
-    account = relationship("Account", back_populates="cash_journal")
-    asset = relationship("Asset")
-
-
-
-
-en corporate actions tienes que parsear el asset que sale en los campos y ponerlos en el asset, tambien tiene que parsear ese formato de fecha y ponerlos en los campos que corresponden, pero lo mas importante es parsear el tipo de asset , y los ratios, que la descripcion te pueda dar en este formato:
-
-class CorporateAction(Base):
-    __tablename__ = "corporate_actions"
-    
-    # Identificadores principales
-    action_id = Column(Integer, primary_key=True, index=True)
-    ib_action_id = Column(String, unique=True, nullable=True)  # ActionID del tipo 2, puede ser NULL
-    transaction_id = Column(String, nullable=True)  # TransactionID del tipo 2, puede ser NULL
-    
-    # Relaciones obligatorias
-    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)  # Puede ser NULL si no hay activo
-    
-    # Campos del tipo 1
-    action_type = Column(String, nullable=True)  # Tipo normalizado: SPLIT, SPINOFF, MATURITY, RIGHTS, ACQUISITION, DELISTING
-    
-    # Fechas (pueden venir en diferentes formatos)
-    report_date = Column(Date, nullable=True)  # Fecha del reporte (tipo 2)
-    execution_date = Column(Date, nullable=True)  # Fecha de ejecución
-    
-    # Descripciones
-    description = Column(Text, nullable=True)  # Descripción completa
-    
-    # Campos de ratios (extraíbles de la descripción)
-    ratio_old = Column(Numeric(10, 6), nullable=True)
-    ratio_new = Column(Numeric(10, 6), nullable=True)
-    
-    # Ajustes
-    quantity_adjustment = Column(Numeric(20, 6), nullable=True)  # Cantidad ajustada
-    
-    # Campos del tipo 2
-    symbol = Column(String, nullable=True)  # Símbolo del activo
-    isin = Column(String, nullable=True)  # ISIN del activo
-    cusip = Column(String, nullable=True)  # CUSIP del activo
-    security_id = Column(String, nullable=True)  # SecurityID
-    security_id_type = Column(String, nullable=True)  # Tipo de SecurityID
-    
-    # Campos financieros del tipo 2
-    amount = Column(Numeric(20, 6), nullable=True)
-    proceeds = Column(Numeric(20, 6), nullable=True)
-    value = Column(Numeric(20, 6), nullable=True)
-    fifo_pnl_realized = Column(Numeric(20, 6), nullable=True)
-    mtm_pnl = Column(Numeric(20, 6), nullable=True)
-    
-    # Campos adicionales de metadatos
-    currency = Column(String, nullable=True)  # Moneda
-    
-    
-    # Relaciones
-    account = relationship("Account", back_populates="corporate_actions")
-    asset = relationship("Asset", back_populates="corporate_actions")
-
-
-
-
-
-
-
-
-todo lo que son dividends, fee summary e interest details debe ir en cash_journal:
-la de interest details debe ir en cash journal, debes parsear los datos de la descripcion para poner type del descripcion "accrued interest, bond coupon, hkd debit", debes parsear el asset, tambien en extra details pon el raw_rate.
-
- en fee sumary tambien en cash_journal y como tipo pones fee y los datos como corresponden, date en date, amount en amount, description en description.
-
-
-class CashJournal(Base):
-    __tablename__ = "cash_journal"
-    journal_id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(Integer, ForeignKey("accounts.account_id"))
-    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True)
-    
-    date = Column(Date, nullable=False)
-    ex_date = Column(Date, nullable=True)      # Ex-Date (Fecha de corte del derecho)
-    type = Column(String, nullable=False) 
-    amount = Column(Numeric, nullable=False)
-    currency = Column(CHAR(3), ForeignKey("currencies.code")) 
-    
-    quantity = Column(Numeric, nullable=True)
-    rate_per_share = Column(Numeric, nullable=True)
-
-    description = Column(Text)
-    reference_code = Column(String, unique=True, nullable=True) # TransactionID único
-    extra_details = Column(JSONB, nullable=True)
-    account = relationship("Account", back_populates="cash_journal")
-    asset = relationship("Asset")
-
-
-
-
-
-
+    logger.info("📈 Importando Performance Attribution...")
+    df = pd.read_csv(fpath)
+    stats["CSV_Rows"] += len(df)
+    count = 0
+
+    for i, row in df.iterrows():
+        # Performance rara vez tiene lógica de exclusión en tu código original, 
+        # pero si parse_decimal fallara en algo crítico, aquí podríamos loguearlo.
+        # Por ahora asumimos que pasa todo.
+        sym = row.get('Symbol')
+        is_total = pd.isna(sym) or "Total" in str(sym) or "Cash" in str(sym)
+        
+        asset_id = get_asset_id(db, sym) if not is_total else None
+        label = str(sym) if is_total or not asset_id else None
+        
+        pa = PerformanceAttribution(
+            account_id=acct_map["USD"],
+            asset_id=asset_id,
+            category_label=label,
+            avg_weight=parse_decimal(row.get('AvgWeight')),
+            return_pct=parse_decimal(row.get('Return')),
+            contribution_pct=parse_decimal(row.get('Contribution')),
+            realized_pnl=parse_decimal(row.get('Realized_P&L')),
+            unrealized_pnl=parse_decimal(row.get('Unrealized_P&L')),
+            is_open_position=(str(row.get('Open')).lower() == 'yes')
+        )
+        db.add(pa)
+        count += 1
+        inserted_records["Performance"].append({"Symbol": str(sym)})
+
+    db.commit()
+    stats["DB_Inserted"] += count
+    logger.info(f"✅ {count} Performance rows insertadas.")
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, (datetime, Decimal)):
+            return str(o)
+        return super().default(o)
+
+def run_all():
+    db = SessionLocal()
+    try:
+        acct_map = setup_user_and_accounts(db)
+        
+        import_trades(db, acct_map)
+        import_cash_journal(db, acct_map)
+        import_corporate_actions(db, acct_map)
+        import_history(db, acct_map)
+        import_performance(db, acct_map)
+        
+        # --- REPORTE FINAL ---
+        print("\n" + "="*60)
+        print("📊 RESUMEN DE IMPORTACIÓN")
+        print("="*60)
+        print(f"📄 Total Filas Leídas (CSV): {stats['CSV_Rows']}")
+        print(f"💾 Total Insertado en DB:  {stats['DB_Inserted']}")
+        print(f"🗑️  Total Ignorado:        {len(skipped_log)}")
+        print("="*60)
+        
+        if skipped_log:
+            print("\n🔍 DETALLE DE FILAS IGNORADAS:")
+            for item in skipped_log:
+                print(f"❌ [{item['File']} | Fila {item['Row']}] -> {item['Reason']}")
+                # Descomenta la siguiente línea si quieres ver toda la data de la fila:
+                # print(f"   Data: {item['Data']}")
+                print("-" * 30)
+
+        # Guardar JSON
+        with open(JSON_OUTPUT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(inserted_records, f, indent=2, cls=DateTimeEncoder)
+        
+        print(f"\n📝 Detalle guardado en: {JSON_OUTPUT_FILE}")
+        logger.info("🚀 --- PROCESO COMPLETADO EXITOSAMENTE ---")
+
+    except Exception as e:
+        logger.error(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    run_all()
