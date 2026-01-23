@@ -1,66 +1,62 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-//ADD
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Plus, Search, Edit2, Trash2, Building, Globe, Factory, BarChart3, Coins, ArrowUpDown, Check, ChevronsUpDown } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Building, Globe, Factory, BarChart3, Coins, ArrowUpDown, Search, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import ExchangesSection from './BasicDataSections/ExchangesSection';
+import CountriesSection from './BasicDataSections/CountriesSection';
+import IndustriesSection from './BasicDataSections/IndustriesSection';
+import IndicesSection from './BasicDataSections/IndicesSection';
+import CurrenciesSection from './BasicDataSections/CurrenciesSection';
+import AssetClassesSection from './BasicDataSections/AssetClassesSection.tsx';
 
 // Data is fetched from API (catalogs)
 
-type ExchangeApi = {
+export type ExchangeApi = {
   exchange_code: string;
   name: string;
   country_code?: string | null;
 };
 
-type CountryApi = {
+export type CountryApi = {
   iso_code: string;
   name?: string | null;
 };
 
-type IndustryApi = {
+export type IndustryApi = {
   industry_code: string;
   name: string;
   sector?: string | null;
 };
 
-type IndexApi = {
+export type IndexApi = {
   index_code: string;
   name: string;
   country_code?: string | null;
   exchange_code?: string | null;
 };
 
-type CurrencyApi = {
+export type CurrencyApi = {
   code: string;
   name: string;
 };
 
-type SortConfig = { key: string; direction: 'asc' | 'desc' };
+export type AssetSubClassApi = {
+  sub_class_id?: number;
+  code: string;
+  name: string;
+};
+
+export type AssetClassApi = {
+  class_id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  sub_classes: AssetSubClassApi[];
+};
+
+export type SortConfig = { key: string; direction: 'asc' | 'desc' };
 
 const BasicData = () => {
   const [activeTab, setActiveTab] = useState('exchanges');
@@ -135,6 +131,23 @@ const BasicData = () => {
   const [currencyActionLoading, setCurrencyActionLoading] = useState(false);
   const [currencyActionError, setCurrencyActionError] = useState<string | null>(null);
   const [currencyToDelete, setCurrencyToDelete] = useState<CurrencyApi | null>(null);
+
+  const [assetClasses, setAssetClasses] = useState<AssetClassApi[]>([]);
+  const [assetClassesLoading, setAssetClassesLoading] = useState(false);
+  const [assetClassesError, setAssetClassesError] = useState<string | null>(null);
+  const [isCreateAssetClassOpen, setIsCreateAssetClassOpen] = useState(false);
+  const [isEditAssetClassOpen, setIsEditAssetClassOpen] = useState(false);
+  const [assetClassDraft, setAssetClassDraft] = useState({
+    class_id: 0,
+    code: '',
+    name: '',
+    description: '',
+    sub_classes: [] as AssetSubClassApi[],
+  });
+  const [editingAssetClass, setEditingAssetClass] = useState<AssetClassApi | null>(null);
+  const [assetClassActionLoading, setAssetClassActionLoading] = useState(false);
+  const [assetClassActionError, setAssetClassActionError] = useState<string | null>(null);
+  const [assetClassToDelete, setAssetClassToDelete] = useState<AssetClassApi | null>(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
   
@@ -293,6 +306,33 @@ const BasicData = () => {
     return () => controller.abort();
   }, [apiBaseUrl]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadAssetClasses = async () => {
+      try {
+        setAssetClassesLoading(true);
+        setAssetClassesError(null);
+        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/asset-classes`, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as AssetClassApi[];
+        setAssetClasses(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setAssetClassesError('Could not load Asset Classes.');
+        setAssetClasses([]);
+      } finally {
+        setAssetClassesLoading(false);
+      }
+    };
+
+    loadAssetClasses();
+    return () => controller.abort();
+  }, [apiBaseUrl]);
+
   const countryNameByIso = useMemo(() => {
     const map = new Map<string, string>();
     for (const country of countries) {
@@ -345,6 +385,15 @@ const BasicData = () => {
   const refreshCurrencies = async () => {
     const data = await fetchAllPages<CurrencyApi>('/api/v1/catalogs/currencies');
     setCurrencies(data);
+  };
+
+  const refreshAssetClasses = async () => {
+    const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/asset-classes`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = (await response.json()) as AssetClassApi[];
+    setAssetClasses(Array.isArray(data) ? data : []);
   };
 
   const handleCreateExchange = async () => {
@@ -954,6 +1003,144 @@ const BasicData = () => {
     }
   };
 
+  const handleCreateAssetClass = async () => {
+    if (!assetClassDraft.code.trim() || !assetClassDraft.name.trim()) {
+      setAssetClassActionError('Code and Name fields are required.');
+      return;
+    }
+    try {
+      setAssetClassActionLoading(true);
+      setAssetClassActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/asset-classes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: assetClassDraft.code.trim().toUpperCase(),
+          name: assetClassDraft.name.trim(),
+          description: assetClassDraft.description?.trim() || null,
+          sub_classes: assetClassDraft.sub_classes.map((sub) => ({
+            code: sub.code.trim().toUpperCase(),
+            name: sub.name.trim(),
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshAssetClasses();
+      setAssetClassDraft({ class_id: 0, code: '', name: '', description: '', sub_classes: [] });
+      setIsCreateAssetClassOpen(false);
+
+      toast({
+        title: 'Asset class created',
+        description: `Asset class "${assetClassDraft.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setAssetClassActionError(error.message || 'Could not create the asset class.');
+    } finally {
+      setAssetClassActionLoading(false);
+    }
+  };
+
+  const handleEditAssetClass = (assetClass: AssetClassApi) => {
+    setEditingAssetClass(assetClass);
+    setAssetClassDraft({
+      class_id: assetClass.class_id,
+      code: assetClass.code,
+      name: assetClass.name,
+      description: assetClass.description ?? '',
+      sub_classes: assetClass.sub_classes.map((sub) => ({
+        sub_class_id: sub.sub_class_id,
+        code: sub.code,
+        name: sub.name,
+      })),
+    });
+    setAssetClassActionError(null);
+    setIsEditAssetClassOpen(true);
+  };
+
+  const handleUpdateAssetClass = async () => {
+    if (!editingAssetClass) {
+      return;
+    }
+    if (!assetClassDraft.code.trim() || !assetClassDraft.name.trim()) {
+      setAssetClassActionError('Code and Name fields are required.');
+      return;
+    }
+    try {
+      setAssetClassActionLoading(true);
+      setAssetClassActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/asset-classes/${editingAssetClass.class_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: assetClassDraft.code.trim().toUpperCase(),
+          name: assetClassDraft.name.trim(),
+          description: assetClassDraft.description?.trim() || null,
+          sub_classes: assetClassDraft.sub_classes.map((sub) => ({
+            sub_class_id: sub.sub_class_id,
+            code: sub.code.trim().toUpperCase(),
+            name: sub.name.trim(),
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshAssetClasses();
+      setIsEditAssetClassOpen(false);
+      setEditingAssetClass(null);
+
+      toast({
+        title: 'Asset class updated',
+        description: `Asset class "${assetClassDraft.name}" has been updated successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setAssetClassActionError(error.message || 'Could not update the asset class.');
+    } finally {
+      setAssetClassActionLoading(false);
+    }
+  };
+
+  const handleDeleteAssetClass = async (classId: number) => {
+    try {
+      setAssetClassActionLoading(true);
+      setAssetClassActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/asset-classes/${classId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshAssetClasses();
+
+      toast({
+        title: 'Asset class deleted',
+        description: 'Asset class has been deleted successfully.',
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting',
+        description: error.message || 'Could not delete the asset class.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAssetClassActionLoading(false);
+    }
+  };
+
   const filteredExchanges = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     let result = exchanges;
@@ -1054,6 +1241,27 @@ const BasicData = () => {
     });
   }, [currencies, searchQuery, currencySort]);
 
+  const filteredAssetClasses = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    let result = assetClasses;
+    if (query) {
+      result = result.filter((assetClass) => {
+        const matchesClass = [
+          assetClass.code,
+          assetClass.name,
+          assetClass.description ?? '',
+        ]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(query));
+        const matchesSub = assetClass.sub_classes?.some((sub) =>
+          [sub.code, sub.name].filter(Boolean).some((value) => value.toLowerCase().includes(query))
+        );
+        return matchesClass || !!matchesSub;
+      });
+    }
+    return [...result].sort((a, b) => a.name.localeCompare(b.name));
+  }, [assetClasses, searchQuery]);
+
   // Sortable column header component
   const SortableHeader = ({ label, sortKey, currentSort, onSort }: { label: string; sortKey: string; currentSort: SortConfig; onSort: (key: string) => void }) => (
     <th
@@ -1094,6 +1302,10 @@ const BasicData = () => {
                   <Coins className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                   Currencies
                 </TabsTrigger>
+                <TabsTrigger value="asset-classes" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
+                  <Layers className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  Asset Classes
+                </TabsTrigger>
               </TabsList>
 
               <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
@@ -1111,1419 +1323,170 @@ const BasicData = () => {
             </div>
           </div>
 
-        {/* Exchanges Tab */}
-        <TabsContent value="exchanges">
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <h3 className="font-semibold text-foreground text-sm md:text-base">Stock Exchanges</h3>
-              <Dialog
-                open={isCreateExchangeOpen}
-                onOpenChange={(open) => {
-                  setIsCreateExchangeOpen(open);
-                  setExchangeActionError(null);
-                  if (open) {
-                    setExchangeDraft({ exchange_code: '', name: '', country_code: '' });
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
-                    <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
-                    Add Exchange
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Add Stock Exchange</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {exchangeActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {exchangeActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="exchange-code">Code *</Label>
-                        <Input
-                          id="exchange-code"
-                          placeholder="NYSE"
-                          className="mt-1"
-                          value={exchangeDraft.exchange_code}
-                          onChange={(e) => setExchangeDraft({ ...exchangeDraft, exchange_code: e.target.value.toUpperCase() })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="exchange-country">Country</Label>
-                        <div className="mt-1">
-                          <Popover open={exchangeCountryOpen} onOpenChange={setExchangeCountryOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                id="exchange-country"
-                                className="w-full justify-between"
-                              >
-                                {exchangeDraft.country_code
-                                  ? (countryNameByIso.get(exchangeDraft.country_code) ?? exchangeDraft.country_code)
-                                  : 'Select country'}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-full p-0"
-                              align="start"
-                              onWheel={(event) => event.stopPropagation()}
-                            >
-                              <Command>
-                                <CommandInput placeholder="Search country..." />
-                                <CommandEmpty>No country found.</CommandEmpty>
-                                <CommandList className="max-h-60 overflow-auto">
-                                  <CommandGroup>
-                                    {countries.map((country) => (
-                                      <CommandItem
-                                        key={country.iso_code}
-                                        value={`${country.name ?? country.iso_code} ${country.iso_code}`}
-                                        onSelect={() => {
-                                          setExchangeDraft({
-                                            ...exchangeDraft,
-                                            country_code: country.iso_code,
-                                          });
-                                          setExchangeCountryOpen(false);
-                                        }}
-                                      >
-                                        <Check
-                                          className={`mr-2 h-4 w-4 ${exchangeDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
-                                        />
-                                        <span>{country.name ?? country.iso_code}</span>
-                                        <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="exchange-name">Name *</Label>
-                      <Input
-                        id="exchange-name"
-                        placeholder="New York Stock Exchange"
-                        className="mt-1"
-                        value={exchangeDraft.name}
-                        onChange={(e) => setExchangeDraft({ ...exchangeDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsCreateExchangeOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleCreateExchange}
-                        disabled={exchangeActionLoading}
-                      >
-                        {exchangeActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Dialog open={isEditExchangeOpen} onOpenChange={setIsEditExchangeOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Edit Stock Exchange</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {exchangeActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {exchangeActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="edit-exchange-code">Code</Label>
-                        <Input
-                          id="edit-exchange-code"
-                          className="mt-1"
-                          value={exchangeDraft.exchange_code}
-                          disabled
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-exchange-country">Country</Label>
-                        <div className="mt-1">
-                          <Popover open={exchangeEditCountryOpen} onOpenChange={setExchangeEditCountryOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                id="edit-exchange-country"
-                                className="w-full justify-between"
-                              >
-                                {exchangeDraft.country_code
-                                  ? (countryNameByIso.get(exchangeDraft.country_code) ?? exchangeDraft.country_code)
-                                  : 'Select country'}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-full p-0"
-                              align="start"
-                              onWheel={(event) => event.stopPropagation()}
-                            >
-                              <Command>
-                                <CommandInput placeholder="Search country..." />
-                                <CommandEmpty>No country found.</CommandEmpty>
-                                <CommandList className="max-h-60 overflow-auto">
-                                  <CommandGroup>
-                                    {countries.map((country) => (
-                                      <CommandItem
-                                        key={country.iso_code}
-                                        value={`${country.name ?? country.iso_code} ${country.iso_code}`}
-                                        onSelect={() => {
-                                          setExchangeDraft({
-                                            ...exchangeDraft,
-                                            country_code: country.iso_code,
-                                          });
-                                          setExchangeEditCountryOpen(false);
-                                        }}
-                                      >
-                                        <Check
-                                          className={`mr-2 h-4 w-4 ${exchangeDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
-                                        />
-                                        <span>{country.name ?? country.iso_code}</span>
-                                        <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-exchange-name">Name *</Label>
-                      <Input
-                        id="edit-exchange-name"
-                        className="mt-1"
-                        value={exchangeDraft.name}
-                        onChange={(e) => setExchangeDraft({ ...exchangeDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsEditExchangeOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleUpdateExchange}
-                        disabled={exchangeActionLoading}
-                      >
-                        {exchangeActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <SortableHeader label="Code" sortKey="exchange_code" currentSort={exchangeSort} onSort={(k) => toggleSort(setExchangeSort, k)} />
-                    <SortableHeader label="Name" sortKey="name" currentSort={exchangeSort} onSort={(k) => toggleSort(setExchangeSort, k)} />
-                    <th className="text-xs md:text-sm hidden sm:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setExchangeSort, 'country_code')}>
-                      <div className="flex items-center gap-1">Country <ArrowUpDown className={`h-3 w-3 ${exchangeSort.key === 'country_code' ? 'opacity-100' : 'opacity-40'}`} /></div>
-                    </th>
-                    <th className="text-xs md:text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {exchangesLoading && (
-                    <tr>
-                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Loading exchanges...
-                      </td>
-                    </tr>
-                  )}
-                  {!exchangesLoading && exchangesError && (
-                    <tr>
-                      <td colSpan={4} className="text-destructive text-xs md:text-sm text-center py-6">
-                        {exchangesError}
-                      </td>
-                    </tr>
-                  )}
-                  {!exchangesLoading && !exchangesError && filteredExchanges.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No exchanges to display.
-                      </td>
-                    </tr>
-                  )}
-                  {!exchangesLoading && !exchangesError && filteredExchanges.map((exchange) => (
-                    <tr key={exchange.exchange_code}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{exchange.exchange_code}</td>
-                      <td className="text-foreground text-xs md:text-sm">{exchange.name}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">
-                        {exchange.country_code
-                          ? (countryNameByIso.get(exchange.country_code) ?? exchange.country_code)
-                          : '—'}
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8"
-                            onClick={() => handleEditExchange(exchange)}
-                          >
-                            <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                            onClick={() => setExchangeToDelete(exchange)}
-                            disabled={exchangeActionLoading}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <AlertDialog open={!!exchangeToDelete} onOpenChange={(open) => !open && setExchangeToDelete(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete exchange</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete exchange "{exchangeToDelete?.exchange_code}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      if (exchangeToDelete) {
-                        handleDeleteExchange(exchangeToDelete.exchange_code);
-                      }
-                      setExchangeToDelete(null);
-                    }}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </TabsContent>
+        <ExchangesSection
+          exchangesLoading={exchangesLoading}
+          exchangesError={exchangesError}
+          filteredExchanges={filteredExchanges}
+          exchangeSort={exchangeSort}
+          onSort={(key) => toggleSort(setExchangeSort, key)}
+          countries={countries}
+          countryNameByIso={countryNameByIso}
+          exchangeDraft={exchangeDraft}
+          setExchangeDraft={setExchangeDraft}
+          isCreateExchangeOpen={isCreateExchangeOpen}
+          setIsCreateExchangeOpen={setIsCreateExchangeOpen}
+          isEditExchangeOpen={isEditExchangeOpen}
+          setIsEditExchangeOpen={setIsEditExchangeOpen}
+          exchangeActionError={exchangeActionError}
+          exchangeActionLoading={exchangeActionLoading}
+          setExchangeActionError={setExchangeActionError}
+          handleCreateExchange={handleCreateExchange}
+          handleUpdateExchange={handleUpdateExchange}
+          handleEditExchange={handleEditExchange}
+          exchangeToDelete={exchangeToDelete}
+          setExchangeToDelete={setExchangeToDelete}
+          handleDeleteExchange={handleDeleteExchange}
+          exchangeCountryOpen={exchangeCountryOpen}
+          setExchangeCountryOpen={setExchangeCountryOpen}
+          exchangeEditCountryOpen={exchangeEditCountryOpen}
+          setExchangeEditCountryOpen={setExchangeEditCountryOpen}
+          SortableHeader={SortableHeader}
+        />
 
-        {/* Countries Tab */}
-        <TabsContent value="countries">
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <h3 className="font-semibold text-foreground text-sm md:text-base">Countries</h3>
-              <Dialog
-                open={isCreateCountryOpen}
-                onOpenChange={(open) => {
-                  setIsCreateCountryOpen(open);
-                  setCountryActionError(null);
-                  if (open) {
-                    setCountryDraft({ iso_code: '', name: '' });
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
-                    <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
-                    Add Country
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Add Country</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {countryActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {countryActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div>
-                      <Label htmlFor="country-iso">ISO Code *</Label>
-                      <Input
-                        id="country-iso"
-                        placeholder="US"
-                        className="mt-1"
-                        maxLength={2}
-                        value={countryDraft.iso_code}
-                        onChange={(e) => setCountryDraft({ ...countryDraft, iso_code: e.target.value.toUpperCase() })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="country-name">Name *</Label>
-                      <Input
-                        id="country-name"
-                        placeholder="United States"
-                        className="mt-1"
-                        value={countryDraft.name}
-                        onChange={(e) => setCountryDraft({ ...countryDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsCreateCountryOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleCreateCountry}
-                        disabled={countryActionLoading}
-                      >
-                        {countryActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Dialog open={isEditCountryOpen} onOpenChange={setIsEditCountryOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Edit Country</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {countryActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {countryActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div>
-                      <Label htmlFor="edit-country-iso">ISO Code</Label>
-                      <Input
-                        id="edit-country-iso"
-                        className="mt-1"
-                        value={countryDraft.iso_code}
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-country-name">Name *</Label>
-                      <Input
-                        id="edit-country-name"
-                        className="mt-1"
-                        value={countryDraft.name}
-                        onChange={(e) => setCountryDraft({ ...countryDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsEditCountryOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleUpdateCountry}
-                        disabled={countryActionLoading}
-                      >
-                        {countryActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <SortableHeader label="Code" sortKey="iso_code" currentSort={countrySort} onSort={(k) => toggleSort(setCountrySort, k)} />
-                    <SortableHeader label="Name" sortKey="name" currentSort={countrySort} onSort={(k) => toggleSort(setCountrySort, k)} />
-                    <th className="text-xs md:text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {countriesLoading && (
-                    <tr>
-                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Loading countries...
-                      </td>
-                    </tr>
-                  )}
-                  {!countriesLoading && countriesError && (
-                    <tr>
-                      <td colSpan={3} className="text-destructive text-xs md:text-sm text-center py-6">
-                        {countriesError}
-                      </td>
-                    </tr>
-                  )}
-                  {!countriesLoading && !countriesError && filteredCountries.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No countries to display.
-                      </td>
-                    </tr>
-                  )}
-                  {!countriesLoading && !countriesError && filteredCountries.map((country) => (
-                    <tr key={country.iso_code}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{country.iso_code}</td>
-                      <td className="text-foreground text-xs md:text-sm">{country.name ?? '—'}</td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8"
-                            onClick={() => handleEditCountry(country)}
-                          >
-                            <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                            onClick={() => setCountryToDelete(country)}
-                            disabled={countryActionLoading}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <AlertDialog open={!!countryToDelete} onOpenChange={(open) => !open && setCountryToDelete(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete country</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete country "{countryToDelete?.name ?? countryToDelete?.iso_code}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      if (countryToDelete) {
-                        handleDeleteCountry(countryToDelete.iso_code);
-                      }
-                      setCountryToDelete(null);
-                    }}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </TabsContent>
+        <CountriesSection
+          countriesLoading={countriesLoading}
+          countriesError={countriesError}
+          filteredCountries={filteredCountries}
+          countrySort={countrySort}
+          onSort={(key) => toggleSort(setCountrySort, key)}
+          countryDraft={countryDraft}
+          setCountryDraft={setCountryDraft}
+          isCreateCountryOpen={isCreateCountryOpen}
+          setIsCreateCountryOpen={setIsCreateCountryOpen}
+          isEditCountryOpen={isEditCountryOpen}
+          setIsEditCountryOpen={setIsEditCountryOpen}
+          countryActionError={countryActionError}
+          countryActionLoading={countryActionLoading}
+          setCountryActionError={setCountryActionError}
+          handleCreateCountry={handleCreateCountry}
+          handleUpdateCountry={handleUpdateCountry}
+          handleEditCountry={handleEditCountry}
+          countryToDelete={countryToDelete}
+          setCountryToDelete={setCountryToDelete}
+          handleDeleteCountry={handleDeleteCountry}
+          SortableHeader={SortableHeader}
+        />
 
-        {/* Industries Tab */}
-        <TabsContent value="industries">
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <h3 className="font-semibold text-foreground text-sm md:text-base">Industries</h3>
-              <Dialog
-                open={isCreateIndustryOpen}
-                onOpenChange={(open) => {
-                  setIsCreateIndustryOpen(open);
-                  setIndustryActionError(null);
-                  if (open) {
-                    setIndustryDraft({ industry_code: '', name: '', sector: '' });
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
-                    <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
-                    Add Industry
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Add Industry</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {industryActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {industryActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div>
-                      <Label>Code</Label>
-                      <Input
-                        placeholder="TECH"
-                        className="mt-1"
-                        value={industryDraft.industry_code}
-                        onChange={(e) => setIndustryDraft({ ...industryDraft, industry_code: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Name</Label>
-                      <Input
-                        placeholder="Technology"
-                        className="mt-1"
-                        value={industryDraft.name}
-                        onChange={(e) => setIndustryDraft({ ...industryDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="industry-sector">Sector</Label>
-                      <Input
-                        id="industry-sector"
-                        list="industry-sector-options"
-                        placeholder="Information Technology"
-                        className="mt-1"
-                        value={industryDraft.sector}
-                        onChange={(e) => setIndustryDraft({ ...industryDraft, sector: e.target.value })}
-                      />
-                      <datalist id="industry-sector-options">
-                        {industrySectorOptions.map((sector) => (
-                          <option key={sector} value={sector} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsCreateIndustryOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleCreateIndustry}
-                        disabled={industryActionLoading}
-                      >
-                        {industryActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Dialog open={isEditIndustryOpen} onOpenChange={setIsEditIndustryOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Edit Industry</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {industryActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {industryActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div>
-                      <Label>Code</Label>
-                      <Input className="mt-1" value={industryDraft.industry_code} disabled />
-                    </div>
-                    <div>
-                      <Label>Name</Label>
-                      <Input
-                        className="mt-1"
-                        value={industryDraft.name}
-                        onChange={(e) => setIndustryDraft({ ...industryDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-industry-sector">Sector</Label>
-                      <Input
-                        id="edit-industry-sector"
-                        list="industry-sector-options"
-                        className="mt-1"
-                        value={industryDraft.sector}
-                        onChange={(e) => setIndustryDraft({ ...industryDraft, sector: e.target.value })}
-                      />
-                      <datalist id="industry-sector-options">
-                        {industrySectorOptions.map((sector) => (
-                          <option key={sector} value={sector} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsEditIndustryOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleUpdateIndustry}
-                        disabled={industryActionLoading}
-                      >
-                        {industryActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <SortableHeader label="Code" sortKey="industry_code" currentSort={industrySort} onSort={(k) => toggleSort(setIndustrySort, k)} />
-                    <SortableHeader label="Name" sortKey="name" currentSort={industrySort} onSort={(k) => toggleSort(setIndustrySort, k)} />
-                    <th className="text-xs md:text-sm hidden sm:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setIndustrySort, 'sector')}>
-                      <div className="flex items-center gap-1">Sector <ArrowUpDown className={`h-3 w-3 ${industrySort.key === 'sector' ? 'opacity-100' : 'opacity-40'}`} /></div>
-                    </th>
-                    <th className="text-xs md:text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {industriesLoading && (
-                    <tr>
-                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Loading industries...
-                      </td>
-                    </tr>
-                  )}
-                  {!industriesLoading && industriesError && (
-                    <tr>
-                      <td colSpan={4} className="text-destructive text-xs md:text-sm text-center py-6">
-                        {industriesError}
-                      </td>
-                    </tr>
-                  )}
-                  {!industriesLoading && !industriesError && filteredIndustries.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No industries to display.
-                      </td>
-                    </tr>
-                  )}
-                  {!industriesLoading && !industriesError && filteredIndustries.map((industry) => (
-                    <tr key={industry.industry_code}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{industry.industry_code}</td>
-                      <td className="text-foreground text-xs md:text-sm">{industry.name}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">
-                        {industry.sector ?? '—'}
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8"
-                            onClick={() => handleEditIndustry(industry)}
-                          >
-                            <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                            onClick={() => setIndustryToDelete(industry)}
-                            disabled={industryActionLoading}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <AlertDialog open={!!industryToDelete} onOpenChange={(open) => !open && setIndustryToDelete(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete industry</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete industry "{industryToDelete?.name ?? industryToDelete?.industry_code}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      if (industryToDelete) {
-                        handleDeleteIndustry(industryToDelete.industry_code);
-                      }
-                      setIndustryToDelete(null);
-                    }}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </TabsContent>
+        <IndustriesSection
+          industriesLoading={industriesLoading}
+          industriesError={industriesError}
+          filteredIndustries={filteredIndustries}
+          industrySort={industrySort}
+          onSort={(key) => toggleSort(setIndustrySort, key)}
+          industryDraft={industryDraft}
+          setIndustryDraft={setIndustryDraft}
+          isCreateIndustryOpen={isCreateIndustryOpen}
+          setIsCreateIndustryOpen={setIsCreateIndustryOpen}
+          isEditIndustryOpen={isEditIndustryOpen}
+          setIsEditIndustryOpen={setIsEditIndustryOpen}
+          industryActionError={industryActionError}
+          industryActionLoading={industryActionLoading}
+          setIndustryActionError={setIndustryActionError}
+          handleCreateIndustry={handleCreateIndustry}
+          handleUpdateIndustry={handleUpdateIndustry}
+          handleEditIndustry={handleEditIndustry}
+          industryToDelete={industryToDelete}
+          setIndustryToDelete={setIndustryToDelete}
+          handleDeleteIndustry={handleDeleteIndustry}
+          industrySectorOptions={industrySectorOptions}
+          SortableHeader={SortableHeader}
+        />
 
-        {/* Indices Tab */}
-        <TabsContent value="indices">
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <h3 className="font-semibold text-foreground text-sm md:text-base">Market Indices</h3>
-              <Dialog
-                open={isCreateIndexOpen}
-                onOpenChange={(open) => {
-                  setIsCreateIndexOpen(open);
-                  setIndexActionError(null);
-                  if (open) {
-                    setIndexDraft({ index_code: '', name: '', country_code: '', exchange_code: '' });
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
-                    <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
-                    Add Index
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Add Market Index</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {indexActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {indexActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="index-code">Code *</Label>
-                        <Input
-                          id="index-code"
-                          placeholder="SPX"
-                          className="mt-1"
-                          value={indexDraft.index_code}
-                          onChange={(e) => setIndexDraft({ ...indexDraft, index_code: e.target.value.toUpperCase() })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="index-exchange">Exchange</Label>
-                        <div className="mt-1">
-                          <Popover open={indexExchangeOpen} onOpenChange={setIndexExchangeOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                id="index-exchange"
-                                className="w-full justify-between"
-                              >
-                                {indexDraft.exchange_code || '-'}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-full p-0"
-                              align="start"
-                              onWheel={(event) => event.stopPropagation()}
-                            >
-                              <Command>
-                                <CommandInput placeholder="Search exchange..." />
-                                <CommandEmpty>No exchange found.</CommandEmpty>
-                                <CommandList className="max-h-60 overflow-auto">
-                                  <CommandGroup>
-                                    <CommandItem
-                                      value="-"
-                                      onSelect={() => {
-                                        setIndexDraft({ ...indexDraft, exchange_code: '' });
-                                        setIndexExchangeOpen(false);
-                                      }}
-                                    >
-                                      <Check className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === '' ? 'opacity-100' : 'opacity-0'}`} />
-                                      -
-                                    </CommandItem>
-                                    {exchanges.map((exchange) => (
-                                      <CommandItem
-                                        key={exchange.exchange_code}
-                                        value={`${exchange.exchange_code} ${exchange.name}`}
-                                        onSelect={() => {
-                                          setIndexDraft({
-                                            ...indexDraft,
-                                            exchange_code: exchange.exchange_code,
-                                          });
-                                          setIndexExchangeOpen(false);
-                                        }}
-                                      >
-                                        <Check
-                                          className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === exchange.exchange_code ? 'opacity-100' : 'opacity-0'}`}
-                                        />
-                                        <span>{exchange.exchange_code}</span>
-                                        <span className="ml-2 text-xs text-muted-foreground">{exchange.name}</span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="index-name">Name *</Label>
-                      <Input
-                        id="index-name"
-                        placeholder="S&P 500"
-                        className="mt-1"
-                        value={indexDraft.name}
-                        onChange={(e) => setIndexDraft({ ...indexDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="index-country">Country</Label>
-                      <div className="mt-1">
-                        <Popover open={indexCountryOpen} onOpenChange={setIndexCountryOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              id="index-country"
-                              className="w-full justify-between"
-                            >
-                              {indexDraft.country_code
-                                ? (countryNameByIso.get(indexDraft.country_code) ?? indexDraft.country_code)
-                                : 'Select country'}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-full p-0"
-                            align="start"
-                            onWheel={(event) => event.stopPropagation()}
-                          >
-                            <Command>
-                              <CommandInput placeholder="Search country..." />
-                              <CommandEmpty>No country found.</CommandEmpty>
-                              <CommandList className="max-h-60 overflow-auto">
-                                <CommandGroup>
-                                  {countries.map((country) => (
-                                    <CommandItem
-                                      key={country.iso_code}
-                                      value={`${country.name ?? country.iso_code} ${country.iso_code}`}
-                                      onSelect={() => {
-                                        setIndexDraft({
-                                          ...indexDraft,
-                                          country_code: country.iso_code,
-                                        });
-                                        setIndexCountryOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={`mr-2 h-4 w-4 ${indexDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
-                                      />
-                                      <span>{country.name ?? country.iso_code}</span>
-                                      <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsCreateIndexOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleCreateIndex}
-                        disabled={indexActionLoading}
-                      >
-                        {indexActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Dialog open={isEditIndexOpen} onOpenChange={setIsEditIndexOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Edit Market Index</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {indexActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {indexActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="edit-index-code">Code</Label>
-                        <Input
-                          id="edit-index-code"
-                          className="mt-1"
-                          value={indexDraft.index_code}
-                          disabled
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-index-exchange">Exchange</Label>
-                        <div className="mt-1">
-                          <Popover open={indexEditExchangeOpen} onOpenChange={setIndexEditExchangeOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                id="edit-index-exchange"
-                                className="w-full justify-between"
-                              >
-                                {indexDraft.exchange_code || '-'}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-full p-0"
-                              align="start"
-                              onWheel={(event) => event.stopPropagation()}
-                            >
-                              <Command>
-                                <CommandInput placeholder="Search exchange..." />
-                                <CommandEmpty>No exchange found.</CommandEmpty>
-                                <CommandList className="max-h-60 overflow-auto">
-                                  <CommandGroup>
-                                    <CommandItem
-                                      value="-"
-                                      onSelect={() => {
-                                        setIndexDraft({ ...indexDraft, exchange_code: '' });
-                                        setIndexEditExchangeOpen(false);
-                                      }}
-                                    >
-                                      <Check className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === '' ? 'opacity-100' : 'opacity-0'}`} />
-                                      -
-                                    </CommandItem>
-                                    {exchanges.map((exchange) => (
-                                      <CommandItem
-                                        key={exchange.exchange_code}
-                                        value={`${exchange.exchange_code} ${exchange.name}`}
-                                        onSelect={() => {
-                                          setIndexDraft({
-                                            ...indexDraft,
-                                            exchange_code: exchange.exchange_code,
-                                          });
-                                          setIndexEditExchangeOpen(false);
-                                        }}
-                                      >
-                                        <Check
-                                          className={`mr-2 h-4 w-4 ${indexDraft.exchange_code === exchange.exchange_code ? 'opacity-100' : 'opacity-0'}`}
-                                        />
-                                        <span>{exchange.exchange_code}</span>
-                                        <span className="ml-2 text-xs text-muted-foreground">{exchange.name}</span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-index-name">Name *</Label>
-                      <Input
-                        id="edit-index-name"
-                        className="mt-1"
-                        value={indexDraft.name}
-                        onChange={(e) => setIndexDraft({ ...indexDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-index-country">Country</Label>
-                      <div className="mt-1">
-                        <Popover open={indexEditCountryOpen} onOpenChange={setIndexEditCountryOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              id="edit-index-country"
-                              className="w-full justify-between"
-                            >
-                              {indexDraft.country_code
-                                ? (countryNameByIso.get(indexDraft.country_code) ?? indexDraft.country_code)
-                                : 'Select country'}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="w-full p-0"
-                            align="start"
-                            onWheel={(event) => event.stopPropagation()}
-                          >
-                            <Command>
-                              <CommandInput placeholder="Search country..." />
-                              <CommandEmpty>No country found.</CommandEmpty>
-                              <CommandList className="max-h-60 overflow-auto">
-                                <CommandGroup>
-                                  {countries.map((country) => (
-                                    <CommandItem
-                                      key={country.iso_code}
-                                      value={`${country.name ?? country.iso_code} ${country.iso_code}`}
-                                      onSelect={() => {
-                                        setIndexDraft({
-                                          ...indexDraft,
-                                          country_code: country.iso_code,
-                                        });
-                                        setIndexEditCountryOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={`mr-2 h-4 w-4 ${indexDraft.country_code === country.iso_code ? 'opacity-100' : 'opacity-0'}`}
-                                      />
-                                      <span>{country.name ?? country.iso_code}</span>
-                                      <span className="ml-auto text-xs text-muted-foreground">{country.iso_code}</span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsEditIndexOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleUpdateIndex}
-                        disabled={indexActionLoading}
-                      >
-                        {indexActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <SortableHeader label="Code" sortKey="index_code" currentSort={indexSort} onSort={(k) => toggleSort(setIndexSort, k)} />
-                    <SortableHeader label="Name" sortKey="name" currentSort={indexSort} onSort={(k) => toggleSort(setIndexSort, k)} />
-                    <th className="text-xs md:text-sm hidden sm:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setIndexSort, 'exchange_code')}>
-                      <div className="flex items-center gap-1">Exchange <ArrowUpDown className={`h-3 w-3 ${indexSort.key === 'exchange_code' ? 'opacity-100' : 'opacity-40'}`} /></div>
-                    </th>
-                    <th className="text-xs md:text-sm hidden md:table-cell cursor-pointer hover:bg-muted/50" onClick={() => toggleSort(setIndexSort, 'country_code')}>
-                      <div className="flex items-center gap-1">Country <ArrowUpDown className={`h-3 w-3 ${indexSort.key === 'country_code' ? 'opacity-100' : 'opacity-40'}`} /></div>
-                    </th>
-                    <th className="text-xs md:text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {indicesLoading && (
-                    <tr>
-                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Loading indices...
-                      </td>
-                    </tr>
-                  )}
-                  {!indicesLoading && indicesError && (
-                    <tr>
-                      <td colSpan={5} className="text-destructive text-xs md:text-sm text-center py-6">
-                        {indicesError}
-                      </td>
-                    </tr>
-                  )}
-                  {!indicesLoading && !indicesError && filteredIndices.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No indices to display.
-                      </td>
-                    </tr>
-                  )}
-                  {!indicesLoading && !indicesError && filteredIndices.map((index) => (
-                    <tr key={index.index_code}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{index.index_code}</td>
-                      <td className="text-foreground text-xs md:text-sm">{index.name}</td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden sm:table-cell">
-                        {index.exchange_code
-                          ? `${exchangeNameByCode.get(index.exchange_code) ?? index.exchange_code} (${index.exchange_code})`
-                          : '—'}
-                      </td>
-                      <td className="text-muted-foreground text-xs md:text-sm hidden md:table-cell">
-                        {index.country_code
-                          ? (countryNameByIso.get(index.country_code) ?? index.country_code)
-                          : '—'}
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8"
-                            onClick={() => handleEditIndex(index)}
-                          >
-                            <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                            onClick={() => setIndexToDelete(index)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <AlertDialog open={!!indexToDelete} onOpenChange={(open) => !open && setIndexToDelete(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete market index</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete index "{indexToDelete?.index_code}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      if (indexToDelete) {
-                        handleDeleteIndex(indexToDelete.index_code);
-                      }
-                      setIndexToDelete(null);
-                    }}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </TabsContent>
+        <IndicesSection
+          indicesLoading={indicesLoading}
+          indicesError={indicesError}
+          filteredIndices={filteredIndices}
+          indexSort={indexSort}
+          onSort={(key) => toggleSort(setIndexSort, key)}
+          exchanges={exchanges}
+          countries={countries}
+          countryNameByIso={countryNameByIso}
+          exchangeNameByCode={exchangeNameByCode}
+          indexDraft={indexDraft}
+          setIndexDraft={setIndexDraft}
+          isCreateIndexOpen={isCreateIndexOpen}
+          setIsCreateIndexOpen={setIsCreateIndexOpen}
+          isEditIndexOpen={isEditIndexOpen}
+          setIsEditIndexOpen={setIsEditIndexOpen}
+          indexActionError={indexActionError}
+          indexActionLoading={indexActionLoading}
+          setIndexActionError={setIndexActionError}
+          handleCreateIndex={handleCreateIndex}
+          handleUpdateIndex={handleUpdateIndex}
+          handleEditIndex={handleEditIndex}
+          indexToDelete={indexToDelete}
+          setIndexToDelete={setIndexToDelete}
+          handleDeleteIndex={handleDeleteIndex}
+          indexCountryOpen={indexCountryOpen}
+          setIndexCountryOpen={setIndexCountryOpen}
+          indexExchangeOpen={indexExchangeOpen}
+          setIndexExchangeOpen={setIndexExchangeOpen}
+          indexEditCountryOpen={indexEditCountryOpen}
+          setIndexEditCountryOpen={setIndexEditCountryOpen}
+          indexEditExchangeOpen={indexEditExchangeOpen}
+          setIndexEditExchangeOpen={setIndexEditExchangeOpen}
+          SortableHeader={SortableHeader}
+        />
 
-        {/* Currencies Tab */}
-        <TabsContent value="currencies">
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="p-3 md:p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <h3 className="font-semibold text-foreground text-sm md:text-base">Currencies</h3>
-              <Dialog
-                open={isCreateCurrencyOpen}
-                onOpenChange={(open) => {
-                  setIsCreateCurrencyOpen(open);
-                  setCurrencyActionError(null);
-                  if (open) {
-                    setCurrencyDraft({ code: '', name: '' });
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
-                    <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
-                    Add Currency
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Add Currency</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {currencyActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {currencyActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div>
-                      <Label htmlFor="currency-code">Code *</Label>
-                      <Input
-                        id="currency-code"
-                        placeholder="USD"
-                        className="mt-1"
-                        value={currencyDraft.code}
-                        onChange={(e) => setCurrencyDraft({ ...currencyDraft, code: e.target.value.toUpperCase() })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="currency-name">Name *</Label>
-                      <Input
-                        id="currency-name"
-                        placeholder="US Dollar"
-                        className="mt-1"
-                        value={currencyDraft.name}
-                        onChange={(e) => setCurrencyDraft({ ...currencyDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsCreateCurrencyOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleCreateCurrency}
-                        disabled={currencyActionLoading}
-                      >
-                        {currencyActionLoading ? 'Creating...' : 'Create'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+        <CurrenciesSection
+          currenciesLoading={currenciesLoading}
+          currenciesError={currenciesError}
+          filteredCurrencies={filteredCurrencies}
+          currencySort={currencySort}
+          onSort={(key) => toggleSort(setCurrencySort, key)}
+          currencyDraft={currencyDraft}
+          setCurrencyDraft={setCurrencyDraft}
+          isCreateCurrencyOpen={isCreateCurrencyOpen}
+          setIsCreateCurrencyOpen={setIsCreateCurrencyOpen}
+          isEditCurrencyOpen={isEditCurrencyOpen}
+          onEditCurrencyOpenChange={(open) => {
+            setIsEditCurrencyOpen(open);
+            if (!open) {
+              setEditingCurrency(null);
+            }
+          }}
+          currencyActionError={currencyActionError}
+          currencyActionLoading={currencyActionLoading}
+          setCurrencyActionError={setCurrencyActionError}
+          handleCreateCurrency={handleCreateCurrency}
+          handleUpdateCurrency={handleUpdateCurrency}
+          handleEditCurrency={handleEditCurrency}
+          currencyToDelete={currencyToDelete}
+          setCurrencyToDelete={setCurrencyToDelete}
+          handleDeleteCurrency={handleDeleteCurrency}
+          SortableHeader={SortableHeader}
+        />
 
-              <Dialog
-                open={isEditCurrencyOpen}
-                onOpenChange={(open) => {
-                  setIsEditCurrencyOpen(open);
-                  setCurrencyActionError(null);
-                  if (!open) {
-                    setEditingCurrency(null);
-                  }
-                }}
-              >
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Edit Currency</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    {currencyActionError && (
-                      <Alert variant="destructive" className="border-red-200 bg-red-50">
-                        <AlertDescription className="text-sm text-red-800">
-                          {currencyActionError}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div>
-                      <Label htmlFor="edit-currency-code">Code</Label>
-                      <Input
-                        id="edit-currency-code"
-                        className="mt-1"
-                        value={currencyDraft.code}
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-currency-name">Name *</Label>
-                      <Input
-                        id="edit-currency-name"
-                        className="mt-1"
-                        value={currencyDraft.name}
-                        onChange={(e) => setCurrencyDraft({ ...currencyDraft, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsEditCurrencyOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button
-                        className="bg-primary text-primary-foreground"
-                        onClick={handleUpdateCurrency}
-                        disabled={currencyActionLoading}
-                      >
-                        {currencyActionLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <SortableHeader label="Code" sortKey="code" currentSort={currencySort} onSort={(k) => toggleSort(setCurrencySort, k)} />
-                    <SortableHeader label="Name" sortKey="name" currentSort={currencySort} onSort={(k) => toggleSort(setCurrencySort, k)} />
-                    <th className="text-xs md:text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currenciesLoading && (
-                    <tr>
-                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        Loading...
-                      </td>
-                    </tr>
-                  )}
-                  {currenciesError && (
-                    <tr>
-                      <td colSpan={3} className="text-destructive text-xs md:text-sm text-center py-6">
-                        {currenciesError}
-                      </td>
-                    </tr>
-                  )}
-                  {!currenciesLoading && !currenciesError && filteredCurrencies.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="text-muted-foreground text-xs md:text-sm text-center py-6">
-                        No currencies found.
-                      </td>
-                    </tr>
-                  )}
-                  {!currenciesLoading && !currenciesError && filteredCurrencies.map((currency) => (
-                    <tr key={currency.code}>
-                      <td className="font-medium text-foreground text-xs md:text-sm">{currency.code}</td>
-                      <td className="text-foreground text-xs md:text-sm">{currency.name}</td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8"
-                            onClick={() => handleEditCurrency(currency)}
-                          >
-                            <Edit2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-8 md:w-8 text-destructive"
-                            onClick={() => setCurrencyToDelete(currency)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <AlertDialog open={!!currencyToDelete} onOpenChange={(open) => !open && setCurrencyToDelete(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete currency</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete currency "{currencyToDelete?.code}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      if (currencyToDelete) {
-                        handleDeleteCurrency(currencyToDelete.code);
-                      }
-                      setCurrencyToDelete(null);
-                    }}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </TabsContent>
+        <AssetClassesSection
+          assetClassesLoading={assetClassesLoading}
+          assetClassesError={assetClassesError}
+          filteredAssetClasses={filteredAssetClasses}
+          assetClassDraft={assetClassDraft}
+          setAssetClassDraft={setAssetClassDraft}
+          isCreateAssetClassOpen={isCreateAssetClassOpen}
+          setIsCreateAssetClassOpen={setIsCreateAssetClassOpen}
+          isEditAssetClassOpen={isEditAssetClassOpen}
+          setIsEditAssetClassOpen={setIsEditAssetClassOpen}
+          assetClassActionError={assetClassActionError}
+          assetClassActionLoading={assetClassActionLoading}
+          setAssetClassActionError={setAssetClassActionError}
+          handleCreateAssetClass={handleCreateAssetClass}
+          handleUpdateAssetClass={handleUpdateAssetClass}
+          handleEditAssetClass={handleEditAssetClass}
+          assetClassToDelete={assetClassToDelete}
+          setAssetClassToDelete={setAssetClassToDelete}
+          handleDeleteAssetClass={handleDeleteAssetClass}
+        />
         </Tabs>
       </div>
     </AppLayout>
