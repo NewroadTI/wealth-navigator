@@ -1,0 +1,43 @@
+Date,Type,Description,Amount
+06/01/21,ACATIN,"Davivi 5 7/8 07/09/22 (DAVIVI 5 7/8 07/09/22) Quantity: 39,000",40592.37
+06/01/21,ACATIN,"Gnbsud 7 1/2 07/30/22 (GNBSUD 7 1/2 07/30/22 VAA0) Quantity: 45,000",47204.1
+06/01/21,ACATIN,"Creal 7 1/4 07/20/23 (CREAL 7 1/4 07/20/23 7AA4) Quantity: 40,000",39012
+06/01/21,ACATIN,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: 37,000",37203.5
+06/01/21,ACATIN,"Gnbsud 7 1/2 04/16/31 (GNBSUD 7 1/2 04/16/31) Quantity: 49,000",49793.8
+06/02/21,DEPOSIT,Cash Receipts / Electronic Fund Transfers ,132000
+06/03/21,ACATIN,"Biopharma Credit Plc (BPCR) Quantity: 45,400",44038
+06/28/22,ACATOUT,Ishares Gold Trust (IAU) Quantity: -235,-8138.05
+08/18/22,ACATOUT,Ishares Gold Trust (IAU) Quantity: -240,-8040
+02/09/23,ACATOUT,Ishares Short Treasury Bond (SHV) Quantity: -73,-8029.27
+05/04/23,ACATOUT,"Creal 7 1/4 07/20/23 (CREAL 7 1/4 07/20/23 7AA4) Quantity: -40,000",-2862
+05/04/23,ACATOUT,"Gnbsud 7 1/2 04/16/31 (GNBSUD 7 1/2 04/16/31) Quantity: -49,000",-36273.72
+05/04/23,ACATOUT,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: -37,000",-30930.33
+05/05/23,ACATIN,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: 37,000",30928.39
+05/05/23,ACATOUTCNCL,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: 37,000",30930.33
+05/05/23,ACATOUT,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: -37,000",-30928.39
+05/05/23,ACATOUTCNCL,"Gnbsud 7 1/2 04/16/31 (GNBSUD 7 1/2 04/16/31) Quantity: 49,000",36273.72
+05/05/23,ACATIN,"Gnbsud 7 1/2 04/16/31 (GNBSUD 7 1/2 04/16/31) Quantity: 49,000",36241.87
+05/05/23,ACATOUT,"Gnbsud 7 1/2 04/16/31 (GNBSUD 7 1/2 04/16/31) Quantity: -49,000",-36241.87
+05/05/23,ACATIN,"Creal 7 1/4 07/20/23 (CREAL 7 1/4 07/20/23 7AA4) Quantity: 40,000",3312.8
+05/05/23,ACATOUT,"Creal 7 1/4 07/20/23 (CREAL 7 1/4 07/20/23 7AA4) Quantity: -40,000",-3312.8
+05/05/23,ACATOUTCNCL,"Creal 7 1/4 07/20/23 (CREAL 7 1/4 07/20/23 7AA4) Quantity: 40,000",2862
+05/16/23,ACATOUT,"Creal 7 1/4 07/20/23 (CREAL 7 1/4 07/20/23 7AA4) Quantity: -40,000",-3566.4
+05/16/23,ACATOUT,"Hntoil 6 3/8 06/01/28 (HNTOIL 6 3/8 06/01/28) Quantity: -37,000",-31125.33
+05/16/23,ACATOUT,"Gnbsud 7 1/2 04/16/31 (GNBSUD 7 1/2 04/16/31) Quantity: -49,000",-37019.5
+06/14/23,ACATOUT,Ishares Short Treasury Bond (SHV) Quantity: -75,-8262
+04/16/24,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -89,-7225.02
+04/18/24,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -89,-7225.91
+04/18/24,ACATOUTCNCL,Ishares 1-3 Year Treasury Bo (SHY) Quantity: 89,7225.02
+07/15/24,ACATOUT,Ishares 20+ Year Treasury Bd (TLT) Quantity: -56,-5260.64
+12/19/24,NA,Adjustment: Commission (consolidated Audit Trail Fee Refund) ,0.2
+12/27/24,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -80,-6543.2
+04/08/25,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -80,-6615.2
+05/27/25,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -430,-35470.7
+06/24/25,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -88,-7258.24
+06/26/25,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -88,-7280.24
+06/26/25,ACATOUTCNCL,Ishares 1-3 Year Treasury Bo (SHY) Quantity: 88,7258.24
+08/20/25,DEPOSIT,Cash Receipts / Electronic Fund Transfers (from Roberto Alfredo ) ,20000
+08/21/25,ACATOUT,Ishares Short Treasury Bond (SHV) Quantity: -182,-20081.88
+11/05/25,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -27,-2233.44
+11/07/25,ACATOUT,Ishares 1-3 Year Treasury Bo (SHY) Quantity: -27,-2235.33
+11/07/25,ACATOUTCNCL,Ishares 1-3 Year Treasury Bo (SHY) Quantity: 27,2233.44

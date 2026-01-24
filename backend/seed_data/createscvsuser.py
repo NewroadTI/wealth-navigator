@@ -2,42 +2,86 @@ import csv
 import os
 import shutil
 import re
+from datetime import datetime  # <--- IMPORTANTE: Necesario para manejar fechas
 
 # --- CONFIGURACIÓN ---
-SOURCE_FILENAME = "userhistory.csv"
+SOURCE_FILENAME = "user2.csv"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SOURCE_PATH = os.path.join(BASE_DIR, SOURCE_FILENAME)
 
-# Si no está en seed_data, buscar en root
 if not os.path.exists(SOURCE_PATH):
     SOURCE_PATH = os.path.join("/app", SOURCE_FILENAME)
 
-OUTPUT_DIR = os.path.join(BASE_DIR, "inceptioncsvs")
+BASE_OUTPUT_DIR = os.path.join(BASE_DIR, "inceptioncsvs")
 
 def sanitize_filename(name):
     """Limpia el nombre para que sea un archivo válido."""
-    # Reemplazar espacios y caracteres raros por guiones bajos
     clean = re.sub(r'[^a-zA-Z0-9]', '_', name.strip())
-    # Eliminar guiones bajos duplicados
     return re.sub(r'_+', '_', clean)
+
+def parse_date_to_iso(date_str):
+    """
+    Convierte 'January 21, 2026' a '2026-01-21'.
+    Si falla, devuelve el string original.
+    """
+    try:
+        # %B = Nombre completo del mes (January)
+        # %d = Día del mes (21)
+        # %Y = Año con siglo (2026)
+        dt_obj = datetime.strptime(date_str.strip(), "%B %d, %Y")
+        return dt_obj.strftime("%Y-%m-%d")
+    except ValueError:
+        print(f"⚠️ No se pudo parsear la fecha: '{date_str}', se usará tal cual.")
+        return date_str
+
+def get_account_code():
+    """Busca el código de cuenta en la sección Introduction."""
+    try:
+        with open(SOURCE_PATH, 'r', encoding='utf-8', errors='replace') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) >= 4 and row[0].strip() == 'Introduction' and row[1].strip() == 'Data':
+                    return row[3].strip() 
+    except Exception as e:
+        print(f"⚠️ No se pudo pre-leer el código de cuenta: {e}")
+    return "unknown_account"
+
+def get_report_date():
+    """Busca la fecha 'As Of' y la convierte a YYYY-MM-DD."""
+    try:
+        with open(SOURCE_PATH, 'r', encoding='utf-8', errors='replace') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                # Busca: Projected Income, MetaInfo, As Of, [DATE]
+                if len(row) >= 4 and row[0].strip() == 'Projected Income' and row[1].strip() == 'MetaInfo':
+                    if "As Of" in row[2]:
+                        raw_date = row[3].strip()
+                        return parse_date_to_iso(raw_date) # <--- Aquí convertimos la fecha
+    except Exception as e:
+        print(f"⚠️ No se pudo pre-leer la fecha del reporte: {e}")
+    return ""
 
 def split_csv():
     print(f"📂 Leyendo archivo maestro: {SOURCE_PATH}")
     
-    # 1. Preparar directorio de salida (Limpiar si existe)
-    if os.path.exists(OUTPUT_DIR):
-        shutil.rmtree(OUTPUT_DIR)
-    os.makedirs(OUTPUT_DIR)
-    print(f"📁 Directorio creado: {OUTPUT_DIR}")
-
-    # Contadores para manejar secciones con múltiples tablas (ej: Historical Performance)
-    section_counters = {} 
+    user_code = get_account_code()
+    report_date = get_report_date() # Ahora esto ya trae "2026-01-21"
     
+    print(f"👤 Usuario detectado: {user_code}")
+    print(f"📅 Fecha de reporte (ISO): {report_date}")
+    
+    final_output_dir = os.path.join(BASE_OUTPUT_DIR, user_code)
+
+    if os.path.exists(final_output_dir):
+        shutil.rmtree(final_output_dir)
+    os.makedirs(final_output_dir, exist_ok=True)
+    print(f"📁 Directorio de salida: {final_output_dir}")
+
+    section_counters = {} 
     current_file = None
     current_writer = None
     current_section_name = None
     
-    # Abrimos el archivo original
     try:
         with open(SOURCE_PATH, 'r', encoding='utf-8', errors='replace') as f_in:
             reader = csv.reader(f_in)
@@ -50,69 +94,47 @@ def split_csv():
                 
                 section = row[0].strip()
                 row_type = row[1].strip()
-                
-                # Los datos reales suelen empezar en la columna 2 (index 2)
-                # Introduction, Header, Name, Account... -> Datos son [Name, Account...]
                 content = row[2:]
                 
-                # Limpiar columnas vacías al final de la fila
-                # (Iteramos al revés para quitar vacíos del final)
                 while content and not content[-1].strip():
                     content.pop()
 
-                # --- DETECTAR NUEVA TABLA ---
-                # Una nueva tabla empieza si encontramos un "Header"
                 if row_type == 'Header':
-                    # Cerrar archivo anterior si existe
                     if current_file:
                         current_file.close()
                     
-                    # Calcular nombre del nuevo archivo
-                    # Si la sección se repite (como Historical Performance), incrementamos contador
                     count = section_counters.get(section, 0)
-                    if section != current_section_name:
-                         # Si cambiamos de sección totalmente, resetear o mantener lógica
-                         # Pero como Historical Performance aparece en bloques contiguos, el contador sirve.
-                         pass
-                    
                     filename = f"{sanitize_filename(section)}_{count}.csv"
                     section_counters[section] = count + 1
                     
-                    filepath = os.path.join(OUTPUT_DIR, filename)
-                    
-                    # Abrir nuevo archivo
+                    filepath = os.path.join(final_output_dir, filename)
                     current_file = open(filepath, 'w', newline='', encoding='utf-8')
                     current_writer = csv.writer(current_file)
                     
-                    # Escribir encabezado
-                    current_writer.writerow(content)
+                    # INYECCIÓN HEADER
+                    if section == 'Projected Income':
+                        content.append("reportdate")
                     
+                    current_writer.writerow(content)
                     current_section_name = section
                     files_created += 1
-                    # print(f"   -> Creando: {filename}")
 
-                # --- ESCRIBIR DATOS ---
                 elif row_type == 'Data' and current_writer:
-                    # Solo escribir si pertenece a la sección activa
                     if section == current_section_name:
+                        # INYECCIÓN DATA
+                        if section == 'Projected Income':
+                            content.append(report_date)
+                        
                         current_writer.writerow(content)
                 
                 rows_processed += 1
 
-            # Cerrar el último archivo
             if current_file:
                 current_file.close()
 
         print(f"✅ Proceso terminado.")
-        print(f"   - Filas procesadas: {rows_processed}")
-        print(f"   - Archivos generados: {files_created}")
-        print(f"   - Ubicación: {OUTPUT_DIR}")
+        print(f"   - Archivos generados en: {final_output_dir}")
         
-        # Listar archivos generados para confirmar
-        print("\nArchivos Generados:")
-        for f in sorted(os.listdir(OUTPUT_DIR)):
-            print(f" - {f}")
-
     except FileNotFoundError:
         print(f"❌ Error: No se encontró el archivo {SOURCE_PATH}")
     except Exception as e:

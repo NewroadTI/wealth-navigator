@@ -18,7 +18,7 @@ try:
     from app.models.user import User
     # ... otros imports ...
     from app.models.portfolio import Portfolio, Account, AccountReturnSeries
-    from app.models.asset import Asset, Trades, CashJournal, CorporateAction, PerformanceAttribution, Position, Industry
+    from app.models.asset import Asset, Trades, CashJournal, CorporateAction, PerformanceAttribution, Position, Industry, FXTransaction, IncomeProjection
 except ImportError:
     print("⚠️ Error importando modelos. Ejecuta desde la raíz del proyecto.")
     sys.exit(1)
@@ -67,7 +67,8 @@ inserted_records = {
     "CashJournal": [],
     "CorporateActions": [],
     "Performance": [],
-    "History": []
+    "History": [],
+    "IncomeProjections": []  
 }
 
 stats = {"CSV_Rows": 0, "DB_Inserted": 0}
@@ -157,109 +158,146 @@ def import_trades(db, acct_map):
     fpath = os.path.join(SPLIT_DIR, "Trade_Summary_0.csv")
     if not os.path.exists(fpath): return
 
-    logger.info(f"🛒 Importando Trades...")
+    logger.info(f"🛒 Importando Trades y FX...")
     df = pd.read_csv(fpath)
     count = 0
+    fx_count = 0
     stats["CSV_Rows"] += len(df)
 
     for i, row in df.iterrows():
-        # Extracción de Datos Crudos
+        # 1. Extracción de Datos Crudos
         raw_qty_buy = parse_decimal(row.get('Quantity Bought'))
         raw_qty_sell = parse_decimal(row.get('Quantity Sold'))
+        financial_instrument = str(row.get('Financial Instrument', '')).strip()
+        csv_symbol = str(row.get('Symbol', '')).strip()
         
+        # Si no hay movimiento en ninguna dirección, saltamos
         if (not raw_qty_buy or raw_qty_buy == 0) and (not raw_qty_sell or raw_qty_sell == 0):
-            skipped_log.append({
-                "File": "Trade_Summary", "Row": i+2, 
-                "Reason": "Sin cantidad de compra ni venta", "Data": row.to_dict()
-            })
             continue
 
-        # Datos Comunes
+        fixed_date = datetime(2025, 12, 1) # Fecha dummy
+
+        # ===================================================
+        # CASO A: TRANSACCIONES FOREX (FX)
+        # ===================================================
+        if financial_instrument == "Forex":
+            parts = csv_symbol.split('.')
+            if len(parts) == 2:
+                base_curr, quote_curr = parts[0], parts[1]
+            else:
+                base_curr, quote_curr = "USD", "not_found"
+
+            # --- SUB-BLOQUE 1: COMPRA (BUY) ---
+            if raw_qty_buy and raw_qty_buy != 0:
+                proceeds_buy = parse_decimal(row.get('Proceeds Bought'))
+                
+                # Dinero que SALE (Source): Quote Currency (HKD en USD.HKD)
+                source_curr = quote_curr
+                source_amt = proceeds_buy 
+                
+                # Dinero que ENTRA (Target): Base Currency (USD en USD.HKD)
+                target_curr = base_curr
+                target_amt = raw_qty_buy
+                
+                # Buscamos los IDs de ambas cuentas en tu acct_map
+                s_acct_id = acct_map.get(source_curr)
+                t_acct_id = acct_map.get(target_curr)
+
+                fx_buy = FXTransaction(
+                    trade_date=fixed_date,
+                    account_id=s_acct_id,        # Cuenta HKD
+                    target_account_id=t_acct_id, # Cuenta USD
+                    source_currency=source_curr,
+                    source_amount=source_amt,
+                    target_currency=target_curr,
+                    target_amount=target_amt,
+                    exchange_rate=parse_decimal(row.get('Average Price Bought')),
+                    side="BUY",
+                    external_id=f"FX_B_{uuid.uuid4().hex[:8]}"
+                )
+                db.add(fx_buy)
+                fx_count += 1
+
+            # --- SUB-BLOQUE 2: VENTA (SELL) ---
+            if raw_qty_sell and raw_qty_sell != 0:
+                proceeds_sell = parse_decimal(row.get('Proceeds Sold'))
+                
+                # Dinero que SALE (Source): Base Currency (USD en USD.HKD)
+                source_curr = base_curr
+                source_amt = raw_qty_sell
+                
+                # Dinero que ENTRA (Target): Quote Currency (HKD en USD.HKD)
+                target_curr = quote_curr
+                target_amt = proceeds_sell
+                
+                s_acct_id = acct_map.get(source_curr)
+                t_acct_id = acct_map.get(target_curr)
+
+                fx_sell = FXTransaction(
+                    trade_date=fixed_date,
+                    account_id=s_acct_id,        # Cuenta USD
+                    target_account_id=t_acct_id, # Cuenta HKD
+                    source_currency=source_curr,
+                    source_amount=source_amt,
+                    target_currency=target_curr,
+                    target_amount=target_amt,
+                    exchange_rate=parse_decimal(row.get('Average Price Sold')),
+                    side="SELL",
+                    #external_id=f"FX_S_{uuid.uuid4().hex[:8]}"
+                )
+                db.add(fx_sell)
+                fx_count += 1
+            
+            continue
+
+        # ===================================================
+        # CASO B: TRADES NORMALES (Stocks, Bonds, ETFs)
+        # ===================================================
         curr_code = get_currency_code(row.get('Currency'))
         acct_id = acct_map.get(curr_code, acct_map['USD'])
         
-        # --- NUEVA LÓGICA DE BÚSQUEDA DE ASSET ---
-        csv_symbol = str(row.get('Symbol', '')).strip()
+        # Búsqueda de Asset
         asset_id = None
-        
-        # 1. Búsqueda Estándar (Por columna Symbol en DB) - Ideal para Tickers/ISINs
-        if csv_symbol:
-            asset_id = get_asset_id(db, csv_symbol)
+        if csv_symbol: asset_id = get_asset_id(db, csv_symbol)
 
-        # 2. Búsqueda Extendida en Description (Si falló la anterior)
         if not asset_id and csv_symbol:
-            # Intento A: La descripción en DB es IDÉNTICA al symbol del CSV
             asset_obj = db.query(Asset).filter(Asset.description == csv_symbol).first()
-            
-            # Intento B: Caso Bono (El CSV tiene basura al final: "INRSHM... 3AD3")
             if not asset_obj:
-                # Quitamos la última palabra (el código '3AD3') y probamos buscar la descripción limpia
                 tokens = csv_symbol.split()
                 if len(tokens) > 1:
-                    clean_desc = " ".join(tokens[:-1]) # "INRSHM 5 3/4 04/03/28"
-                    # Buscamos si la descripción en DB coincide con esta versión limpia
+                    clean_desc = " ".join(tokens[:-1])
                     asset_obj = db.query(Asset).filter(Asset.description == clean_desc).first()
-            
-            # Intento C: Búsqueda flexible (Si la descripción de la DB está contenida en el CSV)
             if not asset_obj:
-                 # Ejemplo: DB="Apple", CSV="Apple Inc" -> Busca "Apple%"
-                 # Nota: Esto es útil si la descripción de la DB es más corta que el CSV
                  asset_obj = db.query(Asset).filter(Asset.description.ilike(f"{csv_symbol}%")).first()
-
-            if asset_obj:
-                asset_id = asset_obj.asset_id
-        # -----------------------------------------
+            if asset_obj: asset_id = asset_obj.asset_id
 
         desc = row.get('Description')
-        fixed_date = datetime(2025, 12, 1) # Fecha dummy solicitada
 
-        # ---------------------------------------------------
-        # BLOQUE 1: PROCESAR COMPRA (BUY)
-        # ---------------------------------------------------
+        # --- SUB-BLOQUE 1: COMPRA (BUY) ---
         if raw_qty_buy and raw_qty_buy != 0:
-            price = parse_decimal(row.get('Average Price Bought'))
-            proceeds = parse_decimal(row.get('Proceeds Bought'))
-            
-            t_buy = Trades(
-                account_id=acct_id,
-                asset_id=asset_id,
-                trade_date=fixed_date,
-                quantity=abs(raw_qty_buy),
-                price=abs(price) if price else 0,
-                gross_amount=proceeds,
-                currency=curr_code,
-                side="BUY",
-                description=desc
-            )
-            db.add(t_buy)
+            db.add(Trades(
+                account_id=acct_id, asset_id=asset_id, trade_date=fixed_date,
+                quantity=abs(raw_qty_buy), 
+                price=abs(parse_decimal(row.get('Average Price Bought')) or 0),
+                gross_amount=parse_decimal(row.get('Proceeds Bought')), 
+                currency=curr_code, side="BUY", description=desc
+            ))
             count += 1
-            inserted_records["Trades"].append({"Symbol": csv_symbol, "Type": "BUY", "Qty": float(raw_qty_buy)})
 
-        # ---------------------------------------------------
-        # BLOQUE 2: PROCESAR VENTA (SELL)
-        # ---------------------------------------------------
+        # --- SUB-BLOQUE 2: VENTA (SELL) ---
         if raw_qty_sell and raw_qty_sell != 0:
-            price = parse_decimal(row.get('Average Price Sold'))
-            proceeds = parse_decimal(row.get('Proceeds Sold'))
-            
-            t_sell = Trades(
-                account_id=acct_id,
-                asset_id=asset_id,
-                trade_date=fixed_date,
-                quantity=abs(raw_qty_sell),
-                price=abs(price) if price else 0,
-                gross_amount=proceeds,
-                currency=curr_code,
-                side="SELL",
-                description=desc
-            )
-            db.add(t_sell)
+            db.add(Trades(
+                account_id=acct_id, asset_id=asset_id, trade_date=fixed_date,
+                quantity=abs(raw_qty_sell), 
+                price=abs(parse_decimal(row.get('Average Price Sold')) or 0),
+                gross_amount=parse_decimal(row.get('Proceeds Sold')), 
+                currency=curr_code, side="SELL", description=desc
+            ))
             count += 1
-            inserted_records["Trades"].append({"Symbol": csv_symbol, "Type": "SELL", "Qty": float(raw_qty_sell)})
 
     db.commit()
-    stats["DB_Inserted"] += count
-    logger.info(f"✅ {count} Trades insertados.")
+    stats["DB_Inserted"] += (count + fx_count)
+    logger.info(f"✅ {count} Trades y {fx_count} FX insertados.")
 
 def import_cash_journal(db, acct_map):
     # Definición de archivos y columnas base
@@ -831,6 +869,86 @@ def import_positions(db, acct_map):
     stats["DB_Inserted"] += count
     logger.info(f"✅ {count} Positions insertadas.")
 
+def import_income_projections(db, acct_map):
+    fpath = os.path.join(SPLIT_DIR, "Projected_Income_0.csv")
+    if not os.path.exists(fpath): return
+
+    logger.info("📅 Importando Proyecciones de Ingresos...")
+    df = pd.read_csv(fpath)
+    stats["CSV_Rows"] += len(df)
+    count = 0
+
+    # Cache de USD Asset
+    usd_asset_id = get_asset_id(db, "USD") or get_asset_id(db, "CASH")
+
+    for i, row in df.iterrows():
+        raw_sym = row.get('Symbol')
+        
+        # 1. FILTROS: Ignorar filas vacías o que son Totales
+        if pd.isna(raw_sym) or "Total" in str(raw_sym):
+            continue
+            
+        sym = str(raw_sym).strip()
+        desc_original = str(row.get('Description', '')).strip()
+        fin_instr = str(row.get('Financial Instrument', '')).strip()
+
+        # 2. PARSEAR DESCRIPCIÓN A TIPO (Normalización)
+        type_mapped = desc_original
+        desc_lower = desc_original.lower()
+        
+        if "ordinary dividend" in desc_lower:
+            type_mapped = "DIVIDEND"
+        elif "credit interest" in desc_lower or "interest" in desc_lower:
+            type_mapped = "INTEREST"
+        elif "fee" in desc_lower:
+            type_mapped = "FEE"
+
+        # 3. BÚSQUEDA DE ASSET
+        asset_id = None
+        # Caso especial para Cash USD
+        if fin_instr == "Cash" and sym == "USD":
+            asset_id = usd_asset_id
+        else:
+            # Búsqueda estándar por símbolo
+            asset_id = get_asset_id(db, sym)
+
+        # 4. OBTENER FECHA DEL REPORTE
+        # Usamos la columna 'reportdate' del CSV
+        report_d = parse_date(row.get('reportdate')) 
+        if not report_d:
+            report_d = datetime.today().date() # Fallback
+
+        # 5. CREAR REGISTRO
+        proj = IncomeProjection(
+            account_id=acct_map.get("USD", 1), # Asumimos cuenta USD
+            asset_id=asset_id,
+            report_date=report_d,
+            
+            # Datos descriptivos
+            symbol=sym,
+            description=type_mapped, # Ej: DIVIDEND
+            
+            # Valores numéricos
+            quantity=parse_decimal(row.get('Quantity')),
+            price=parse_decimal(row.get('Price')),
+            market_value=parse_decimal(row.get('Value')),
+            yield_pct=parse_decimal(row.get('Current Yield %')),
+            
+            estimated_annual_income=parse_decimal(row.get('Estimated Annual Income')),
+            estimated_remaining_income=parse_decimal(row.get('Estimated 2026 Remaining Income')),
+            
+            frequency=int(row.get('Frequency')) if pd.notna(row.get('Frequency')) else None,
+            currency="USD" # Asumido por el reporte, podrías extraerlo si existiera columna
+        )
+        
+        db.add(proj)
+        count += 1
+        inserted_records["IncomeProjections"].append({"Symbol": sym, "Income": float(proj.estimated_annual_income or 0)})
+
+    db.commit()
+    stats["DB_Inserted"] += count
+    logger.info(f"✅ {count} Proyecciones de ingresos insertadas.")
+
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, (datetime, Decimal)):
@@ -847,7 +965,8 @@ def run_all():
         import_corporate_actions(db, acct_map)
         import_history(db, acct_map)
         import_performance(db, acct_map)
-        import_positions(db, acct_map) # <--- AGREGAR ESTO AQUÍ
+        import_positions(db, acct_map) 
+        import_income_projections(db, acct_map)
         # --- REPORTE FINAL ---
         print("\n" + "="*60)
         print("📊 RESUMEN DE IMPORTACIÓN")

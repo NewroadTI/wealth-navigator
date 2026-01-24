@@ -1,0 +1,3 @@
+docker exec -it wealthroad-api python seed_data/initial_data.py
+python3 upload_assets.py
+docker exec -it wealthroad-api python seed_data/import_from_splits.py
