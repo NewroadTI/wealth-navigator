@@ -1,21 +1,224 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PortfolioCard } from '@/components/portfolios/PortfolioCard';
-import { portfolios } from '@/lib/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Filter, Download, User, Building2, Wallet, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, Filter, Download, LayoutGrid, List } from 'lucide-react';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
+
+// Types
+type UserApi = {
+  user_id: number;
+  username: string;
+  email: string | null;
+  full_name: string | null;
+  entity_type: string | null;
+  is_active: boolean;
+};
+
+type CurrencyApi = {
+  code: string;
+  name: string;
+};
+
+type CountryApi = {
+  iso_code: string;
+  name: string | null;
+};
+
+type PortfolioApi = {
+  portfolio_id: number;
+  owner_user_id: number;
+  interface_code: string;
+  name: string;
+  main_currency: string;
+  residence_country: string | null;
+  inception_date: string | null;
+  active_status: boolean;
+  accounts: any[];
+  advisors: any[];
+};
 
 const Portfolios = () => {
   const [isNewPortfolioOpen, setIsNewPortfolioOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+
+  // API data states
+  const [portfolios, setPortfolios] = useState<PortfolioApi[]>([]);
+  const [portfoliosLoading, setPortfoliosLoading] = useState(false);
+  const [investors, setInvestors] = useState<UserApi[]>([]);
+  const [currencies, setCurrencies] = useState<CurrencyApi[]>([]);
+  const [countries, setCountries] = useState<CountryApi[]>([]);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    owner_user_id: '',
+    interface_code: '',
+    name: '',
+    main_currency: 'USD',
+    residence_country: '',
+    inception_date: '',
+  });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
+  // Load portfolios
+  useEffect(() => {
+    const loadPortfolios = async () => {
+      try {
+        setPortfoliosLoading(true);
+        const response = await fetch(`${apiBaseUrl}/api/v1/portfolios`);
+        if (!response.ok) throw new Error('Failed to load portfolios');
+        const data = await response.json();
+        setPortfolios(data);
+      } catch (error) {
+        console.error('Error loading portfolios:', error);
+      } finally {
+        setPortfoliosLoading(false);
+      }
+    };
+    loadPortfolios();
+  }, [apiBaseUrl]);
+
+  // Load investors
+  useEffect(() => {
+    const loadInvestors = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v1/users/investors`);
+        if (!response.ok) throw new Error('Failed to load investors');
+        const data = await response.json();
+        setInvestors(data);
+      } catch (error) {
+        console.error('Error loading investors:', error);
+      }
+    };
+    loadInvestors();
+  }, [apiBaseUrl]);
+
+  // Load currencies
+  useEffect(() => {
+    const loadCurrencies = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/currencies`);
+        if (!response.ok) throw new Error('Failed to load currencies');
+        const data = await response.json();
+        setCurrencies(data);
+      } catch (error) {
+        console.error('Error loading currencies:', error);
+      }
+    };
+    loadCurrencies();
+  }, [apiBaseUrl]);
+
+  // Load countries
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/countries`);
+        if (!response.ok) throw new Error('Failed to load countries');
+        const data = await response.json();
+        setCountries(data);
+      } catch (error) {
+        console.error('Error loading countries:', error);
+      }
+    };
+    loadCountries();
+  }, [apiBaseUrl]);
+
+  // Handle investor selection - auto-complete portfolio name
+  const handleInvestorChange = (userId: string) => {
+    const investor = investors.find(i => i.user_id === parseInt(userId));
+    setFormData(prev => ({
+      ...prev,
+      owner_user_id: userId,
+      name: investor ? `${investor.full_name || investor.username}'s Portfolio` : prev.name,
+    }));
+  };
+
+  // Create portfolio
+  const handleCreatePortfolio = async () => {
+    if (!formData.owner_user_id || !formData.interface_code || !formData.name) {
+      setFormError('Please fill all required fields.');
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      setFormError(null);
+
+      const response = await fetch(`${apiBaseUrl}/api/v1/portfolios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner_user_id: parseInt(formData.owner_user_id),
+          interface_code: formData.interface_code,
+          name: formData.name,
+          main_currency: formData.main_currency,
+          residence_country: formData.residence_country || null,
+          inception_date: formData.inception_date || null,
+          active_status: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      const newPortfolio = await response.json();
+      setPortfolios(prev => [...prev, newPortfolio]);
+      setIsNewPortfolioOpen(false);
+      setFormData({
+        owner_user_id: '',
+        interface_code: '',
+        name: '',
+        main_currency: 'USD',
+        residence_country: '',
+        inception_date: '',
+      });
+
+      toast({
+        title: 'Portfolio created',
+        description: `Portfolio "${newPortfolio.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setFormError(error.message || 'Could not create portfolio.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // Filter portfolios
+  const filteredPortfolios = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return portfolios;
+    return portfolios.filter(p =>
+      p.name.toLowerCase().includes(query) ||
+      p.interface_code.toLowerCase().includes(query)
+    );
+  }, [portfolios, searchQuery]);
+
+  // Get investor name by id
+  const getInvestorName = (userId: number) => {
+    const investor = investors.find(i => i.user_id === userId);
+    return investor?.full_name || investor?.username || 'Unknown';
+  };
+
+  const getInvestorType = (userId: number) => {
+    const investor = investors.find(i => i.user_id === userId);
+    return investor?.entity_type || 'Individual';
+  };
 
   return (
     <AppLayout title="Portfolios" subtitle="Manage investor portfolios and accounts">
@@ -28,6 +231,8 @@ const Portfolios = () => {
               type="search"
               placeholder="Search portfolios..."
               className="pl-9 bg-muted/50 border-border"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <Button variant="outline" size="icon" className="border-border">
@@ -58,362 +263,311 @@ const Portfolios = () => {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Dialog open={isNewPortfolioOpen} onOpenChange={setIsNewPortfolioOpen}>
+          <Dialog open={isNewPortfolioOpen} onOpenChange={(open) => {
+            setIsNewPortfolioOpen(open);
+            if (!open) {
+              setFormError(null);
+              setFormData({
+                owner_user_id: '',
+                interface_code: '',
+                name: '',
+                main_currency: 'USD',
+                residence_country: '',
+                inception_date: '',
+              });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="h-4 w-4 mr-2" />
                 New Portfolio
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-xl">
               <DialogHeader>
-                <DialogTitle>Create New Investor Portfolio</DialogTitle>
+                <DialogTitle>Create New Portfolio</DialogTitle>
               </DialogHeader>
-              <Tabs defaultValue="investor" className="mt-4">
-                <TabsList className="grid grid-cols-3 w-full">
-                  <TabsTrigger value="investor" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Investor
-                  </TabsTrigger>
-                  <TabsTrigger value="portfolio" className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Portfolio
-                  </TabsTrigger>
-                  <TabsTrigger value="accounts" className="flex items-center gap-2">
-                    <Wallet className="h-4 w-4" />
-                    Accounts
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Investor Tab */}
-                <TabsContent value="investor" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="investorName">Full Name / Company Name</Label>
-                      <Input id="investorName" placeholder="James Morrison" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="investorType">Entity Type</Label>
-                      <Select>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Individual">Individual</SelectItem>
-                          <SelectItem value="Company">Company</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+              <div className="space-y-4 mt-4">
+                {formError && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm">
+                    {formError}
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="email@example.com" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input id="phone" placeholder="+1 (555) 123-4567" className="mt-1" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="taxId">Tax ID / Passport</Label>
-                      <Input id="taxId" placeholder="***-**-1234" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="riskLevel">Risk Tolerance</Label>
-                      <Select>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select risk level" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Conservative">Conservative</SelectItem>
-                          <SelectItem value="Moderate">Moderate</SelectItem>
-                          <SelectItem value="Aggressive">Aggressive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
+                )}
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="advisor">Assigned Advisor</Label>
-                    <Select>
+                    <Label htmlFor="investor">Investor *</Label>
+                    <Select value={formData.owner_user_id} onValueChange={handleInvestorChange}>
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select advisor" />
+                        <SelectValue placeholder="Select investor" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="sarah">Sarah Chen (Relationship)</SelectItem>
-                        <SelectItem value="michael">Michael Torres (Sales)</SelectItem>
-                        <SelectItem value="jennifer">Jennifer Williams (Account Manager)</SelectItem>
+                        {investors.map((investor) => (
+                          <SelectItem key={investor.user_id} value={investor.user_id.toString()}>
+                            {investor.full_name || investor.username}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
-                </TabsContent>
-
-                {/* Portfolio Tab */}
-                <TabsContent value="portfolio" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="portfolioName">Portfolio Name</Label>
-                      <Input id="portfolioName" placeholder="Global Growth Portfolio" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="interfaceCode">Interface Code</Label>
-                      <Input id="interfaceCode" placeholder="WR-2024-001" className="mt-1" />
-                    </div>
+                  <div>
+                    <Label htmlFor="interfaceCode">Interface Code *</Label>
+                    <Input
+                      id="interfaceCode"
+                      placeholder="WR-2024-001"
+                      className="mt-1"
+                      value={formData.interface_code}
+                      onChange={(e) => setFormData({ ...formData, interface_code: e.target.value })}
+                    />
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="portfolioType">Portfolio Type</Label>
-                      <Select>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Individual">Individual</SelectItem>
-                          <SelectItem value="Corporate">Corporate</SelectItem>
-                          <SelectItem value="Joint">Joint (Mancomunado)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="mainCurrency">Main Currency</Label>
-                      <Select>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select currency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD - US Dollar</SelectItem>
-                          <SelectItem value="EUR">EUR - Euro</SelectItem>
-                          <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                          <SelectItem value="CHF">CHF - Swiss Franc</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div>
+                  <Label htmlFor="portfolioName">Portfolio Name *</Label>
+                  <Input
+                    id="portfolioName"
+                    placeholder="Global Growth Portfolio"
+                    className="mt-1"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="mainCurrency">Main Currency</Label>
+                    <Select
+                      value={formData.main_currency}
+                      onValueChange={(value) => setFormData({ ...formData, main_currency: value })}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((currency) => (
+                          <SelectItem key={currency.code} value={currency.code}>
+                            {currency.code} - {currency.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="country">Country</Label>
-                      <Input id="country" placeholder="United States" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="benchmark">Benchmark</Label>
-                      <Select>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select benchmark" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sp500">S&P 500</SelectItem>
-                          <SelectItem value="nasdaq">NASDAQ 100</SelectItem>
-                          <SelectItem value="bloomberg">Bloomberg US Agg</SelectItem>
-                          <SelectItem value="eurostoxx">Euro Stoxx 50</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Label htmlFor="country">Residence Country</Label>
+                    <Select
+                      value={formData.residence_country}
+                      onValueChange={(value) => setFormData({ ...formData, residence_country: value })}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countries.map((country) => (
+                          <SelectItem key={country.iso_code} value={country.iso_code}>
+                            {country.name || country.iso_code}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="inceptionDate">Inception Date</Label>
-                      <Input id="inceptionDate" type="date" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label htmlFor="processingType">Processing Type</Label>
-                      <Select>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Full">Full Processing (NAV, Fees, Return)</SelectItem>
-                          <SelectItem value="Custody">Custody Only (View balances)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="inceptionDate">Inception Date</Label>
+                    <Input
+                      id="inceptionDate"
+                      type="date"
+                      className="mt-1"
+                      value={formData.inception_date}
+                      onChange={(e) => setFormData({ ...formData, inception_date: e.target.value })}
+                    />
                   </div>
-                </TabsContent>
-
-                {/* Accounts Tab */}
-                <TabsContent value="accounts" className="space-y-4 mt-4">
-                  <div className="bg-muted/30 border border-border rounded-lg p-4">
-                    <h4 className="font-medium text-foreground mb-4">Add Account</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="institution">Institution</Label>
-                        <Select>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select institution" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ib">Interactive Brokers</SelectItem>
-                            <SelectItem value="pershing">Pershing</SelectItem>
-                            <SelectItem value="ubs">UBS</SelectItem>
-                            <SelectItem value="jpmorgan">JP Morgan</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="accountCode">Account Code</Label>
-                        <Input id="accountCode" placeholder="IB-001" className="mt-1" />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div>
-                        <Label htmlFor="accountName">Account Name</Label>
-                        <Input id="accountName" placeholder="Main Brokerage USD" className="mt-1" />
-                      </div>
-                      <div>
-                        <Label htmlFor="accountType">Account Type</Label>
-                        <Select>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Brokerage">Brokerage (Securities)</SelectItem>
-                            <SelectItem value="Bank">Bank (Cash Only)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div>
-                        <Label htmlFor="accountCurrency">Currency</Label>
-                        <Select>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select currency" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="USD">USD</SelectItem>
-                            <SelectItem value="EUR">EUR</SelectItem>
-                            <SelectItem value="GBP">GBP</SelectItem>
-                            <SelectItem value="CHF">CHF</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="costMethod">Cost Method</Label>
-                        <Select>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="FIFO">FIFO (First-In, First-Out)</SelectItem>
-                            <SelectItem value="Average">Average Cost</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <Button variant="outline" className="mt-4 w-full border-dashed">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Another Account
-                    </Button>
+                  <div>
+                    <Label htmlFor="benchmark">Benchmark</Label>
+                    <Select>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select benchmark" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sp500">S&P 500</SelectItem>
+                        <SelectItem value="nasdaq">NASDAQ 100</SelectItem>
+                        <SelectItem value="bloomberg">Bloomberg US Agg</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+                </div>
 
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Note:</strong> Multi-currency accounts must be registered as separate sub-accounts to prevent accounting errors.
-                  </p>
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-border mt-4">
-                <Button variant="outline" onClick={() => setIsNewPortfolioOpen(false)}>Cancel</Button>
-                <Button className="bg-primary text-primary-foreground">Create Portfolio</Button>
+                <div className="flex justify-end gap-3 pt-4 border-t border-border mt-4">
+                  <Button variant="outline" onClick={() => setIsNewPortfolioOpen(false)}>Cancel</Button>
+                  <Button
+                    className="bg-primary text-primary-foreground"
+                    onClick={handleCreatePortfolio}
+                    disabled={formLoading}
+                  >
+                    {formLoading ? 'Creating...' : 'Create Portfolio'}
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {/* Portfolio Grid or List View */}
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {portfolios.map((portfolio) => (
-            <PortfolioCard key={portfolio.id} portfolio={portfolio} />
-          ))}
+      {/* Loading state */}
+      {portfoliosLoading && (
+        <div className="text-center py-12 text-muted-foreground">Loading portfolios...</div>
+      )}
+
+      {/* Empty state */}
+      {!portfoliosLoading && filteredPortfolios.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          {searchQuery ? 'No portfolios match your search.' : 'No portfolios found. Create your first portfolio!'}
         </div>
-      ) : (
+      )}
+
+      {/* Portfolio Grid or List View */}
+      {!portfoliosLoading && filteredPortfolios.length > 0 && viewMode === 'grid' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredPortfolios.map((portfolio) => {
+            const investorName = getInvestorName(portfolio.owner_user_id);
+            const investorType = getInvestorType(portfolio.owner_user_id);
+
+            return (
+              <Link
+                key={portfolio.portfolio_id}
+                to={`/portfolios/${portfolio.portfolio_id}`}
+                className="block"
+              >
+                <div className="bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-colors cursor-pointer">
+                  {/* Header with name and badges */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-foreground">{portfolio.name}</h3>
+                      <p className="text-xs text-muted-foreground">{portfolio.interface_code}</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${portfolio.active_status
+                          ? 'bg-success/20 text-success border-success/30'
+                          : 'bg-warning/20 text-warning border-warning/30'
+                          }`}
+                      >
+                        {portfolio.active_status ? 'Active' : 'Pending'}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {investorType}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Value and Day Change */}
+                  <div className="flex items-baseline gap-3 mb-4">
+                    <span className="text-2xl font-bold mono text-foreground">
+                      {formatCurrency(2847532.45)}
+                    </span>
+                    <span className="text-sm font-medium text-success">
+                      ↗ +0.44%
+                    </span>
+                  </div>
+
+                  {/* Investor and Advisor Row */}
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">👤</span>
+                      <span className="text-foreground truncate">{investorName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">⚙️</span>
+                      <span className="text-foreground">Sarah Chen</span>
+                    </div>
+                  </div>
+
+                  {/* Inception Date and YTD Row */}
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">📅</span>
+                      <span className="text-foreground">
+                        {portfolio.inception_date ? new Date(portfolio.inception_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">↗</span>
+                      <span className="text-foreground">YTD:</span>
+                      <span className="text-success font-medium">+8.72%</span>
+                    </div>
+                  </div>
+
+                  {/* Currency, Benchmark and Risk Badge */}
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <span className="text-xs text-muted-foreground">
+                      {portfolio.main_currency} • S&P 500
+                    </span>
+                    <Badge variant="outline" className="text-xs bg-chart-1/20 text-chart-1 border-chart-1/30">
+                      Moderate
+                    </Badge>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {!portfoliosLoading && filteredPortfolios.length > 0 && viewMode === 'list' && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           {/* List Header */}
           <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-muted/30 border-b border-border text-sm font-medium text-muted-foreground">
             <div className="col-span-3">Portfolio</div>
             <div className="col-span-2">Investor</div>
+            <div className="col-span-2">Advisor</div>
             <div className="col-span-2 text-right">Total Value</div>
-            <div className="col-span-2 text-right">Day Change</div>
             <div className="col-span-1 text-right">YTD</div>
             <div className="col-span-1 text-center">Status</div>
             <div className="col-span-1 text-center">Type</div>
           </div>
 
           {/* List Rows */}
-          {portfolios.map((portfolio) => (
+          {filteredPortfolios.map((portfolio) => (
             <Link
-              key={portfolio.id}
-              to={`/portfolios/${portfolio.id}`}
+              key={portfolio.portfolio_id}
+              to={`/portfolios/${portfolio.portfolio_id}`}
               className="grid grid-cols-12 gap-4 px-5 py-4 items-center border-b border-border hover:bg-muted/20 cursor-pointer transition-colors"
             >
               <div className="col-span-3">
                 <p className="font-medium text-foreground">{portfolio.name}</p>
-                <p className="text-xs text-muted-foreground">{portfolio.interfaceCode}</p>
+                <p className="text-xs text-muted-foreground">{portfolio.interface_code}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-sm text-foreground">{portfolio.investor.name}</p>
-                <p className="text-xs text-muted-foreground">{portfolio.type}</p>
+                <p className="text-sm text-foreground">{getInvestorName(portfolio.owner_user_id)}</p>
+              </div>
+              <div className="col-span-2">
+                <span className="text-sm text-foreground">Sarah Chen</span>
               </div>
               <div className="col-span-2 text-right">
                 <p className="font-mono font-medium text-foreground">
-                  {formatCurrency(portfolio.totalValue)}
-                </p>
-              </div>
-              <div className="col-span-2 text-right">
-                <p
-                  className={`font-mono font-medium ${
-                    portfolio.dayChange >= 0 ? 'text-success' : 'text-destructive'
-                  }`}
-                >
-                  {portfolio.dayChange >= 0 ? '+' : ''}
-                  {formatCurrency(portfolio.dayChange)}
-                </p>
-                <p
-                  className={`text-xs ${
-                    portfolio.dayChangePercent >= 0 ? 'text-success' : 'text-destructive'
-                  }`}
-                >
-                  {formatPercent(portfolio.dayChangePercent)}
+                  {formatCurrency(1250000)}
                 </p>
               </div>
               <div className="col-span-1 text-right">
-                <span
-                  className={`font-mono ${
-                    portfolio.ytdReturn >= 0 ? 'text-success' : 'text-destructive'
-                  }`}
-                >
-                  {formatPercent(portfolio.ytdReturn)}
+                <span className="font-mono text-success">
+                  {formatPercent(0.0845)}
                 </span>
               </div>
               <div className="col-span-1 text-center">
                 <Badge
                   variant="outline"
-                  className={`text-xs ${
-                    portfolio.status === 'Active'
-                      ? 'bg-success/20 text-success border-success/30'
-                      : portfolio.status === 'Pending'
-                      ? 'bg-warning/20 text-warning border-warning/30'
-                      : 'bg-muted/20 text-muted-foreground border-border'
-                  }`}
+                  className={`text-xs ${portfolio.active_status
+                    ? 'bg-success/20 text-success border-success/30'
+                    : 'bg-muted/20 text-muted-foreground border-border'
+                    }`}
                 >
-                  {portfolio.status}
+                  {portfolio.active_status ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
               <div className="col-span-1 text-center">
                 <Badge variant="outline" className="text-xs">
-                  {portfolio.processingType}
+                  {getInvestorType(portfolio.owner_user_id)}
                 </Badge>
               </div>
             </Link>
