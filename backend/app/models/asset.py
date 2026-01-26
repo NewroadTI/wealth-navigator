@@ -207,12 +207,17 @@ class FXTransaction(Base):
     fx_id = Column(Integer, primary_key=True, index=True)
     trade_date = Column(DateTime)
     
-    account_id = Column(Integer, ForeignKey("accounts.account_id"))
+    # Cuenta de donde SALE el dinero (Source)
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
+    
+    # NUEVA: Cuenta a donde ENTRA el dinero (Target)
+    target_account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=True)
     
     source_currency = Column(CHAR(3))
     source_amount = Column(Numeric)
     target_currency = Column(CHAR(3))
     target_amount = Column(Numeric)
+    side = Column(String, nullable=True) # BUY-SELL
     
     exchange_rate = Column(Numeric)
     external_id = Column(String, unique=True)
@@ -382,7 +387,36 @@ class Country(Base):
     # Relaciones inversas
     assets = relationship("Asset", back_populates="country")
     exchanges = relationship("StockExchange", back_populates="country")
-
+    
+class IncomeProjection(Base):
+    __tablename__ = "income_projections"
+    
+    projection_id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=True) # Null para Cash
+    
+    # Fecha en la que se generó esta proyección
+    report_date = Column(Date, nullable=False, index=True)
+    
+    # Datos del activo en ese momento
+    symbol = Column(String) # Opcional: Denormalizado para rapidez
+    description = Column(String) # Ej: "Ordinary Dividend" o "Credit Interest"
+    
+    # Valores Proyectados
+    quantity = Column(Numeric)
+    price = Column(Numeric)
+    market_value = Column(Numeric)      # Columna 'Value'
+    yield_pct = Column(Numeric)         # Columna 'Current Yield %'
+    
+    # Resultados del Ingreso
+    estimated_annual_income = Column(Numeric)
+    estimated_remaining_income = Column(Numeric) # El resto del 2026
+    
+    frequency = Column(Integer) # Ej: 12, 4, 1
+    currency = Column(CHAR(3))
+    
+    account = relationship("Account")
+    asset = relationship("Asset")
 
 event.listen(
     MarketPrice.__table__, 
