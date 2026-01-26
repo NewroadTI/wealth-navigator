@@ -1,35 +1,70 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { portfolios, getPortfolioTransactions } from '@/lib/mockData';
 import { assetsApi, catalogsApi, AssetApi, AssetClass } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Search, Plus, Download, Package, ArrowUpDown } from 'lucide-react';
+import {
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Search, Plus, Download, SlidersHorizontal } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
-
-type AssetSortKey = 'symbol' | 'description' | 'class' | 'type' | 'currency' | 'isin' | 'country' | 'industry';
-type SortConfig = { key: AssetSortKey; direction: 'asc' | 'desc' };
+import {
+  AssetFormFields,
+  AssetFormState,
+  defaultAssetFormState,
+  formatDecimalValue,
+  AssetsTable,
+  AssetSortKey,
+  SortConfig,
+  createColumnDefinitions,
+} from './AssetsSection';
 
 const Assets = () => {
-  const location = useLocation();
+  const { toast } = useToast();
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all');
   const [selectedAssetClass, setSelectedAssetClass] = useState<string>('all');
   const [selectedAssetSubclass, setSelectedAssetSubclass] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isNewAssetOpen, setIsNewAssetOpen] = useState(false);
-  const [newAssetClass, setNewAssetClass] = useState<string>('Equity');
+  const [isEditAssetOpen, setIsEditAssetOpen] = useState(false);
   const [assetClasses, setAssetClasses] = useState<AssetClass[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [countries, setCountries] = useState<Array<{ iso_code: string; name?: string | null }>>([]);
+  const [industries, setIndustries] = useState<Array<{ industry_code: string; name: string; sector?: string | null }>>([]);
+  const [currencies, setCurrencies] = useState<Array<{ code: string; name: string }>>([]);
   const [assets, setAssets] = useState<AssetApi[]>([]);
   const [isLoadingAssets, setIsLoadingAssets] = useState(true);
   const [assetSort, setAssetSort] = useState<SortConfig>({ key: 'symbol', direction: 'asc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleColumns, setVisibleColumns] = useState<AssetSortKey[]>([
+    'symbol',
+    'description',
+    'class',
+    'type',
+    'currency',
+    'isin',
+    'country',
+    'industry',
+  ]);
+  const pageSize = 100;
+  const maxAssets = 3000;
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
+  const [newAssetDraft, setNewAssetDraft] = useState<AssetFormState>(defaultAssetFormState);
+  const [editAssetDraft, setEditAssetDraft] = useState<AssetFormState>(defaultAssetFormState);
+  const [assetToDelete, setAssetToDelete] = useState<AssetApi | null>(null);
+  const [editingAsset, setEditingAsset] = useState<AssetApi | null>(null);
+  const [assetActionError, setAssetActionError] = useState<string | null>(null);
+  const [assetActionLoading, setAssetActionLoading] = useState(false);
 
   // Cargar asset classes desde el API
   useEffect(() => {
@@ -38,9 +73,8 @@ const Assets = () => {
         setIsLoadingClasses(true);
         const classes = await catalogsApi.getAssetClasses();
         setAssetClasses(classes);
-        // Inicializar newAssetClass con el primer asset class
         if (classes.length > 0) {
-          setNewAssetClass(classes[0].code);
+          setNewAssetDraft((prev) => ({ ...prev, class_id: String(classes[0].class_id) }));
         }
       } catch (error) {
         console.error('Error loading asset classes:', error);
@@ -51,47 +85,125 @@ const Assets = () => {
     loadAssetClasses();
   }, []);
 
-  // Cargar assets desde el API
   useEffect(() => {
     const controller = new AbortController();
-    const loadAssets = async () => {
+    const loadCatalogs = async () => {
       try {
-        setIsLoadingAssets(true);
-        const data = await assetsApi.getAssets({ skip: 0, limit: 3000 });
-        if (!controller.signal.aborted) {
-          setAssets(data);
+        const [countriesResponse, industriesResponse, currenciesResponse] = await Promise.all([
+          fetch(`${apiBaseUrl}/api/v1/catalogs/countries`, { signal: controller.signal }),
+          fetch(`${apiBaseUrl}/api/v1/catalogs/industries`, { signal: controller.signal }),
+          fetch(`${apiBaseUrl}/api/v1/catalogs/currencies`, { signal: controller.signal }),
+        ]);
+        if (!countriesResponse.ok || !industriesResponse.ok || !currenciesResponse.ok) {
+          throw new Error('Failed to load catalogs');
         }
+        const countriesData = (await countriesResponse.json()) as Array<{ iso_code: string; name?: string | null }>;
+        const industriesData = (await industriesResponse.json()) as Array<{ industry_code: string; name: string; sector?: string | null }>;
+        const currenciesData = (await currenciesResponse.json()) as Array<{ code: string; name: string }>;
+        setCountries(Array.isArray(countriesData) ? countriesData : []);
+        setIndustries(Array.isArray(industriesData) ? industriesData : []);
+        setCurrencies(Array.isArray(currenciesData) ? currenciesData : []);
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        console.error('Error loading assets:', error);
-        setAssets([]);
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingAssets(false);
-        }
+        setCountries([]);
+        setIndustries([]);
+        setCurrencies([]);
       }
     };
-    loadAssets();
+    loadCatalogs();
     return () => controller.abort();
-  }, []);
+  }, [apiBaseUrl]);
+
+  const loadAssets = async (signal?: AbortSignal) => {
+    try {
+      setIsLoadingAssets(true);
+      const allAssets: AssetApi[] = [];
+      let skip = 0;
+
+      while (skip < maxAssets && !(signal?.aborted)) {
+        const data = await assetsApi.getAssets({ skip, limit: pageSize });
+        if (signal?.aborted) {
+          return;
+        }
+        allAssets.push(...data);
+        if (data.length < pageSize) {
+          break;
+        }
+        skip += pageSize;
+      }
+
+      if (!signal?.aborted) {
+        setAssets(allAssets.slice(0, maxAssets));
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+      console.error('Error loading assets:', error);
+      setAssets([]);
+    } finally {
+      if (!signal?.aborted) {
+        setIsLoadingAssets(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadAssets(controller.signal);
+    return () => controller.abort();
+  }, [pageSize]);
 
   const classNameById = useMemo(() => new Map(assetClasses.map((cls) => [cls.class_id, cls.name])), [assetClasses]);
   const subClassNameById = useMemo(() => {
     return new Map(assetClasses.flatMap((cls) => cls.sub_classes.map((sub) => [sub.sub_class_id, sub.name])));
   }, [assetClasses]);
 
+  const currencyOptions = useMemo(
+    () =>
+      currencies.map((currency) => ({
+        value: currency.code,
+        label: `${currency.code} - ${currency.name}`,
+      })),
+    [currencies],
+  );
+
+  const countryOptions = useMemo(
+    () =>
+      countries.map((country) => ({
+        value: country.iso_code,
+        label: `${country.name ?? country.iso_code} (${country.iso_code})`,
+      })),
+    [countries],
+  );
+
+  const industryOptions = useMemo(
+    () =>
+      industries.map((industry) => ({
+        value: industry.industry_code,
+        label: industry.name,
+        secondary: industry.industry_code,
+      })),
+    [industries],
+  );
+
+  const columnDefinitions = useMemo(
+    () => createColumnDefinitions(classNameById, subClassNameById),
+    [classNameById, subClassNameById]
+  );
+
   const selectedClassId = selectedAssetClass === 'all' ? null : Number(selectedAssetClass);
   const selectedSubClassId = selectedAssetSubclass === 'all' ? null : Number(selectedAssetSubclass);
   const selectedClassName = selectedClassId ? classNameById.get(selectedClassId) : undefined;
-  
+
   // Get transactions filtered by portfolio and asset class
   const filteredTransactions = selectedPortfolio === 'all'
     ? []
     : getPortfolioTransactions(selectedPortfolio).filter(
-        t => (selectedAssetClass === 'all' || (selectedClassName ? t.assetClass === selectedClassName : true))
-      );
+      t => (selectedAssetClass === 'all' || (selectedClassName ? t.assetClass === selectedClassName : true))
+    );
 
   const portfolio = portfolios.find(p => p.id === selectedPortfolio);
 
@@ -139,6 +251,44 @@ const Assets = () => {
           return asset.country_code ?? '';
         case 'industry':
           return asset.industry_code ?? '';
+        case 'figi':
+          return asset.figi ?? '';
+        case 'cusip':
+          return asset.cusip ?? '';
+        case 'multiplier':
+          return asset.multiplier ?? '';
+        case 'contract_size':
+          return asset.contract_size ?? '';
+        case 'underlying_symbol':
+          return asset.underlying_symbol ?? '';
+        case 'strike_price':
+          return asset.strike_price ?? '';
+        case 'expiry_date':
+          return asset.expiry_date ?? '';
+        case 'put_call':
+          return asset.put_call ?? '';
+        case 'maturity_date':
+          return asset.maturity_date ?? '';
+        case 'coupon_rate':
+          return asset.coupon_rate ?? '';
+        case 'issuer':
+          return asset.issuer ?? '';
+        case 'initial_fixing_date':
+          return asset.initial_fixing_date ?? '';
+        case 'next_autocall_date':
+          return asset.next_autocall_date ?? '';
+        case 'next_coupon_payment_date':
+          return asset.next_coupon_payment_date ?? '';
+        case 'autocall_trigger':
+          return asset.autocall_trigger ?? '';
+        case 'coupon_trigger':
+          return asset.coupon_trigger ?? '';
+        case 'capital_barrier':
+          return asset.capital_barrier ?? '';
+        case 'protection_level':
+          return asset.protection_level ?? '';
+        case 'payment_frequency':
+          return asset.payment_frequency ?? '';
         default:
           return '';
       }
@@ -151,6 +301,21 @@ const Assets = () => {
     });
   }, [assets, selectedClassId, selectedSubClassId, searchQuery, assetSort, classNameById, subClassNameById]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClassId, selectedSubClassId, searchQuery]);
+
+  const totalAssets = filteredAssets.length;
+  const totalPages = Math.max(1, Math.ceil(totalAssets / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = totalAssets === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const pageEnd = Math.min(safePage * pageSize, totalAssets);
+
+  const pagedAssets = useMemo(() => {
+    const startIndex = (safePage - 1) * pageSize;
+    return filteredAssets.slice(startIndex, startIndex + pageSize);
+  }, [filteredAssets, safePage, pageSize]);
+
   // Obtener subclasses disponibles para la clase seleccionada
   const availableSubclasses = useMemo(() => {
     if (selectedClassId === null) return [];
@@ -158,22 +323,184 @@ const Assets = () => {
     return selectedClass?.sub_classes || [];
   }, [selectedClassId, assetClasses]);
 
-  // Build current filter string for saving
-  const currentFilters = useMemo(() => {
-    const params = new URLSearchParams();
-    if (selectedPortfolio !== 'all') params.set('portfolio', selectedPortfolio);
-    if (selectedAssetClass !== 'all') params.set('class', selectedAssetClass);
-    if (selectedAssetSubclass !== 'all') params.set('subclass', selectedAssetSubclass);
-    if (searchQuery) params.set('q', searchQuery);
-    return params.toString();
-  }, [selectedPortfolio, selectedAssetClass, selectedAssetSubclass, searchQuery]);
+  const normalizeNumber = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
 
-  const filterTitle = useMemo(() => {
-    const parts = ['Assets'];
-    if (selectedAssetClass !== 'all' && selectedClassName) parts.push(selectedClassName);
-    if (searchQuery) parts.push(`"${searchQuery}"`);
-    return parts.join(' - ');
-  }, [selectedAssetClass, selectedClassName, searchQuery]);
+  const getErrorMessage = (errorData: any, fallback: string) => {
+    if (!errorData) {
+      return fallback;
+    }
+    if (typeof errorData.detail === 'string') {
+      return errorData.detail;
+    }
+    if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && errorData.detail[0]?.msg) {
+      return errorData.detail[0].msg;
+    }
+    if (typeof errorData.message === 'string') {
+      return errorData.message;
+    }
+    return fallback;
+  };
+
+  const buildAssetPayload = (formState: AssetFormState) => {
+    const normalizedPutCall = formState.put_call.trim();
+    return {
+      symbol: formState.symbol.trim(),
+      name: formState.name.trim() || null,
+      description: formState.description.trim() || null,
+      isin: formState.isin.trim() || null,
+      figi: formState.figi.trim() || null,
+      cusip: formState.cusip.trim() || null,
+      class_id: Number(formState.class_id),
+      sub_class_id: formState.sub_class_id ? Number(formState.sub_class_id) : null,
+      industry_code: formState.industry_code.trim() ? formState.industry_code.trim().toUpperCase() : null,
+      country_code: formState.country_code.trim() ? formState.country_code.trim().toUpperCase() : null,
+      currency: formState.currency.trim() ? formState.currency.trim().toUpperCase() : null,
+      multiplier: normalizeNumber(formState.multiplier),
+      contract_size: normalizeNumber(formState.contract_size),
+      underlying_symbol: formState.underlying_symbol.trim() || null,
+      strike_price: normalizeNumber(formState.strike_price),
+      expiry_date: formState.expiry_date || null,
+      put_call: normalizedPutCall && normalizedPutCall !== '-' ? normalizedPutCall : null,
+      maturity_date: formState.maturity_date || null,
+      coupon_rate: normalizeNumber(formState.coupon_rate),
+      issuer: formState.issuer.trim() || null,
+      initial_fixing_date: formState.initial_fixing_date || null,
+      next_autocall_date: formState.next_autocall_date || null,
+      next_coupon_payment_date: formState.next_coupon_payment_date || null,
+      autocall_trigger: normalizeNumber(formState.autocall_trigger),
+      coupon_trigger: normalizeNumber(formState.coupon_trigger),
+      capital_barrier: normalizeNumber(formState.capital_barrier),
+      protection_level: normalizeNumber(formState.protection_level),
+      payment_frequency: formState.payment_frequency.trim() || null,
+    };
+  };
+
+  const handleCreateAsset = async () => {
+    if (!newAssetDraft.symbol.trim() || !newAssetDraft.class_id) {
+      setAssetActionError('Symbol and Asset Class are required.');
+      return;
+    }
+    try {
+      setAssetActionLoading(true);
+      setAssetActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/assets/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAssetPayload(newAssetDraft)),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(getErrorMessage(errorData, `HTTP ${response.status}`));
+      }
+
+      await loadAssets();
+      setIsNewAssetOpen(false);
+      setNewAssetDraft(defaultAssetFormState);
+      toast({
+        title: 'Asset created',
+        description: `Asset "${newAssetDraft.symbol.trim()}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setAssetActionError(error.message || 'Could not create the asset.');
+    } finally {
+      setAssetActionLoading(false);
+    }
+  };
+
+  const handleEditAsset = (asset: AssetApi) => {
+    setEditingAsset(asset);
+    setEditAssetDraft({
+      symbol: asset.symbol ?? '',
+      name: asset.name ?? '',
+      description: asset.description ?? '',
+      isin: asset.isin ?? '',
+      figi: asset.figi ?? '',
+      cusip: asset.cusip ?? '',
+      class_id: asset.class_id ? String(asset.class_id) : '',
+      sub_class_id: asset.sub_class_id ? String(asset.sub_class_id) : '',
+      industry_code: asset.industry_code ?? '',
+      country_code: asset.country_code ?? '',
+      currency: asset.currency ?? '',
+      multiplier: formatDecimalValue(asset.multiplier ?? '1.0'),
+      contract_size: formatDecimalValue(asset.contract_size ?? '0.0'),
+      underlying_symbol: asset.underlying_symbol ?? '',
+      strike_price: formatDecimalValue(asset.strike_price ?? '0.0'),
+      expiry_date: asset.expiry_date ?? '',
+      put_call: asset.put_call ?? '',
+      maturity_date: asset.maturity_date ?? '',
+      coupon_rate: asset.coupon_rate ?? '0.0',
+      issuer: asset.issuer ?? '',
+      initial_fixing_date: asset.initial_fixing_date ?? '',
+      next_autocall_date: asset.next_autocall_date ?? '',
+      next_coupon_payment_date: asset.next_coupon_payment_date ?? '',
+      autocall_trigger: asset.autocall_trigger ?? '',
+      coupon_trigger: asset.coupon_trigger ?? '',
+      capital_barrier: asset.capital_barrier ?? '',
+      protection_level: asset.protection_level ?? '',
+      payment_frequency: asset.payment_frequency ?? '',
+    });
+    setAssetActionError(null);
+    setIsEditAssetOpen(true);
+  };
+
+  const handleUpdateAsset = async (assetId: number) => {
+    if (!editAssetDraft.symbol.trim() || !editAssetDraft.class_id) {
+      setAssetActionError('Symbol and Asset Class are required.');
+      return;
+    }
+    try {
+      setAssetActionLoading(true);
+      setAssetActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/assets/${assetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAssetPayload(editAssetDraft)),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(getErrorMessage(errorData, `HTTP ${response.status}`));
+      }
+
+      await loadAssets();
+      setIsEditAssetOpen(false);
+    } catch (error: any) {
+      setAssetActionError(error.message || 'Could not update the asset.');
+    } finally {
+      setAssetActionLoading(false);
+    }
+  };
+
+  const handleDeleteAsset = async (assetId: number) => {
+    try {
+      setAssetActionLoading(true);
+      setAssetActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/assets/${assetId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(getErrorMessage(errorData, `HTTP ${response.status}`));
+      }
+
+      await loadAssets();
+    } catch (error: any) {
+      setAssetActionError(error.message || 'Could not delete the asset.');
+    } finally {
+      setAssetActionLoading(false);
+    }
+  };
+
 
   const toggleSort = (key: AssetSortKey) => {
     setAssetSort((prev) => ({
@@ -182,17 +509,7 @@ const Assets = () => {
     }));
   };
 
-  const SortableHeader = ({ label, sortKey }: { label: string; sortKey: AssetSortKey }) => (
-    <th
-      className="text-xs cursor-pointer hover:bg-muted/50 transition-colors select-none"
-      onClick={() => toggleSort(sortKey)}
-    >
-      <div className="flex items-center gap-1">
-        {label}
-        <ArrowUpDown className={`h-3 w-3 ${assetSort.key === sortKey ? 'opacity-100' : 'opacity-40'}`} />
-      </div>
-    </th>
-  );
+  const visibleColumnDefs = columnDefinitions.filter((column) => visibleColumns.includes(column.key));
 
   return (
     <AppLayout title="Assets" subtitle="Manage and filter assets by portfolio and type">
@@ -213,7 +530,7 @@ const Assets = () => {
                 ))}
               </SelectContent>
             </Select>
-            
+
             <Select
               value={selectedAssetClass}
               onValueChange={(v) => {
@@ -260,136 +577,143 @@ const Assets = () => {
               />
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 md:gap-3">
-            <SaveFilterButton
-              currentPath={location.pathname}
-              currentFilters={currentFilters}
-              defaultTitle={filterTitle}
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="border-border text-xs md:text-sm h-8 md:h-9">
+                  <SlidersHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
+                  Filter
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="start">
+                <div className="space-y-2">
+                  {columnDefinitions.map((column) => (
+                    <label key={column.key} className="flex items-center gap-2 text-xs">
+                      <Checkbox
+                        checked={visibleColumns.includes(column.key)}
+                        onCheckedChange={(checked) => {
+                          const isChecked = Boolean(checked);
+                          setVisibleColumns((prev) => {
+                            if (isChecked) {
+                              return [...prev, column.key];
+                            }
+                            return prev.filter((key) => key !== column.key);
+                          });
+                        }}
+                      />
+                      <span>{column.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button variant="outline" size="sm" className="border-border text-xs md:text-sm h-8 md:h-9">
               <Download className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
               <span className="hidden sm:inline">Export</span>
             </Button>
-            <Dialog open={isNewAssetOpen} onOpenChange={setIsNewAssetOpen}>
+            <Dialog
+              open={isNewAssetOpen}
+              onOpenChange={(open) => {
+                setIsNewAssetOpen(open);
+                setAssetActionError(null);
+                if (open) {
+                  setNewAssetDraft({
+                    ...defaultAssetFormState,
+                    class_id: assetClasses[0]?.class_id ? String(assetClasses[0].class_id) : '',
+                  });
+                }
+              }}
+            >
               <DialogTrigger asChild>
                 <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs md:text-sm h-8 md:h-9">
                   <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
                   <span className="hidden sm:inline">New Asset</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Register New Asset</DialogTitle>
                 </DialogHeader>
-                <Tabs value={newAssetClass} onValueChange={setNewAssetClass} className="mt-4">
-                  <TabsList className="grid w-full text-xs" style={{ gridTemplateColumns: `repeat(${assetClasses.length}, minmax(0, 1fr))` }}>
-                    {assetClasses.map((ac) => (
-                      <TabsTrigger key={ac.class_id} value={ac.code}>
-                        {ac.name.length > 10 ? ac.name.substring(0, 8) + '.' : ac.name}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  
-                  {assetClasses.map((assetClass) => (
-                    <TabsContent key={assetClass.class_id} value={assetClass.code} className="space-y-4 mt-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="symbol" className="text-sm">Symbol / Ticker</Label>
-                          <Input id="symbol" placeholder="AAPL" className="mt-1" />
-                        </div>
-                        <div>
-                          <Label htmlFor="name" className="text-sm">Asset Name</Label>
-                          <Input id="name" placeholder="Apple Inc." className="mt-1" />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="assetType" className="text-sm">Asset Type</Label>
-                          <Select>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {assetClass.sub_classes.length > 0 ? (
-                                assetClass.sub_classes.map(sc => (
-                                  <SelectItem key={sc.sub_class_id} value={sc.code}>{sc.name}</SelectItem>
-                                ))
-                              ) : (
-                                <SelectItem value="default">Default</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="currency" className="text-sm">Currency</Label>
-                          <Select>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select currency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="USD">USD</SelectItem>
-                              <SelectItem value="EUR">EUR</SelectItem>
-                              <SelectItem value="GBP">GBP</SelectItem>
-                              <SelectItem value="CHF">CHF</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+                <div className="space-y-5 mt-4">
+                  {assetActionError && (
+                    <Alert variant="destructive" className="border-red-200 bg-red-50">
+                      <AlertDescription className="text-sm text-red-800">
+                        {assetActionError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <AssetFormFields
+                    formState={newAssetDraft}
+                    setFormState={setNewAssetDraft}
+                    assetClasses={assetClasses}
+                    isLoadingClasses={isLoadingClasses}
+                    currencyOptions={currencyOptions}
+                    countryOptions={countryOptions}
+                    industryOptions={industryOptions}
+                    idPrefix="asset"
+                  />
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={() => setIsNewAssetOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      className="bg-primary text-primary-foreground"
+                      onClick={handleCreateAsset}
+                      disabled={assetActionLoading}
+                    >
+                      {assetActionLoading ? 'Saving...' : 'Create Asset'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="isin" className="text-sm">ISIN</Label>
-                          <Input id="isin" placeholder="US0378331005" className="mt-1" />
-                        </div>
-                        <div>
-                          <Label htmlFor="exchange" className="text-sm">Exchange</Label>
-                          <Input id="exchange" placeholder="NASDAQ" className="mt-1" />
-                        </div>
-                      </div>
-
-                      {assetClass.code === 'FIXED_INCOME' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div>
-                            <Label htmlFor="coupon" className="text-sm">Coupon (%)</Label>
-                            <Input id="coupon" type="number" placeholder="2.5" className="mt-1" />
-                          </div>
-                          <div>
-                            <Label htmlFor="maturity" className="text-sm">Maturity Date</Label>
-                            <Input id="maturity" type="date" className="mt-1" />
-                          </div>
-                          <div>
-                            <Label htmlFor="rating" className="text-sm">Rating</Label>
-                            <Input id="rating" placeholder="AAA" className="mt-1" />
-                          </div>
-                        </div>
-                      )}
-
-                      {assetClass.code === 'DERIVATIVES' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div>
-                            <Label htmlFor="strike" className="text-sm">Strike Price</Label>
-                            <Input id="strike" type="number" placeholder="200" className="mt-1" />
-                          </div>
-                          <div>
-                            <Label htmlFor="expiry" className="text-sm">Expiration Date</Label>
-                            <Input id="expiry" type="date" className="mt-1" />
-                          </div>
-                          <div>
-                            <Label htmlFor="underlying" className="text-sm">Underlying Asset</Label>
-                            <Input id="underlying" placeholder="AAPL" className="mt-1" />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex justify-end gap-3 pt-4">
-                        <Button variant="outline" onClick={() => setIsNewAssetOpen(false)}>Cancel</Button>
-                        <Button className="bg-primary text-primary-foreground">Create Asset</Button>
-                      </div>
-                    </TabsContent>
-                  ))}
-                </Tabs>
+            <Dialog
+              open={isEditAssetOpen}
+              onOpenChange={(open) => {
+                setIsEditAssetOpen(open);
+                if (!open) {
+                  setEditingAsset(null);
+                }
+                setAssetActionError(null);
+              }}
+            >
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Asset</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-5 mt-4">
+                  {assetActionError && (
+                    <Alert variant="destructive" className="border-red-200 bg-red-50">
+                      <AlertDescription className="text-sm text-red-800">
+                        {assetActionError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <AssetFormFields
+                    formState={editAssetDraft}
+                    setFormState={setEditAssetDraft}
+                    assetClasses={assetClasses}
+                    isLoadingClasses={isLoadingClasses}
+                    currencyOptions={currencyOptions}
+                    countryOptions={countryOptions}
+                    industryOptions={industryOptions}
+                    idPrefix="edit-asset"
+                  />
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={() => setIsEditAssetOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      className="bg-primary text-primary-foreground"
+                      onClick={() => editingAsset && handleUpdateAsset(editingAsset.asset_id)}
+                      disabled={assetActionLoading || !editingAsset}
+                    >
+                      {assetActionLoading ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -413,53 +737,24 @@ const Assets = () => {
       )}
 
       {/* Assets Catalog */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden mb-4 md:mb-6">
-        <div className="p-3 md:p-4 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-            <h3 className="font-semibold text-foreground text-sm md:text-base">Asset Catalog</h3>
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {isLoadingAssets ? 'Loading...' : `${filteredAssets.length} assets`}
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <SortableHeader label="Symbol" sortKey="symbol" />
-                <SortableHeader label="Description" sortKey="description" />
-                <SortableHeader label="Class" sortKey="class" />
-                <SortableHeader label="Type" sortKey="type" />
-                <SortableHeader label="Currency" sortKey="currency" />
-                <SortableHeader label="ISIN" sortKey="isin" />
-                <SortableHeader label="Country" sortKey="country" />
-                <SortableHeader label="Industry" sortKey="industry" />
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAssets.map((asset) => (
-                <tr key={asset.asset_id}>
-                  <td className="font-medium text-foreground text-xs md:text-sm">{asset.symbol || '-'}</td>
-                  <td className="text-foreground text-xs md:text-sm max-w-[220px] truncate">{asset.description || '-'}</td>
-                  <td className="text-muted-foreground text-xs md:text-sm">
-                    <span className="px-1.5 py-0.5 text-[10px] md:text-xs rounded-full bg-primary/20 text-primary">
-                      {classNameById.get(asset.class_id ?? -1) || '-'}
-                    </span>
-                  </td>
-                  <td className="text-muted-foreground text-xs md:text-sm">
-                    {subClassNameById.get(asset.sub_class_id ?? -1) || '-'}
-                  </td>
-                  <td className="text-muted-foreground text-xs md:text-sm">{asset.currency || '-'}</td>
-                  <td className="text-muted-foreground mono text-[10px] md:text-xs">{asset.isin || '-'}</td>
-                  <td className="text-muted-foreground text-xs md:text-sm">{asset.country_code || '-'}</td>
-                  <td className="text-muted-foreground text-xs md:text-sm">{asset.industry_code || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AssetsTable
+        assets={pagedAssets}
+        visibleColumnDefs={visibleColumnDefs}
+        sortConfig={assetSort}
+        onSort={toggleSort}
+        isLoading={isLoadingAssets}
+        totalAssets={totalAssets}
+        pageStart={pageStart}
+        pageEnd={pageEnd}
+        currentPage={safePage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        onEdit={handleEditAsset}
+        onDeleteRequest={setAssetToDelete}
+        assetToDelete={assetToDelete}
+        onDeleteConfirm={handleDeleteAsset}
+        onDeleteCancel={() => setAssetToDelete(null)}
+      />
 
       {/* Transactions by Asset */}
       {selectedPortfolio !== 'all' && (

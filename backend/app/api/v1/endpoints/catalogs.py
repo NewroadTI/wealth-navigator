@@ -4,12 +4,13 @@ from sqlalchemy.orm import Session
 from app.api import deps
 
 # Importamos el Modelo (SQLAlchemy) y el Schema (Pydantic)
-from app.models.asset import Country, Currency, StockExchange, MarketIndex
+from app.models.asset import Country, Currency, StockExchange, MarketIndex, AssetClass, AssetSubClass, Asset
 from app.schemas.asset import (
     CountryRead, CountryCreate, CountryUpdate,
     CurrencyRead, CurrencyCreate, CurrencyUpdate,
     StockExchangeRead, StockExchangeCreate, StockExchangeUpdate,
-    MarketIndexRead, MarketIndexCreate, MarketIndexUpdate
+    MarketIndexRead, MarketIndexCreate, MarketIndexUpdate,
+    AssetClassRead, AssetClassCreate, AssetClassUpdate
 )
 
 router = APIRouter()
@@ -480,12 +481,6 @@ def delete_industry(
     db.commit()
 
 
-# ... imports anteriores ...
-from app.models.asset import AssetClass # Importar el modelo
-from app.schemas.asset import AssetClassRead # Importar el schema nuevo
-
-# ... endpoints anteriores ...
-
 @router.get("/asset-classes", response_model=List[AssetClassRead])
 def get_asset_hierarchy(
     db: Session = Depends(deps.get_db)
@@ -497,3 +492,134 @@ def get_asset_hierarchy(
     # SQLAlchemy traerá las clases y, automáticamente, sus subclases anidadas
     classes = db.query(AssetClass).order_by(AssetClass.name).all()
     return classes
+
+
+@router.post("/asset-classes", response_model=AssetClassRead, status_code=status.HTTP_201_CREATED)
+def create_asset_class(
+    payload: AssetClassCreate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Crea una Asset Class con subclases opcionales.
+    """
+    existing = db.query(AssetClass).filter(AssetClass.code == payload.code.upper()).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Asset class already exists.")
+
+    obj_kwargs = {
+        "code": payload.code.upper(),
+        "name": payload.name,
+    }
+    if hasattr(AssetClass, "description"):
+        obj_kwargs["description"] = payload.description
+
+    obj = AssetClass(**obj_kwargs)
+    db.add(obj)
+    db.flush()
+
+    for sub in payload.sub_classes:
+        db.add(AssetSubClass(
+            class_id=obj.class_id,
+            code=sub.code.upper(),
+            name=sub.name,
+        ))
+
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/asset-classes/{class_id}", response_model=AssetClassRead)
+def update_asset_class(
+    class_id: int,
+    payload: AssetClassUpdate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Actualiza una Asset Class y sincroniza sus subclases.
+    """
+    obj = db.query(AssetClass).filter(AssetClass.class_id == class_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Asset class was not found.")
+
+    if payload.code is not None:
+        code_upper = payload.code.upper()
+        existing = db.query(AssetClass).filter(AssetClass.code == code_upper, AssetClass.class_id != class_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Asset class code already exists.")
+        obj.code = code_upper
+
+    if payload.name is not None:
+        obj.name = payload.name
+
+    if payload.description is not None and hasattr(obj, "description"):
+        obj.description = payload.description
+
+    if payload.sub_classes is not None:
+        existing_subs = {sub.sub_class_id: sub for sub in obj.sub_classes}
+        provided_ids = set()
+
+        for sub in payload.sub_classes:
+            if sub.sub_class_id:
+                existing_sub = existing_subs.get(sub.sub_class_id)
+                if not existing_sub:
+                    raise HTTPException(status_code=404, detail="Asset sub class was not found.")
+                existing_sub.code = sub.code.upper()
+                existing_sub.name = sub.name
+                provided_ids.add(sub.sub_class_id)
+            else:
+                db.add(AssetSubClass(
+                    class_id=obj.class_id,
+                    code=sub.code.upper(),
+                    name=sub.name,
+                ))
+
+        to_delete = [sub for sub_id, sub in existing_subs.items() if sub_id not in provided_ids]
+        if to_delete:
+            delete_ids = [sub.sub_class_id for sub in to_delete]
+            assets_count = db.query(Asset).filter(Asset.sub_class_id.in_(delete_ids)).count()
+            if assets_count > 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot delete sub class because it has assets associated.",
+                )
+            for sub in to_delete:
+                db.delete(sub)
+
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/asset-classes/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_asset_class(
+    class_id: int,
+    db: Session = Depends(deps.get_db)
+) -> None:
+    """
+    Elimina una Asset Class si no tiene activos asociados.
+    """
+    obj = db.query(AssetClass).filter(AssetClass.class_id == class_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Asset class was not found.")
+
+    assets_count = db.query(Asset).filter(Asset.class_id == class_id).count()
+    if assets_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete asset class because it has assets associated.",
+        )
+
+    sub_ids = [sub.sub_class_id for sub in obj.sub_classes]
+    if sub_ids:
+        sub_assets_count = db.query(Asset).filter(Asset.sub_class_id.in_(sub_ids)).count()
+        if sub_assets_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete asset class because it has sub class assets associated.",
+            )
+        for sub in obj.sub_classes:
+            db.delete(sub)
+
+    db.delete(obj)
+    db.commit()

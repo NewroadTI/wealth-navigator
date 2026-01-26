@@ -126,6 +126,9 @@ def update_asset(
     except AttributeError:
         update_data = asset_in.dict(exclude_unset=True)
 
+    if "name" in update_data:
+        del update_data["name"]
+
     for field, value in update_data.items():
         setattr(asset, field, value)
 

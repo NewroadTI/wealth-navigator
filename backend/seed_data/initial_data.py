@@ -21,6 +21,7 @@ def main():
         "seed_asset_classes.py",
         "seed_industries.py",
         "seed_market_data.py",
+        "seed_roles.py",
         "seed_user.py"
     ]
 
