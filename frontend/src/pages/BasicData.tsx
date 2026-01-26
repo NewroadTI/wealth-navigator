@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Globe, Factory, BarChart3, Coins, Search, Layers } from 'lucide-react';
+import { Building, Globe, Factory, BarChart3, Coins, Search, Layers, Target } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   ExchangesSection,
@@ -11,6 +11,7 @@ import {
   IndicesSection,
   CurrenciesSection,
   AssetClassesSection,
+  InvestmentStrategiesSection,
   fetchAllPages,
   toggleSort,
   SortableHeader,
@@ -23,6 +24,7 @@ import type {
   CurrencyApi,
   AssetClassApi,
   AssetSubClassApi,
+  InvestmentStrategyApi,
   SortConfig,
 } from './BasicDataSections';
 
@@ -119,6 +121,19 @@ const BasicData = () => {
   const [assetClassActionLoading, setAssetClassActionLoading] = useState(false);
   const [assetClassActionError, setAssetClassActionError] = useState<string | null>(null);
   const [assetClassToDelete, setAssetClassToDelete] = useState<AssetClassApi | null>(null);
+
+  // Investment Strategies state
+  const [strategies, setStrategies] = useState<InvestmentStrategyApi[]>([]);
+  const [strategiesLoading, setStrategiesLoading] = useState(false);
+  const [strategiesError, setStrategiesError] = useState<string | null>(null);
+  const [strategySort, setStrategySort] = useState<SortConfig>({ key: 'name', direction: 'asc' });
+  const [isCreateStrategyOpen, setIsCreateStrategyOpen] = useState(false);
+  const [isEditStrategyOpen, setIsEditStrategyOpen] = useState(false);
+  const [strategyDraft, setStrategyDraft] = useState({ name: '', description: '' });
+  const [editingStrategy, setEditingStrategy] = useState<InvestmentStrategyApi | null>(null);
+  const [strategyActionLoading, setStrategyActionLoading] = useState(false);
+  const [strategyActionError, setStrategyActionError] = useState<string | null>(null);
+  const [strategyToDelete, setStrategyToDelete] = useState<InvestmentStrategyApi | null>(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
@@ -301,6 +316,29 @@ const BasicData = () => {
     };
 
     loadAssetClasses();
+    return () => controller.abort();
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadStrategies = async () => {
+      try {
+        setStrategiesLoading(true);
+        setStrategiesError(null);
+        const data = await fetchAllPages<InvestmentStrategyApi>('/api/v1/catalogs/investment-strategies', controller.signal);
+        setStrategies(data);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setStrategiesError('Could not load Investment Strategies.');
+        setStrategies([]);
+      } finally {
+        setStrategiesLoading(false);
+      }
+    };
+
+    loadStrategies();
     return () => controller.abort();
   }, [apiBaseUrl]);
 
@@ -1112,6 +1150,132 @@ const BasicData = () => {
     }
   };
 
+  // --- Investment Strategies Handlers ---
+  const refreshStrategies = async () => {
+    const data = await fetchAllPages<InvestmentStrategyApi>('/api/v1/catalogs/investment-strategies');
+    setStrategies(data);
+  };
+
+  const handleCreateStrategy = async () => {
+    if (!strategyDraft.name.trim()) {
+      setStrategyActionError('Name field is required.');
+      return;
+    }
+    try {
+      setStrategyActionLoading(true);
+      setStrategyActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/investment-strategies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: strategyDraft.name.trim(),
+          description: strategyDraft.description.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshStrategies();
+      setStrategyDraft({ name: '', description: '' });
+      setIsCreateStrategyOpen(false);
+
+      toast({
+        title: 'Strategy created',
+        description: `Strategy "${strategyDraft.name}" has been created successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setStrategyActionError(error.message || 'Could not create the strategy.');
+    } finally {
+      setStrategyActionLoading(false);
+    }
+  };
+
+  const handleEditStrategy = (strategy: InvestmentStrategyApi) => {
+    setEditingStrategy(strategy);
+    setStrategyDraft({
+      name: strategy.name,
+      description: strategy.description ?? '',
+    });
+    setStrategyActionError(null);
+    setIsEditStrategyOpen(true);
+  };
+
+  const handleUpdateStrategy = async () => {
+    if (!editingStrategy) {
+      return;
+    }
+    if (!strategyDraft.name.trim()) {
+      setStrategyActionError('Name field is required.');
+      return;
+    }
+    try {
+      setStrategyActionLoading(true);
+      setStrategyActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/investment-strategies/${editingStrategy.strategy_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: strategyDraft.name.trim(),
+          description: strategyDraft.description.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshStrategies();
+      setIsEditStrategyOpen(false);
+      setEditingStrategy(null);
+
+      toast({
+        title: 'Strategy updated',
+        description: `Strategy "${strategyDraft.name}" has been updated successfully.`,
+        variant: 'success',
+      });
+    } catch (error: any) {
+      setStrategyActionError(error.message || 'Could not update the strategy.');
+    } finally {
+      setStrategyActionLoading(false);
+    }
+  };
+
+  const handleDeleteStrategy = async (strategyId: number) => {
+    try {
+      setStrategyActionLoading(true);
+      setStrategyActionError(null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/investment-strategies/${strategyId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      await refreshStrategies();
+
+      toast({
+        title: 'Strategy deleted',
+        description: 'Strategy has been deleted successfully.',
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting',
+        description: error.message || 'Could not delete the strategy.',
+        variant: 'destructive',
+      });
+    } finally {
+      setStrategyActionLoading(false);
+    }
+  };
+
   const filteredExchanges = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     let result = exchanges;
@@ -1233,7 +1397,23 @@ const BasicData = () => {
     return [...result].sort((a, b) => a.name.localeCompare(b.name));
   }, [assetClasses, searchQuery]);
 
-
+  const filteredStrategies = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    let result = strategies;
+    if (query) {
+      result = result.filter((strategy) => {
+        return (
+          strategy.name.toLowerCase().includes(query) ||
+          (strategy.description ?? '').toLowerCase().includes(query)
+        );
+      });
+    }
+    return [...result].sort((a, b) => {
+      const aVal = String((a as Record<string, unknown>)[strategySort.key] ?? '').toLowerCase();
+      const bVal = String((b as Record<string, unknown>)[strategySort.key] ?? '').toLowerCase();
+      return strategySort.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+  }, [strategies, searchQuery, strategySort]);
 
   return (
     <AppLayout title="Basic Data" subtitle="Manage reference data for the system">
@@ -1265,6 +1445,10 @@ const BasicData = () => {
                 <TabsTrigger value="asset-classes" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
                   <Layers className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                   Asset Classes
+                </TabsTrigger>
+                <TabsTrigger value="strategies" className="data-[state=active]:bg-card text-xs md:text-sm whitespace-nowrap">
+                  <Target className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  Strategies
                 </TabsTrigger>
               </TabsList>
 
@@ -1446,6 +1630,29 @@ const BasicData = () => {
             assetClassToDelete={assetClassToDelete}
             setAssetClassToDelete={setAssetClassToDelete}
             handleDeleteAssetClass={handleDeleteAssetClass}
+          />
+
+          <InvestmentStrategiesSection
+            strategiesLoading={strategiesLoading}
+            strategiesError={strategiesError}
+            filteredStrategies={filteredStrategies}
+            strategySort={strategySort}
+            onSort={(key) => toggleSort(setStrategySort, key)}
+            strategyDraft={strategyDraft}
+            setStrategyDraft={setStrategyDraft}
+            isCreateStrategyOpen={isCreateStrategyOpen}
+            setIsCreateStrategyOpen={setIsCreateStrategyOpen}
+            isEditStrategyOpen={isEditStrategyOpen}
+            setIsEditStrategyOpen={setIsEditStrategyOpen}
+            strategyActionError={strategyActionError}
+            strategyActionLoading={strategyActionLoading}
+            setStrategyActionError={setStrategyActionError}
+            handleCreateStrategy={handleCreateStrategy}
+            handleUpdateStrategy={handleUpdateStrategy}
+            handleEditStrategy={handleEditStrategy}
+            strategyToDelete={strategyToDelete}
+            setStrategyToDelete={setStrategyToDelete}
+            handleDeleteStrategy={handleDeleteStrategy}
           />
         </Tabs>
       </div>

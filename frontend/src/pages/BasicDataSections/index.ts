@@ -9,4 +9,4 @@ export { default as IndustriesSection } from './IndustriesSection';
 export { default as IndicesSection } from './IndicesSection';
 export { default as CurrenciesSection } from './CurrenciesSection';
 export { default as AssetClassesSection } from './AssetClassesSection';
-
+export { default as InvestmentStrategiesSection } from './InvestmentStrategiesSection';

@@ -418,6 +418,13 @@ class IncomeProjection(Base):
     account = relationship("Account")
     asset = relationship("Asset")
 
+class InvestmentStrategy(Base):
+    """Estrategias de inversión para clasificar portfolios."""
+    __tablename__ = "investment_strategies"
+    strategy_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+
 event.listen(
     MarketPrice.__table__, 
     'after_create', 

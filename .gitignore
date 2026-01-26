@@ -33,3 +33,4 @@ node_modules/
 .DS_Store
 dist/
 postgres_data/
+scripts/

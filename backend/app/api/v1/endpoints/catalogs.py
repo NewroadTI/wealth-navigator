@@ -623,3 +623,88 @@ def delete_asset_class(
 
     db.delete(obj)
     db.commit()
+
+
+# --- INVESTMENT STRATEGIES ENDPOINTS ---
+from app.models.asset import InvestmentStrategy
+from app.schemas.asset import InvestmentStrategyRead, InvestmentStrategyCreate, InvestmentStrategyUpdate
+
+@router.get("/investment-strategies", response_model=List[InvestmentStrategyRead])
+def get_investment_strategies(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100
+) -> Any:
+    """
+    Lista las estrategias de inversión disponibles.
+    """
+    return db.query(InvestmentStrategy).order_by(InvestmentStrategy.name).offset(skip).limit(limit).all()
+
+
+@router.post("/investment-strategies", response_model=InvestmentStrategyRead, status_code=status.HTTP_201_CREATED)
+def create_investment_strategy(
+    payload: InvestmentStrategyCreate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Crea una nueva estrategia de inversión.
+    """
+    existing = db.query(InvestmentStrategy).filter(InvestmentStrategy.name == payload.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Investment strategy '{payload.name}' already exists.")
+
+    obj = InvestmentStrategy(
+        name=payload.name,
+        description=payload.description
+    )
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/investment-strategies/{strategy_id}", response_model=InvestmentStrategyRead)
+def update_investment_strategy(
+    strategy_id: int,
+    payload: InvestmentStrategyUpdate,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Actualiza una estrategia de inversión existente.
+    """
+    obj = db.query(InvestmentStrategy).filter(InvestmentStrategy.strategy_id == strategy_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Investment strategy was not found.")
+
+    if payload.name is not None:
+        # Verificar que el nuevo nombre no exista ya
+        existing = db.query(InvestmentStrategy).filter(
+            InvestmentStrategy.name == payload.name,
+            InvestmentStrategy.strategy_id != strategy_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Investment strategy '{payload.name}' already exists.")
+        obj.name = payload.name
+    
+    if payload.description is not None:
+        obj.description = payload.description
+
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/investment-strategies/{strategy_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_investment_strategy(
+    strategy_id: int,
+    db: Session = Depends(deps.get_db)
+) -> None:
+    """
+    Elimina una estrategia de inversión.
+    """
+    obj = db.query(InvestmentStrategy).filter(InvestmentStrategy.strategy_id == strategy_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Investment strategy was not found.")
+
+    db.delete(obj)
+    db.commit()

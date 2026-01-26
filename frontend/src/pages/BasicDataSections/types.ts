@@ -43,4 +43,10 @@ export type AssetClassApi = {
     sub_classes: AssetSubClassApi[];
 };
 
+export type InvestmentStrategyApi = {
+    strategy_id: number;
+    name: string;
+    description?: string | null;
+};
+
 export type SortConfig = { key: string; direction: 'asc' | 'desc' };

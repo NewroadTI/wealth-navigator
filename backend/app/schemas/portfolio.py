@@ -23,8 +23,9 @@ class AccountBase(BaseModel):
     institution: str = Field(default="IBKR", description="Nombre del broker o banco")
     account_code: str = Field(..., description="Código único, ej: U6177570_USD")
     account_alias: Optional[str] = None
-    account_type: Optional[str] = "Individual"
-    currency: str = Field(..., min_length=3, max_length=3, description="Código ISO de moneda (USD, EUR)")
+    account_type: Optional[str] = "Brokerage"
+    currency: str = "USD"
+    investment_strategy_id: Optional[int] = None
 
 class AccountCreate(AccountBase):
     portfolio_id: int
