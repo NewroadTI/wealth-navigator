@@ -25,6 +25,7 @@ class AccountBase(BaseModel):
     account_alias: Optional[str] = None
     account_type: Optional[str] = "Brokerage"
     currency: str = "USD"
+    investment_strategy_id: Optional[int] = None
 
 class AccountCreate(AccountBase):
     portfolio_id: int
@@ -39,13 +40,19 @@ class AccountRead(AccountBase):
 class PortfolioBase(BaseModel):
     interface_code: str
     name: str
-    type: Optional[str] = "Individual"
     main_currency: str = "USD"
     residence_country: Optional[str] = None
     active_status: bool = True
 
 class PortfolioCreate(PortfolioBase):
     owner_user_id: int
+    inception_date: Optional[date] = None
+
+class PortfolioUpdate(BaseModel):
+    name: Optional[str] = None
+    main_currency: Optional[str] = None
+    residence_country: Optional[str] = None
+    active_status: Optional[bool] = None
     inception_date: Optional[date] = None
 
 class PortfolioRead(PortfolioBase):

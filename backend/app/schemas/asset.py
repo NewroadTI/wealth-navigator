@@ -368,3 +368,20 @@ class AssetClassUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     sub_classes: Optional[List[AssetSubClassUpsert]] = None
+
+# --- INVESTMENT STRATEGY SCHEMAS ---
+class InvestmentStrategyBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class InvestmentStrategyCreate(InvestmentStrategyBase):
+    pass
+
+class InvestmentStrategyUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class InvestmentStrategyRead(InvestmentStrategyBase):
+    strategy_id: int
+    class Config:
+        from_attributes = True

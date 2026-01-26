@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import utils, users, auth, catalogs, assets, roles
+from app.api.v1.endpoints import utils, users, auth, catalogs, assets, roles, portfolios
 
 api_router = APIRouter()
 
@@ -10,6 +10,4 @@ api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(roles.router, prefix="/roles", tags=["Roles"])
 api_router.include_router(catalogs.router, prefix="/catalogs", tags=["Catalogs"])
 api_router.include_router(assets.router, prefix="/assets", tags=["Assets"])
-# Estas aparecerán apenas crees los archivos correspondientes
-# api_router.include_router(portfolios.router, prefix="/portfolios", tags=["Portfolios"])
-# api_router.include_router(transactions.router, prefix="/transactions", tags=["Transacciones & ETL"])
+api_router.include_router(portfolios.router, prefix="/portfolios", tags=["Portfolios"])

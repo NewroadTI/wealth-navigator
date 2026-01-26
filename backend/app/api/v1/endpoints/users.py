@@ -23,6 +23,47 @@ def get_users_list(
     users = db.query(User).offset(skip).limit(limit).all()
     return users
 
+
+@router.get("/investors", response_model=List[UserRead])
+def get_investors(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100
+) -> Any:
+    """
+    Lista usuarios con rol INVESTOR.
+    """
+    investor_role = db.query(Role).filter(Role.name == "INVESTOR").first()
+    if not investor_role:
+        return []
+    
+    investors = db.query(User).filter(
+        User.role_id == investor_role.role_id,
+        User.is_active == True
+    ).order_by(User.full_name).offset(skip).limit(limit).all()
+    return investors
+
+
+@router.get("/advisors", response_model=List[UserRead])
+def get_advisors(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100
+) -> Any:
+    """
+    Lista usuarios con rol ADVISOR.
+    """
+    advisor_role = db.query(Role).filter(Role.name == "ADVISOR").first()
+    if not advisor_role:
+        return []
+    
+    advisors = db.query(User).filter(
+        User.role_id == advisor_role.role_id,
+        User.is_active == True
+    ).order_by(User.full_name).offset(skip).limit(limit).all()
+    return advisors
+
+
 @router.get("/{user_id}", response_model=UserRead)
 def get_user_by_id(
     user_id: int,
