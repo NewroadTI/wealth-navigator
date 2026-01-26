@@ -5,7 +5,7 @@ from app.api import deps
 
 from app.models.portfolio import Portfolio, Account
 from app.models.user import User
-from app.schemas.portfolio import PortfolioRead, PortfolioCreate, PortfolioUpdate
+from app.schemas.portfolio import PortfolioRead, PortfolioCreate, PortfolioUpdate, PortfolioSimpleRead
 
 router = APIRouter()
 
@@ -32,6 +32,25 @@ def get_portfolios(
     portfolios = query.order_by(Portfolio.name).offset(skip).limit(limit).all()
     return portfolios
 
+@router.get("/simple", response_model=List[PortfolioSimpleRead])
+def get_portfolios_simple(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = True
+) -> Any:
+    """
+    Lista portfolios SOLO con información básica.
+    Ideal para dropdowns, selectores o tablas resumen.
+    """
+    # No usamos joinedload porque no queremos traer las relaciones pesadas
+    query = db.query(Portfolio)
+    
+    if active_only:
+        query = query.filter(Portfolio.active_status == True)
+    
+    portfolios = query.order_by(Portfolio.portfolio_id).offset(skip).limit(limit).all()
+    return portfolios
 
 @router.get("/{portfolio_id}", response_model=PortfolioRead)
 def get_portfolio_by_id(

@@ -2,6 +2,9 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any # Agrega Dict y Any para JSONBfrom datetime import date, datetime
 from decimal import Decimal
 from datetime import date, datetime
+# --- TRADE SCHEMAS ---
+
+
 # --- CATALOG SCHEMAS ---
 class CurrencyRead(BaseModel):
     code: str
@@ -32,7 +35,6 @@ class CountryUpdate(BaseModel):
 # --- ASSET SCHEMAS ---
 class AssetBase(BaseModel):
     symbol: str
-    name: Optional[str] = None
     description: Optional[str] = None
     isin: Optional[str] = None
     figi: Optional[str] = None
@@ -125,94 +127,116 @@ class AssetRead(AssetBase):
     class Config:
         from_attributes = True
 
-# --- TRADE SCHEMAS ---
+
+# --- TRADES ---
 class TradeBase(BaseModel):
-    ib_exec_id: str
+    ib_exec_id: Optional[str] = None
+    ib_transaction_id: Optional[str] = None
     ib_order_id: Optional[str] = None
     trade_date: datetime
     settlement_date: Optional[date] = None
+    report_date: Optional[date] = None
     
-    transaction_type: str # BUY, SELL
+    transaction_type: Optional[str] = None
+    side: Optional[str] = None
+    exchange: Optional[str] = None
+    
     quantity: Decimal
     price: Decimal
-    
     gross_amount: Optional[Decimal] = None
-    commission: Optional[Decimal] = 0
-    tax: Optional[Decimal] = 0
     net_amount: Optional[Decimal] = None
-    currency: str
+    proceeds: Optional[Decimal] = None
+    commission: Optional[Decimal] = None
+    tax: Optional[Decimal] = None
     
+    cost_basis: Optional[Decimal] = None
+    realized_pnl: Optional[Decimal] = None
+    mtm_pnl: Optional[Decimal] = None
+    
+    currency: str
     description: Optional[str] = None
-    exchange: Optional[str] = None
-
-class TradeCreate(TradeBase):
-    account_id: int
-    asset_id: int
+    notes: Optional[str] = None
 
 class TradeRead(TradeBase):
-    trade_id: int
-    asset: Optional[AssetRead] = None
+    transaction_id: int  # CORREGIDO: Debe coincidir con el modelo DB (era trade_id)
+    account_id: int
+    asset_id: Optional[int] = None # CORREGIDO: Ahora acepta Null (None)
+    
+    
+
     class Config:
         from_attributes = True
 
-# --- CASH JOURNAL SCHEMAS ---
+# --- CASH JOURNAL ---
 class CashJournalBase(BaseModel):
     date: date
-    type: str # DIVIDEND, INTEREST, FEE
+    ex_date: Optional[date] = None
+    type: str
     amount: Decimal
     currency: str
+    
+    quantity: Optional[Decimal] = None
+    rate_per_share: Optional[Decimal] = None
+    
     description: Optional[str] = None
     reference_code: Optional[str] = None
-
-class CashJournalCreate(CashJournalBase):
-    account_id: int
-    asset_id: Optional[int] = None
+    extra_details: Optional[Dict[str, Any]] = None
 
 class CashJournalRead(CashJournalBase):
     journal_id: int
+    account_id: int
+    asset_id: Optional[int] = None
+
     class Config:
         from_attributes = True
 
-# --- FX TRANSACTION SCHEMAS (Nuevo) ---
+# --- FX TRANSACTIONS ---
 class FXTransactionBase(BaseModel):
     trade_date: datetime
     source_currency: str
     source_amount: Decimal
     target_currency: str
     target_amount: Decimal
+    side: Optional[str] = None
     exchange_rate: Optional[Decimal] = None
-    description: Optional[str] = None
     external_id: Optional[str] = None
-
-class FXTransactionCreate(FXTransactionBase):
-    account_id: int
 
 class FXTransactionRead(FXTransactionBase):
     fx_id: int
+    account_id: int
+    target_account_id: Optional[int] = None
+
     class Config:
         from_attributes = True
 
-# --- CORPORATE ACTION SCHEMAS (Nuevo) ---
+# --- CORPORATE ACTIONS ---
 class CorporateActionBase(BaseModel):
     ib_action_id: Optional[str] = None
+    transaction_id: Optional[str] = None
+    action_type: Optional[str] = None
     report_date: Optional[date] = None
     execution_date: Optional[date] = None
-    action_type: str # SPLIT, MERGER
     description: Optional[str] = None
+    
     ratio_old: Optional[Decimal] = None
     ratio_new: Optional[Decimal] = None
     quantity_adjustment: Optional[Decimal] = None
-    cash_in_lieu: Optional[Decimal] = None
-
-class CorporateActionCreate(CorporateActionBase):
-    asset_id: int
-    account_id: int
+    
+    symbol: Optional[str] = None
+    isin: Optional[str] = None
+    amount: Optional[Decimal] = None
+    proceeds: Optional[Decimal] = None
+    value: Optional[Decimal] = None
+    fifo_pnl_realized: Optional[Decimal] = None
+    currency: Optional[str] = None
 
 class CorporateActionRead(CorporateActionBase):
     action_id: int
-    class Config:
-        from_attributes = True
+    account_id: int
+    asset_id: Optional[int] = None
 
+    class Config:
+        from_attributes = True        
 # --- POSITION SCHEMAS (Nuevo - Vital para Snapshots) ---
 class PositionBase(BaseModel):
     report_date: date
