@@ -9,14 +9,12 @@ from datetime import datetime
 from decimal import Decimal
 
 # Configuración de ruta
-sys.path.append("seed_data")
+sys.path.append("/app")
 sys.path.append(".")
 
 try:
-    # Asegúrate de importar Industry
     from app.db.session import SessionLocal
     from app.models.user import User
-    # ... otros imports ...
     from app.models.portfolio import Portfolio, Account, AccountReturnSeries
     from app.models.asset import Asset, Trades, CashJournal, CorporateAction, PerformanceAttribution, Position, Industry, FXTransaction, IncomeProjection
 except ImportError:
@@ -30,7 +28,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SPLIT_DIR = os.path.join(BASE_DIR, "inceptioncsvs")
 if not os.path.exists(SPLIT_DIR):
-    SPLIT_DIR = "seed_data/inceptioncsvs"
+    SPLIT_DIR = "/app/seed_data/inceptioncsvs"
 
 JSON_OUTPUT_FILE = os.path.join(BASE_DIR, "insertion_summary.json")
 
@@ -61,7 +59,7 @@ CURRENCY_MAP = {
 }
 MONEDAS = list(set(CURRENCY_MAP.values()))
 
-# --- ACUMULADORES ---
+# --- ACUMULADOR DE DATOS PARA JSON ---
 inserted_records = {
     "Trades": [],
     "CashJournal": [],
@@ -73,9 +71,6 @@ inserted_records = {
 
 stats = {"CSV_Rows": 0, "DB_Inserted": 0}
 
-# LISTA PARA GUARDAR ERRORES/SKIPS
-skipped_log = []
-
 # --- HELPERS ---
 def parse_decimal(val):
     if pd.isna(val) or str(val).strip() in ["", "-", "nan", "None"]: return None
@@ -86,10 +81,14 @@ def parse_decimal(val):
     except: return None
 
 def validate_numeric_limit(val, precision=10, scale=6):
+    """
+    Evita el error 'NumericValueOutOfRange'.
+    Para Numeric(10,6), el valor abs debe ser < 10000.
+    """
     if val is None: return None
-    limit = Decimal(10**(precision - scale)) 
+    limit = Decimal(10**(precision - scale)) # 10000
     if abs(val) >= limit:
-        return None 
+        return None # Retornamos None si excede
     return val
 
 def parse_date(val):
@@ -109,15 +108,18 @@ def get_currency_code(raw_val):
     clean = str(raw_val).strip()
     return CURRENCY_MAP.get(clean, "USD")
 
+# Cache para assets
 asset_cache = {}
 def get_asset_id(db, symbol):
     if not symbol or pd.isna(symbol): return None
     s = str(symbol).strip()
     if s in asset_cache: return asset_cache[s]
+    
     asset = db.query(Asset).filter(Asset.symbol == s).first()
     if not asset:
         clean = s.split()[0].strip()
         asset = db.query(Asset).filter(Asset.symbol == clean).first()
+    
     aid = asset.asset_id if asset else None
     if aid: asset_cache[s] = aid
     return aid
@@ -152,6 +154,7 @@ def setup_user_and_accounts(db):
             db.commit()
             db.refresh(acc)
         acct_map[curr] = acc.account_id
+    
     return acct_map
 
 def import_trades(db, acct_map):
@@ -300,20 +303,13 @@ def import_trades(db, acct_map):
     logger.info(f"✅ {count} Trades y {fx_count} FX insertados.")
 
 def import_cash_journal(db, acct_map):
-    # Definición de archivos y columnas base
     files = [
         ("Dividends_0.csv", "DIVIDEND", "PayDate", "Amount", "Note"),
         ("Deposits_And_Withdrawals_0.csv", "TRANSFER", "Date", "Amount", "Description"),
         ("Interest_Details_0.csv", "INTEREST", "Date", "Amount", "Description"),
         ("Fee_Summary_0.csv", "FEE", "Date", "Amount", "Description")
     ]
-    
     total = 0
-    usd_asset_id = get_asset_id(db, "USD") or get_asset_id(db, "CASH") #agregar asset cash o usd
-    if not usd_asset_id:
-        logger.warning("⚠️ No se encontró el Asset 'USD' o 'CASH' en la DB. Los intereses en efectivo quedarán sin Asset ID.")
-
-
     for fname, t_def, d_col, a_col, desc_col in files:
         fpath = os.path.join(SPLIT_DIR, fname)
         if not os.path.exists(fpath): continue
@@ -322,131 +318,29 @@ def import_cash_journal(db, acct_map):
         df = pd.read_csv(fpath)
         stats["CSV_Rows"] += len(df)
         
-        for i, row in df.iterrows():
+        for _, row in df.iterrows():
             d = parse_date(row.get(d_col))
-            
-            # --- DETECCIÓN DE ERROR DE FECHA ---
-            if not d:
-                skipped_log.append({
-                    "File": fname, 
-                    "Row": i + 2, 
-                    "Reason": f"Fecha inválida o vacía en columna '{d_col}'", 
-                    "Data": row.to_dict()
-                })
-                continue
+            if not d: continue
 
             desc = str(row.get(desc_col, ""))
             final_type = t_def
-            
-            # Inicializamos variables opcionales en None para esta fila
-            ex_date = None
-            quantity = None
-            rate_per_share = None
-            asset_id = None  # <--- IMPORTANTE: Inicializar aquí para poder modificarlo en los bloques
-
-            # ==========================================
-            # 1. LÓGICA PARA DIVIDENDOS
-            # ==========================================
-            if fname == "Dividends_0.csv":
-                # Captura de campos adicionales específicos de Dividendos
-                ex_date = parse_date(row.get('Ex-Date'))
-                quantity = parse_decimal(row.get('Quantity'))
-                rate_per_share = parse_decimal(row.get('DividendPerShare'))
-
-
-            # ==========================================
-            # 2. LÓGICA PARA INTERESES
-            # ==========================================
-
-            elif fname == "Interest_Details_0.csv":
-                final_type = "INTEREST"
-                
-                # A. CASH / USD
-                if "USD" in desc or "HKD" in desc or "Stock Interest" in desc:
-                    asset_id = usd_asset_id
-                
-                # B. BONOS (Búsqueda inteligente)
-                else:
-                    ignore_words = [
-                        "BOND", "COUPON", "PAYMENT", "ACCRUED", "INTEREST", 
-                        "RECEIVED", "PAID", "FOR", "OF", "WITHHOLDING", "TAX"
-                    ]
-                    
-                    tokens = desc.split()
-                    for token in tokens:
-                        clean_token = token.strip().upper()
-                        
-                        # Filtros para ignorar basura:
-                        if len(clean_token) < 3: continue          # Ignorar palabras de 1 o 2 letras
-                        if clean_token in ignore_words: continue   # Ignorar palabras clave
-                        # Ignorar si tiene números (ej: "2021", "6.65", "3/8")
-                        if any(char.isdigit() for char in clean_token): continue 
-
-                        # 1. Intento Exacto (usando tu cache)
-                        found = get_asset_id(db, clean_token)
-
-                        # 2. Intento "Empieza con" (Directo a DB)
-                        # Esto encuentra el asset "HNTOIL 6 3/8..." buscando solo "HNTOIL"
-                        if not found:
-                            # Buscamos en la DB un asset que EMPIECE por esta palabra
-                            # Importante: 'Asset' debe estar importado de tus modelos
-                            potential = db.query(Asset).filter(Asset.symbol.ilike(f"{clean_token}%")).first()
-                            if potential:
-                                found = potential.asset_id
-                        
-                        if found:
-                            asset_id = found
-                            break
-            
-            # ==========================================
-            # 3. LÓGICA PARA DEPÓSITOS/RETIROS (TRANSFERS)
-            # ==========================================
-            elif fname == "Deposits_And_Withdrawals_0.csv":
+            if fname == "Interest_Details_0.csv":
+                if "Accrued" in desc: final_type = "ACCRUED_INTEREST"
+                elif "Debit" in desc: final_type = "DEBIT_INTEREST"
+            if fname == "Deposits_And_Withdrawals_0.csv":
                 raw_t = row.get('Type')
-                
-                # Verificamos si es un valor nulo/NA de Pandas o la cadena "NA"
-                is_na = pd.isna(raw_t) or str(raw_t).strip().upper() in ['NA', 'NAN', '']
-                
-                if is_na:
-                    # Si el CSV dice NA, guardamos como NA o ADJUSTMENT según prefieras
-                    final_type = "NA" 
-                elif raw_t:
-                    final_type = str(raw_t).upper()
+                if pd.notna(raw_t): final_type = str(raw_t).upper()
 
-            # ==========================================
-            # LÓGICA COMÚN (Moneda, Assets, Amount)
-            # ==========================================
-            
-            # Moneda
             curr_code = "USD"
             if "HKD" in desc: curr_code = "HKD"
             if "GBP" in desc: curr_code = "GBP"
             if "EUR" in desc: curr_code = "EUR"
 
-            # Búsqueda de Asset ID
             asset_id = None
-            if 'Symbol' in row and pd.notna(row['Symbol']):
-                asset_id = get_asset_id(db, row['Symbol'])
+            if 'Symbol' in row: asset_id = get_asset_id(db, row['Symbol'])
             
-            # Fallback de búsqueda en descripción si no hay Symbol directo
-            if not asset_id and desc:
-                matches = re.findall(r'\((.*?)\)', desc)
-                for candidate in matches:
-                    candidate = candidate.strip()
-                    found = get_asset_id(db, candidate)
-                    if found:
-                        asset_id = found
-                        break
-                    first_word = candidate.split(' ')[0]
-                    if first_word and first_word != candidate:
-                        found = get_asset_id(db, first_word)
-                        if found:
-                            asset_id = found
-                            break
-
             amount = parse_decimal(row.get(a_col)) or 0
             
-            # Creación del objeto
             cj = CashJournal(
                 account_id=acct_map.get(curr_code, acct_map["USD"]),
                 asset_id=asset_id,
@@ -455,21 +349,16 @@ def import_cash_journal(db, acct_map):
                 amount=amount,
                 currency=curr_code,
                 description=desc,
-                
-                # --- NUEVOS CAMPOS ---
-                ex_date=ex_date,            # Fecha Ex-Dividendo
-                quantity=quantity,          # Cantidad de acciones
-                rate_per_share=rate_per_share, # Dividendo por acción
-                # ---------------------
-                
-                #reference_code=f"{final_type[:3]}_{uuid.uuid4().hex[:8]}"
+                reference_code=f"{final_type[:3]}_{uuid.uuid4().hex[:8]}"
             )
             db.add(cj)
             total += 1
-            inserted_records["CashJournal"].append({"Date": str(d), "Type": final_type, "Amount": float(amount)})
+            
+            inserted_records["CashJournal"].append({
+                "Date": str(d), "Type": final_type, "Amount": float(amount), "Desc": desc
+            })
             
         db.commit()
-    
     stats["DB_Inserted"] += total
     logger.info(f"✅ {total} movimientos de caja insertados.")
 
@@ -482,24 +371,15 @@ def import_corporate_actions(db, acct_map):
     stats["CSV_Rows"] += len(df)
     count = 0
     
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         d = parse_date(row.get('Date'))
-        
-        # --- DETECCIÓN DE ERROR DE FECHA ---
-        if not d: 
-            skipped_log.append({
-                "File": "Corporate_Actions_0.csv", 
-                "Row": i + 2, 
-                "Reason": "Fecha inválida", 
-                "Data": row.to_dict()
-            })
-            continue
-        # -----------------------------------
+        if not d: continue
 
         desc = str(row.get('Description', ""))
         r_new, r_old = None, None
         match = re.search(r'(\d+(?:\.\d+)?)\s+FOR\s+(\d+(?:\.\d+)?)', desc)
         if match:
+            # --- CORRECCIÓN CRÍTICA: Validar límites numéricos ---
             r_new = validate_numeric_limit(Decimal(match.group(1)))
             r_old = validate_numeric_limit(Decimal(match.group(2)))
 
@@ -510,13 +390,15 @@ def import_corporate_actions(db, acct_map):
             action_type=row.get('Type'),
             description=desc,
             quantity_adjustment=parse_decimal(row.get('Quantity')),
-            ratio_old=r_old,
+            ratio_old=r_old, # Ahora será None si es gigante
             ratio_new=r_new,
-            #ib_action_id=f"CA_{uuid.uuid4().hex[:8]}"
+            ib_action_id=f"CA_{uuid.uuid4().hex[:8]}"
         )
         db.add(ca)
         count += 1
-        inserted_records["CorporateActions"].append({"Date": str(d), "Type": row.get('Type')})
+        inserted_records["CorporateActions"].append({
+            "Date": str(d), "Type": row.get('Type'), "Desc": desc
+        })
 
     db.commit()
     stats["DB_Inserted"] += count
@@ -525,120 +407,51 @@ def import_corporate_actions(db, acct_map):
 def import_history(db, acct_map):
     hist_files = [f for f in os.listdir(SPLIT_DIR) if f.startswith("Historical_Performance")]
     count = 0
-    
     for fname in hist_files:
         fpath = os.path.join(SPLIT_DIR, fname)
         try: df = pd.read_csv(fpath)
         except: continue
         stats["CSV_Rows"] += len(df)
         
-        # -----------------------------------------------------------
-        # CASO 1: FORMATO HORIZONTAL (MTD, QTD, YTD en columnas)
-        # -----------------------------------------------------------
-        if 'YTD' in df.columns or 'MTD' in df.columns:
-            logger.info(f"📊 Procesando formato horizontal (YTD/MTD) en {fname}")
+        for _, row in df.iterrows():
+            label, p_type = None, 'M'
+            for col in ['Month', 'Quarter', 'Year']:
+                if col in row and pd.notna(row[col]):
+                    label = str(row[col])
+                    if col == 'Quarter': p_type = 'Q'
+                    if col == 'Year': p_type = 'Y'
+                    break
             
-            # Mapeo de Columna CSV -> (Period Type, Label)
-            # Puedes ajustar los labels según prefieras
-            col_map = {
-                'MTD': ('M', 'MTD'),
-                'QTD': ('Q', 'QTD'),
-                'YTD': ('YTD', 'YTD'),
-                '1 Year': ('1Y', '1 Year'),
-                '3 Year': ('3Y', '3 Year'),
-                'Since Inception': ('INC', 'Since Inception')
-            }
-
-            for i, row in df.iterrows():
-                # Iteramos sobre las columnas definidas en el mapa
-                for col_name, (p_type, p_label) in col_map.items():
-                    val = row.get(col_name)
-                    
-                    # Si la columna no existe o el valor es nulo, saltamos esa métrica
-                    if pd.isna(val) or val == "": 
-                        continue
-
-                    ret = parse_decimal(val)
-                    if ret is None: continue
-
-                    # Para métricas acumuladas (YTD, MTD, Inception), 
-                    # la fecha fin suele ser la fecha actual (o la del reporte)
-                    end_d = datetime.today().date()
-
-                    ars = AccountReturnSeries(
-                        account_id=acct_map["USD"],
-                        period_type=p_type,
-                        period_label=p_label,
-                        end_date=end_d,
-                        return_pct=ret
-                    )
-                    db.add(ars)
-                    count += 1
-                    inserted_records["History"].append({"Label": p_label, "Return": float(ret)})
-
-        # -----------------------------------------------------------
-        # CASO 2: FORMATO VERTICAL (Month, Quarter, Year en filas)
-        # -----------------------------------------------------------
-        else:
-            logger.info(f"📅 Procesando formato vertical (Series de Tiempo) en {fname}")
+            if not label or label == "YTD": continue
             
-            for i, row in df.iterrows():
-                label, p_type = None, 'M'
-                
-                # Buscamos qué columna define la fecha
-                for col in ['Month', 'Quarter', 'Year']:
-                    if col in row and pd.notna(row[col]):
-                        label = str(row[col])
-                        if col == 'Quarter': p_type = 'Q'
-                        if col == 'Year': p_type = 'Y'
-                        break
-                
-                # Validación
-                if not label or label == "YTD": 
-                    # Nota: Si el archivo vertical tiene una fila "YTD", la saltamos aquí
-                    # porque probablemente ya la capturamos en el archivo horizontal, 
-                    # o puedes agregar lógica especial aquí si lo prefieres.
-                    skipped_log.append({
-                        "File": fname, "Row": i + 2, 
-                        "Reason": f"Registro Ignorado (Label: {label})", "Data": row.to_dict()
-                    })
-                    continue
-                
-                ret = parse_decimal(row.get('AccountReturn'))
-                if ret is None:
-                    skipped_log.append({
-                        "File": fname, "Row": i + 2, 
-                        "Reason": "Valor de Retorno Nulo", "Data": row.to_dict()
-                    })
-                    continue
+            ret = parse_decimal(row.get('AccountReturn'))
+            if ret is None: continue
 
-                # Cálculo de fecha fin para series históricas
-                end_d = datetime.today().date()
-                try:
-                    if p_type == 'M': 
-                        dt = datetime.strptime(label, "%Y%m")
-                        # Último día del mes
-                        nxt = dt.replace(year=dt.year+1, month=1) if dt.month==12 else dt.replace(month=dt.month+1)
-                        end_d = (nxt - pd.Timedelta(days=1)).date()
-                    elif p_type == 'Q': 
-                        y, q = label.split(' Q')
-                        m = int(q)*3
-                        end_d = datetime(int(y), m, 1) 
-                        # Ajuste a fin de mes si fuera necesario, o día 1
-                    elif p_type == 'Y': 
-                        end_d = datetime(int(label), 12, 31).date()
-                except: pass
+            # Fecha fin
+            end_d = datetime.today().date()
+            try:
+                if p_type == 'M': 
+                    dt = datetime.strptime(label, "%Y%m")
+                    nxt = dt.replace(year=dt.year+1, month=1) if dt.month==12 else dt.replace(month=dt.month+1)
+                    end_d = (nxt - pd.Timedelta(days=1)).date()
+                elif p_type == 'Q': 
+                    y, q = label.split(' Q')
+                    m = int(q)*3
+                    end_d = datetime(int(y), m, 1) 
+                elif p_type == 'Y': 
+                    end_d = datetime(int(label), 12, 31).date()
+            except: pass
 
-                ars = AccountReturnSeries(
-                    account_id=acct_map["USD"],
-                    period_type=p_type,
-                    period_label=label,
-                    end_date=end_d,
-                    return_pct=ret
-                )
-                db.add(ars)
-                count += 1
-                inserted_records["History"].append({"Label": label, "Return": float(ret)})
+            ars = AccountReturnSeries(
+                account_id=acct_map["USD"],
+                period_type=p_type,
+                period_label=label,
+                end_date=end_d,
+                return_pct=ret
+            )
+            db.add(ars)
+            count += 1
+            inserted_records["History"].append({"Label": label, "Return": float(ret)})
             
     db.commit()
     stats["DB_Inserted"] += count
@@ -653,110 +466,29 @@ def import_performance(db, acct_map):
     stats["CSV_Rows"] += len(df)
     count = 0
 
-    # Cache local para no consultar la DB en cada fila si el sector ya lo creamos
-    known_sectors = set()
-
-    # Pre-cargar sectores existentes para eficiencia
-    existing_inds = db.query(Industry).all()
-    for ind in existing_inds:
-        known_sectors.add(ind.industry_code)
-
-    ignored_currencies = ["USD", "HKD", "GBP", "EUR"]
-
-    for i, row in df.iterrows():
-        raw_sym = row.get('Symbol')
+    for _, row in df.iterrows():
+        sym = row.get('Symbol')
+        is_total = pd.isna(sym) or "Total" in str(sym) or "Cash" in str(sym)
         
-        if pd.isna(raw_sym):
-            desc_check = str(row.get('Description', ''))
-            if "Total" in desc_check: continue
-            sym = ""
-        else:
-            sym = str(raw_sym).strip()
-
-        # 1. FILTROS
-        if "Total" in sym: continue
-        if "Fees" in sym: continue
-        if sym in ignored_currencies: continue
-
-        # 2. BUSQUEDA ASSET
-        asset_id = None
-        if sym:
-            asset_id = get_asset_id(db, sym)
-
-        if not asset_id and sym:
-            # Intento A: Match exacto Descripción
-            asset_obj = db.query(Asset).filter(Asset.description == sym).first()
-            # Intento B: Match bono (sin código final)
-            if not asset_obj:
-                tokens = sym.split()
-                if len(tokens) > 1:
-                    clean_desc = " ".join(tokens[:-1])
-                    asset_obj = db.query(Asset).filter(Asset.description == clean_desc).first()
-            # Intento C: Prefijo
-            if not asset_obj:
-                 asset_obj = db.query(Asset).filter(Asset.description.ilike(f"{sym}%")).first()
-            
-            if asset_obj:
-                asset_id = asset_obj.asset_id
-
-        # 3. DATOS
-        cat_label = None if asset_id else sym
-        
-        avg_weight = parse_decimal(row.get('AvgWeight'))
-        ret_pct = parse_decimal(row.get('Return'))
-        contrib = parse_decimal(row.get('Contribution'))
-        real_pnl = parse_decimal(row.get('Realized_P&L'))
-        unreal_pnl = parse_decimal(row.get('Unrealized_P&L'))
-        
-        # ==========================================
-        # 4. LÓGICA DE SECTOR (SOLUCIÓN AL ERROR)
-        # ==========================================
-        sector_code = None
-        raw_sector = row.get('Sector')
-        
-        if pd.notna(raw_sector) and str(raw_sector).strip():
-            sector_name = str(raw_sector).strip()
-            
-            # Si el sector no está en nuestro cache de conocidos
-            if sector_name not in known_sectors:
-                # Verificamos DB (por si acaso)
-                ind = db.query(Industry).filter(Industry.industry_code == sector_name).first()
-                if not ind:
-                    # CREAR EL SECTOR SI NO EXISTE
-                    try:
-                        logger.info(f"🆕 Creando sector faltante: {sector_name}")
-                        # Asumo que tu modelo Industry tiene industry_code y name
-                        new_ind = Industry(industry_code=sector_name, name=sector_name)
-                        db.add(new_ind)
-                        db.commit() # Commit inmediato necesario para la FK
-                        db.refresh(new_ind)
-                    except Exception as e:
-                        db.rollback()
-                        logger.error(f"Error creando sector {sector_name}: {e}")
-                
-                # Agregamos al cache para no intentar crearlo de nuevo
-                known_sectors.add(sector_name)
-            
-            sector_code = sector_name
-
-        # ==========================================
+        asset_id = get_asset_id(db, sym) if not is_total else None
+        label = str(sym) if is_total or not asset_id else None
         
         pa = PerformanceAttribution(
             account_id=acct_map["USD"],
             asset_id=asset_id,
-            category_label=cat_label,
-            avg_weight=avg_weight,
-            return_pct=ret_pct,
-            contribution_pct=contrib,
-            realized_pnl=real_pnl,
-            unrealized_pnl=unreal_pnl,
-            sector_snapshot=sector_code, # Usamos el sector validado/creado
-            is_open_position=(str(row.get('Open')).strip().lower() == 'yes')
+            category_label=label,
+            avg_weight=parse_decimal(row.get('AvgWeight')),
+            return_pct=parse_decimal(row.get('Return')),
+            contribution_pct=parse_decimal(row.get('Contribution')),
+            realized_pnl=parse_decimal(row.get('Realized_P&L')),
+            unrealized_pnl=parse_decimal(row.get('Unrealized_P&L')),
+            is_open_position=(str(row.get('Open')).lower() == 'yes')
         )
-        
         db.add(pa)
         count += 1
-        inserted_records["Performance"].append({"Symbol": sym, "PnL": float(real_pnl) if real_pnl else 0})
+        inserted_records["Performance"].append({
+            "Symbol": str(sym), "PnL": float(parse_decimal(row.get('Realized_P&L')) or 0)
+        })
 
     db.commit()
     stats["DB_Inserted"] += count
@@ -968,27 +700,18 @@ def run_all():
         import_positions(db, acct_map) 
         import_income_projections(db, acct_map)
         # --- REPORTE FINAL ---
-        print("\n" + "="*60)
+        print("\n" + "="*50)
         print("📊 RESUMEN DE IMPORTACIÓN")
-        print("="*60)
+        print("="*50)
         print(f"📄 Total Filas Leídas (CSV): {stats['CSV_Rows']}")
         print(f"💾 Total Insertado en DB:  {stats['DB_Inserted']}")
-        print(f"🗑️  Total Ignorado:        {len(skipped_log)}")
-        print("="*60)
+        print("="*50)
         
-        if skipped_log:
-            print("\n🔍 DETALLE DE FILAS IGNORADAS:")
-            for item in skipped_log:
-                print(f"❌ [{item['File']} | Fila {item['Row']}] -> {item['Reason']}")
-                # Descomenta la siguiente línea si quieres ver toda la data de la fila:
-                # print(f"   Data: {item['Data']}")
-                print("-" * 30)
-
         # Guardar JSON
         with open(JSON_OUTPUT_FILE, 'w', encoding='utf-8') as f:
             json.dump(inserted_records, f, indent=2, cls=DateTimeEncoder)
         
-        print(f"\n📝 Detalle guardado en: {JSON_OUTPUT_FILE}")
+        print(f"📝 Detalle guardado en: {JSON_OUTPUT_FILE}")
         logger.info("🚀 --- PROCESO COMPLETADO EXITOSAMENTE ---")
 
     except Exception as e:

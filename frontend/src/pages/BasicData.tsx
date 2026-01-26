@@ -2,75 +2,46 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Globe, Factory, BarChart3, Coins, ArrowUpDown, Search, Layers } from 'lucide-react';
+import { Building, Globe, Factory, BarChart3, Coins, Search, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import ExchangesSection from './BasicDataSections/ExchangesSection';
-import CountriesSection from './BasicDataSections/CountriesSection';
-import IndustriesSection from './BasicDataSections/IndustriesSection';
-import IndicesSection from './BasicDataSections/IndicesSection';
-import CurrenciesSection from './BasicDataSections/CurrenciesSection';
-import AssetClassesSection from './BasicDataSections/AssetClassesSection.tsx';
+import {
+  ExchangesSection,
+  CountriesSection,
+  IndustriesSection,
+  IndicesSection,
+  CurrenciesSection,
+  AssetClassesSection,
+  fetchAllPages,
+  toggleSort,
+  SortableHeader,
+} from './BasicDataSections';
+import type {
+  ExchangeApi,
+  CountryApi,
+  IndustryApi,
+  IndexApi,
+  CurrencyApi,
+  AssetClassApi,
+  AssetSubClassApi,
+  SortConfig,
+} from './BasicDataSections';
 
-// Data is fetched from API (catalogs)
-
-export type ExchangeApi = {
-  exchange_code: string;
-  name: string;
-  country_code?: string | null;
-};
-
-export type CountryApi = {
-  iso_code: string;
-  name?: string | null;
-};
-
-export type IndustryApi = {
-  industry_code: string;
-  name: string;
-  sector?: string | null;
-};
-
-export type IndexApi = {
-  index_code: string;
-  name: string;
-  country_code?: string | null;
-  exchange_code?: string | null;
-};
-
-export type CurrencyApi = {
-  code: string;
-  name: string;
-};
-
-export type AssetSubClassApi = {
-  sub_class_id?: number;
-  code: string;
-  name: string;
-};
-
-export type AssetClassApi = {
-  class_id: number;
-  code: string;
-  name: string;
-  description?: string | null;
-  sub_classes: AssetSubClassApi[];
-};
-
-export type SortConfig = { key: string; direction: 'asc' | 'desc' };
+// Re-export types for backwards compatibility
+export type { ExchangeApi, CountryApi, IndustryApi, IndexApi, CurrencyApi, AssetClassApi, AssetSubClassApi, SortConfig };
 
 const BasicData = () => {
   const [activeTab, setActiveTab] = useState('exchanges');
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const contentRef = useRef<HTMLDivElement>(null);
-  
+
   // Sorting state for each table
   const [exchangeSort, setExchangeSort] = useState<SortConfig>({ key: 'exchange_code', direction: 'asc' });
   const [countrySort, setCountrySort] = useState<SortConfig>({ key: 'iso_code', direction: 'asc' });
   const [industrySort, setIndustrySort] = useState<SortConfig>({ key: 'industry_code', direction: 'asc' });
   const [indexSort, setIndexSort] = useState<SortConfig>({ key: 'index_code', direction: 'asc' });
   const [currencySort, setCurrencySort] = useState<SortConfig>({ key: 'code', direction: 'asc' });
-  
+
   const [exchanges, setExchanges] = useState<ExchangeApi[]>([]);
   const [exchangesLoading, setExchangesLoading] = useState(false);
   const [exchangesError, setExchangesError] = useState<string | null>(null);
@@ -83,7 +54,7 @@ const BasicData = () => {
   const [exchangeToDelete, setExchangeToDelete] = useState<ExchangeApi | null>(null);
   const [exchangeCountryOpen, setExchangeCountryOpen] = useState(false);
   const [exchangeEditCountryOpen, setExchangeEditCountryOpen] = useState(false);
-  
+
   const [countries, setCountries] = useState<CountryApi[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesError, setCountriesError] = useState<string | null>(null);
@@ -94,7 +65,7 @@ const BasicData = () => {
   const [countryActionLoading, setCountryActionLoading] = useState(false);
   const [countryActionError, setCountryActionError] = useState<string | null>(null);
   const [countryToDelete, setCountryToDelete] = useState<CountryApi | null>(null);
-  
+
   const [industries, setIndustries] = useState<IndustryApi[]>([]);
   const [industriesLoading, setIndustriesLoading] = useState(false);
   const [industriesError, setIndustriesError] = useState<string | null>(null);
@@ -105,7 +76,7 @@ const BasicData = () => {
   const [industryActionLoading, setIndustryActionLoading] = useState(false);
   const [industryActionError, setIndustryActionError] = useState<string | null>(null);
   const [industryToDelete, setIndustryToDelete] = useState<IndustryApi | null>(null);
-  
+
   const [indices, setIndices] = useState<IndexApi[]>([]);
   const [indicesLoading, setIndicesLoading] = useState(false);
   const [indicesError, setIndicesError] = useState<string | null>(null);
@@ -150,7 +121,7 @@ const BasicData = () => {
   const [assetClassToDelete, setAssetClassToDelete] = useState<AssetClassApi | null>(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
-  
+
   // Handle sort toggle
   const toggleSort = (setSort: React.Dispatch<React.SetStateAction<SortConfig>>, key: string) => {
     setSort(prev => ({
@@ -158,7 +129,7 @@ const BasicData = () => {
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
-  
+
   // Handle tab change with scroll to top
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -534,16 +505,16 @@ const BasicData = () => {
           name: countryDraft.name.trim(),
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
-      
+
       await refreshCountries();
       setCountryDraft({ iso_code: '', name: '' });
       setIsCreateCountryOpen(false);
-      
+
       toast({
         title: 'Country created',
         description: `Country "${countryDraft.name}" has been created successfully.`,
@@ -584,16 +555,16 @@ const BasicData = () => {
           name: countryDraft.name.trim(),
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
-      
+
       await refreshCountries();
       setIsEditCountryOpen(false);
       setEditingCountry(null);
-      
+
       toast({
         title: 'Country updated',
         description: `Country "${countryDraft.name}" has been updated successfully.`,
@@ -613,14 +584,14 @@ const BasicData = () => {
       const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/countries/${isoCode}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
-      
+
       await refreshCountries();
-      
+
       toast({
         title: 'Country deleted',
         description: `Country "${isoCode}" has been deleted successfully.`,
@@ -654,16 +625,16 @@ const BasicData = () => {
           sector: industryDraft.sector.trim() || null,
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
-      
+
       await refreshIndustries();
       setIndustryDraft({ industry_code: '', name: '', sector: '' });
       setIsCreateIndustryOpen(false);
-      
+
       toast({
         title: 'Industry created',
         description: `Industry "${industryDraft.name}" has been created successfully.`,
@@ -706,16 +677,16 @@ const BasicData = () => {
           sector: industryDraft.sector.trim() || null,
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
-      
+
       await refreshIndustries();
       setIsEditIndustryOpen(false);
       setEditingIndustry(null);
-      
+
       toast({
         title: 'Industry updated',
         description: `Industry "${industryDraft.name}" has been updated successfully.`,
@@ -735,14 +706,14 @@ const BasicData = () => {
       const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/industries/${industryCode}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
-      
+
       await refreshIndustries();
-      
+
       toast({
         title: 'Industry deleted',
         description: `Industry "${industryCode}" has been deleted successfully.`,
@@ -1262,18 +1233,7 @@ const BasicData = () => {
     return [...result].sort((a, b) => a.name.localeCompare(b.name));
   }, [assetClasses, searchQuery]);
 
-  // Sortable column header component
-  const SortableHeader = ({ label, sortKey, currentSort, onSort }: { label: string; sortKey: string; currentSort: SortConfig; onSort: (key: string) => void }) => (
-    <th
-      className="text-xs md:text-sm cursor-pointer hover:bg-muted/50 transition-colors select-none"
-      onClick={() => onSort(sortKey)}
-    >
-      <div className="flex items-center gap-1">
-        {label}
-        <ArrowUpDown className={`h-3 w-3 ${currentSort.key === sortKey ? 'opacity-100' : 'opacity-40'}`} />
-      </div>
-    </th>
-  );
+
 
   return (
     <AppLayout title="Basic Data" subtitle="Manage reference data for the system">
@@ -1323,170 +1283,170 @@ const BasicData = () => {
             </div>
           </div>
 
-        <ExchangesSection
-          exchangesLoading={exchangesLoading}
-          exchangesError={exchangesError}
-          filteredExchanges={filteredExchanges}
-          exchangeSort={exchangeSort}
-          onSort={(key) => toggleSort(setExchangeSort, key)}
-          countries={countries}
-          countryNameByIso={countryNameByIso}
-          exchangeDraft={exchangeDraft}
-          setExchangeDraft={setExchangeDraft}
-          isCreateExchangeOpen={isCreateExchangeOpen}
-          setIsCreateExchangeOpen={setIsCreateExchangeOpen}
-          isEditExchangeOpen={isEditExchangeOpen}
-          setIsEditExchangeOpen={setIsEditExchangeOpen}
-          exchangeActionError={exchangeActionError}
-          exchangeActionLoading={exchangeActionLoading}
-          setExchangeActionError={setExchangeActionError}
-          handleCreateExchange={handleCreateExchange}
-          handleUpdateExchange={handleUpdateExchange}
-          handleEditExchange={handleEditExchange}
-          exchangeToDelete={exchangeToDelete}
-          setExchangeToDelete={setExchangeToDelete}
-          handleDeleteExchange={handleDeleteExchange}
-          exchangeCountryOpen={exchangeCountryOpen}
-          setExchangeCountryOpen={setExchangeCountryOpen}
-          exchangeEditCountryOpen={exchangeEditCountryOpen}
-          setExchangeEditCountryOpen={setExchangeEditCountryOpen}
-          SortableHeader={SortableHeader}
-        />
+          <ExchangesSection
+            exchangesLoading={exchangesLoading}
+            exchangesError={exchangesError}
+            filteredExchanges={filteredExchanges}
+            exchangeSort={exchangeSort}
+            onSort={(key) => toggleSort(setExchangeSort, key)}
+            countries={countries}
+            countryNameByIso={countryNameByIso}
+            exchangeDraft={exchangeDraft}
+            setExchangeDraft={setExchangeDraft}
+            isCreateExchangeOpen={isCreateExchangeOpen}
+            setIsCreateExchangeOpen={setIsCreateExchangeOpen}
+            isEditExchangeOpen={isEditExchangeOpen}
+            setIsEditExchangeOpen={setIsEditExchangeOpen}
+            exchangeActionError={exchangeActionError}
+            exchangeActionLoading={exchangeActionLoading}
+            setExchangeActionError={setExchangeActionError}
+            handleCreateExchange={handleCreateExchange}
+            handleUpdateExchange={handleUpdateExchange}
+            handleEditExchange={handleEditExchange}
+            exchangeToDelete={exchangeToDelete}
+            setExchangeToDelete={setExchangeToDelete}
+            handleDeleteExchange={handleDeleteExchange}
+            exchangeCountryOpen={exchangeCountryOpen}
+            setExchangeCountryOpen={setExchangeCountryOpen}
+            exchangeEditCountryOpen={exchangeEditCountryOpen}
+            setExchangeEditCountryOpen={setExchangeEditCountryOpen}
+            SortableHeader={SortableHeader}
+          />
 
-        <CountriesSection
-          countriesLoading={countriesLoading}
-          countriesError={countriesError}
-          filteredCountries={filteredCountries}
-          countrySort={countrySort}
-          onSort={(key) => toggleSort(setCountrySort, key)}
-          countryDraft={countryDraft}
-          setCountryDraft={setCountryDraft}
-          isCreateCountryOpen={isCreateCountryOpen}
-          setIsCreateCountryOpen={setIsCreateCountryOpen}
-          isEditCountryOpen={isEditCountryOpen}
-          setIsEditCountryOpen={setIsEditCountryOpen}
-          countryActionError={countryActionError}
-          countryActionLoading={countryActionLoading}
-          setCountryActionError={setCountryActionError}
-          handleCreateCountry={handleCreateCountry}
-          handleUpdateCountry={handleUpdateCountry}
-          handleEditCountry={handleEditCountry}
-          countryToDelete={countryToDelete}
-          setCountryToDelete={setCountryToDelete}
-          handleDeleteCountry={handleDeleteCountry}
-          SortableHeader={SortableHeader}
-        />
+          <CountriesSection
+            countriesLoading={countriesLoading}
+            countriesError={countriesError}
+            filteredCountries={filteredCountries}
+            countrySort={countrySort}
+            onSort={(key) => toggleSort(setCountrySort, key)}
+            countryDraft={countryDraft}
+            setCountryDraft={setCountryDraft}
+            isCreateCountryOpen={isCreateCountryOpen}
+            setIsCreateCountryOpen={setIsCreateCountryOpen}
+            isEditCountryOpen={isEditCountryOpen}
+            setIsEditCountryOpen={setIsEditCountryOpen}
+            countryActionError={countryActionError}
+            countryActionLoading={countryActionLoading}
+            setCountryActionError={setCountryActionError}
+            handleCreateCountry={handleCreateCountry}
+            handleUpdateCountry={handleUpdateCountry}
+            handleEditCountry={handleEditCountry}
+            countryToDelete={countryToDelete}
+            setCountryToDelete={setCountryToDelete}
+            handleDeleteCountry={handleDeleteCountry}
+            SortableHeader={SortableHeader}
+          />
 
-        <IndustriesSection
-          industriesLoading={industriesLoading}
-          industriesError={industriesError}
-          filteredIndustries={filteredIndustries}
-          industrySort={industrySort}
-          onSort={(key) => toggleSort(setIndustrySort, key)}
-          industryDraft={industryDraft}
-          setIndustryDraft={setIndustryDraft}
-          isCreateIndustryOpen={isCreateIndustryOpen}
-          setIsCreateIndustryOpen={setIsCreateIndustryOpen}
-          isEditIndustryOpen={isEditIndustryOpen}
-          setIsEditIndustryOpen={setIsEditIndustryOpen}
-          industryActionError={industryActionError}
-          industryActionLoading={industryActionLoading}
-          setIndustryActionError={setIndustryActionError}
-          handleCreateIndustry={handleCreateIndustry}
-          handleUpdateIndustry={handleUpdateIndustry}
-          handleEditIndustry={handleEditIndustry}
-          industryToDelete={industryToDelete}
-          setIndustryToDelete={setIndustryToDelete}
-          handleDeleteIndustry={handleDeleteIndustry}
-          industrySectorOptions={industrySectorOptions}
-          SortableHeader={SortableHeader}
-        />
+          <IndustriesSection
+            industriesLoading={industriesLoading}
+            industriesError={industriesError}
+            filteredIndustries={filteredIndustries}
+            industrySort={industrySort}
+            onSort={(key) => toggleSort(setIndustrySort, key)}
+            industryDraft={industryDraft}
+            setIndustryDraft={setIndustryDraft}
+            isCreateIndustryOpen={isCreateIndustryOpen}
+            setIsCreateIndustryOpen={setIsCreateIndustryOpen}
+            isEditIndustryOpen={isEditIndustryOpen}
+            setIsEditIndustryOpen={setIsEditIndustryOpen}
+            industryActionError={industryActionError}
+            industryActionLoading={industryActionLoading}
+            setIndustryActionError={setIndustryActionError}
+            handleCreateIndustry={handleCreateIndustry}
+            handleUpdateIndustry={handleUpdateIndustry}
+            handleEditIndustry={handleEditIndustry}
+            industryToDelete={industryToDelete}
+            setIndustryToDelete={setIndustryToDelete}
+            handleDeleteIndustry={handleDeleteIndustry}
+            industrySectorOptions={industrySectorOptions}
+            SortableHeader={SortableHeader}
+          />
 
-        <IndicesSection
-          indicesLoading={indicesLoading}
-          indicesError={indicesError}
-          filteredIndices={filteredIndices}
-          indexSort={indexSort}
-          onSort={(key) => toggleSort(setIndexSort, key)}
-          exchanges={exchanges}
-          countries={countries}
-          countryNameByIso={countryNameByIso}
-          exchangeNameByCode={exchangeNameByCode}
-          indexDraft={indexDraft}
-          setIndexDraft={setIndexDraft}
-          isCreateIndexOpen={isCreateIndexOpen}
-          setIsCreateIndexOpen={setIsCreateIndexOpen}
-          isEditIndexOpen={isEditIndexOpen}
-          setIsEditIndexOpen={setIsEditIndexOpen}
-          indexActionError={indexActionError}
-          indexActionLoading={indexActionLoading}
-          setIndexActionError={setIndexActionError}
-          handleCreateIndex={handleCreateIndex}
-          handleUpdateIndex={handleUpdateIndex}
-          handleEditIndex={handleEditIndex}
-          indexToDelete={indexToDelete}
-          setIndexToDelete={setIndexToDelete}
-          handleDeleteIndex={handleDeleteIndex}
-          indexCountryOpen={indexCountryOpen}
-          setIndexCountryOpen={setIndexCountryOpen}
-          indexExchangeOpen={indexExchangeOpen}
-          setIndexExchangeOpen={setIndexExchangeOpen}
-          indexEditCountryOpen={indexEditCountryOpen}
-          setIndexEditCountryOpen={setIndexEditCountryOpen}
-          indexEditExchangeOpen={indexEditExchangeOpen}
-          setIndexEditExchangeOpen={setIndexEditExchangeOpen}
-          SortableHeader={SortableHeader}
-        />
+          <IndicesSection
+            indicesLoading={indicesLoading}
+            indicesError={indicesError}
+            filteredIndices={filteredIndices}
+            indexSort={indexSort}
+            onSort={(key) => toggleSort(setIndexSort, key)}
+            exchanges={exchanges}
+            countries={countries}
+            countryNameByIso={countryNameByIso}
+            exchangeNameByCode={exchangeNameByCode}
+            indexDraft={indexDraft}
+            setIndexDraft={setIndexDraft}
+            isCreateIndexOpen={isCreateIndexOpen}
+            setIsCreateIndexOpen={setIsCreateIndexOpen}
+            isEditIndexOpen={isEditIndexOpen}
+            setIsEditIndexOpen={setIsEditIndexOpen}
+            indexActionError={indexActionError}
+            indexActionLoading={indexActionLoading}
+            setIndexActionError={setIndexActionError}
+            handleCreateIndex={handleCreateIndex}
+            handleUpdateIndex={handleUpdateIndex}
+            handleEditIndex={handleEditIndex}
+            indexToDelete={indexToDelete}
+            setIndexToDelete={setIndexToDelete}
+            handleDeleteIndex={handleDeleteIndex}
+            indexCountryOpen={indexCountryOpen}
+            setIndexCountryOpen={setIndexCountryOpen}
+            indexExchangeOpen={indexExchangeOpen}
+            setIndexExchangeOpen={setIndexExchangeOpen}
+            indexEditCountryOpen={indexEditCountryOpen}
+            setIndexEditCountryOpen={setIndexEditCountryOpen}
+            indexEditExchangeOpen={indexEditExchangeOpen}
+            setIndexEditExchangeOpen={setIndexEditExchangeOpen}
+            SortableHeader={SortableHeader}
+          />
 
-        <CurrenciesSection
-          currenciesLoading={currenciesLoading}
-          currenciesError={currenciesError}
-          filteredCurrencies={filteredCurrencies}
-          currencySort={currencySort}
-          onSort={(key) => toggleSort(setCurrencySort, key)}
-          currencyDraft={currencyDraft}
-          setCurrencyDraft={setCurrencyDraft}
-          isCreateCurrencyOpen={isCreateCurrencyOpen}
-          setIsCreateCurrencyOpen={setIsCreateCurrencyOpen}
-          isEditCurrencyOpen={isEditCurrencyOpen}
-          onEditCurrencyOpenChange={(open) => {
-            setIsEditCurrencyOpen(open);
-            if (!open) {
-              setEditingCurrency(null);
-            }
-          }}
-          currencyActionError={currencyActionError}
-          currencyActionLoading={currencyActionLoading}
-          setCurrencyActionError={setCurrencyActionError}
-          handleCreateCurrency={handleCreateCurrency}
-          handleUpdateCurrency={handleUpdateCurrency}
-          handleEditCurrency={handleEditCurrency}
-          currencyToDelete={currencyToDelete}
-          setCurrencyToDelete={setCurrencyToDelete}
-          handleDeleteCurrency={handleDeleteCurrency}
-          SortableHeader={SortableHeader}
-        />
+          <CurrenciesSection
+            currenciesLoading={currenciesLoading}
+            currenciesError={currenciesError}
+            filteredCurrencies={filteredCurrencies}
+            currencySort={currencySort}
+            onSort={(key) => toggleSort(setCurrencySort, key)}
+            currencyDraft={currencyDraft}
+            setCurrencyDraft={setCurrencyDraft}
+            isCreateCurrencyOpen={isCreateCurrencyOpen}
+            setIsCreateCurrencyOpen={setIsCreateCurrencyOpen}
+            isEditCurrencyOpen={isEditCurrencyOpen}
+            onEditCurrencyOpenChange={(open) => {
+              setIsEditCurrencyOpen(open);
+              if (!open) {
+                setEditingCurrency(null);
+              }
+            }}
+            currencyActionError={currencyActionError}
+            currencyActionLoading={currencyActionLoading}
+            setCurrencyActionError={setCurrencyActionError}
+            handleCreateCurrency={handleCreateCurrency}
+            handleUpdateCurrency={handleUpdateCurrency}
+            handleEditCurrency={handleEditCurrency}
+            currencyToDelete={currencyToDelete}
+            setCurrencyToDelete={setCurrencyToDelete}
+            handleDeleteCurrency={handleDeleteCurrency}
+            SortableHeader={SortableHeader}
+          />
 
-        <AssetClassesSection
-          assetClassesLoading={assetClassesLoading}
-          assetClassesError={assetClassesError}
-          filteredAssetClasses={filteredAssetClasses}
-          assetClassDraft={assetClassDraft}
-          setAssetClassDraft={setAssetClassDraft}
-          isCreateAssetClassOpen={isCreateAssetClassOpen}
-          setIsCreateAssetClassOpen={setIsCreateAssetClassOpen}
-          isEditAssetClassOpen={isEditAssetClassOpen}
-          setIsEditAssetClassOpen={setIsEditAssetClassOpen}
-          assetClassActionError={assetClassActionError}
-          assetClassActionLoading={assetClassActionLoading}
-          setAssetClassActionError={setAssetClassActionError}
-          handleCreateAssetClass={handleCreateAssetClass}
-          handleUpdateAssetClass={handleUpdateAssetClass}
-          handleEditAssetClass={handleEditAssetClass}
-          assetClassToDelete={assetClassToDelete}
-          setAssetClassToDelete={setAssetClassToDelete}
-          handleDeleteAssetClass={handleDeleteAssetClass}
-        />
+          <AssetClassesSection
+            assetClassesLoading={assetClassesLoading}
+            assetClassesError={assetClassesError}
+            filteredAssetClasses={filteredAssetClasses}
+            assetClassDraft={assetClassDraft}
+            setAssetClassDraft={setAssetClassDraft}
+            isCreateAssetClassOpen={isCreateAssetClassOpen}
+            setIsCreateAssetClassOpen={setIsCreateAssetClassOpen}
+            isEditAssetClassOpen={isEditAssetClassOpen}
+            setIsEditAssetClassOpen={setIsEditAssetClassOpen}
+            assetClassActionError={assetClassActionError}
+            assetClassActionLoading={assetClassActionLoading}
+            setAssetClassActionError={setAssetClassActionError}
+            handleCreateAssetClass={handleCreateAssetClass}
+            handleUpdateAssetClass={handleUpdateAssetClass}
+            handleEditAssetClass={handleEditAssetClass}
+            assetClassToDelete={assetClassToDelete}
+            setAssetClassToDelete={setAssetClassToDelete}
+            handleDeleteAssetClass={handleDeleteAssetClass}
+          />
         </Tabs>
       </div>
     </AppLayout>
