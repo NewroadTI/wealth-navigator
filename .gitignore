@@ -34,3 +34,8 @@ node_modules/
 dist/
 postgres_data/
 scripts/
+
+
+#json
+
+backend/seed_data/insertion_summary.json
