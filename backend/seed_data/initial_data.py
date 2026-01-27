@@ -22,7 +22,8 @@ def main():
         "seed_industries.py",
         "seed_market_data.py",
         "seed_roles.py",
-        "seed_user.py"
+        "seed_user.py",
+        "seed_strategies.py"
     ]
 
     logger.info("🚀 Iniciando carga masiva de datos...")

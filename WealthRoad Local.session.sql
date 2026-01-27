@@ -1,1 +1,1 @@
-SELECT * FROM income_projections; 
+SELECT * FROM accounts

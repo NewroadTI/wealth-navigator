@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, CHAR, Numeric
 from sqlalchemy.orm import relationship
 from app.db.base import Base
+from app.models.asset import InvestmentStrategy
 
 class Portfolio(Base):
     __tablename__ = "portfolios"
@@ -10,7 +11,6 @@ class Portfolio(Base):
     
     interface_code = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
-    type = Column(String)
     main_currency = Column(CHAR(3)) 
     residence_country = Column(CHAR(2))
     
@@ -42,10 +42,13 @@ class Account(Base):
     portfolio_id = Column(Integer, ForeignKey("portfolios.portfolio_id"))
     
     institution = Column(String, default='IBKR', nullable=False)
-    account_code = Column(String, nullable=False, unique=True) # UXXXXXX
-    account_alias = Column(String)
+    account_code = Column(String, nullable=False, unique=True) # UXXXXXX_USD, UXXXXXX_EUR
+    account_alias = Column(String)  # UXXXXXX (solo numero de cuenta, sin moneda)
     account_type = Column(String)
     currency = Column(CHAR(3))
+    investment_strategy_id = Column(Integer, ForeignKey("investment_strategies.strategy_id"), nullable=True)
+    
+    investment_strategy = relationship("InvestmentStrategy")
     
     portfolio = relationship("Portfolio", back_populates="accounts")
     trades = relationship("Trades", back_populates="account")

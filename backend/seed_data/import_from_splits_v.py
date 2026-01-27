@@ -15,7 +15,8 @@ sys.path.append(".")
 try:
     # Asegúrate de importar Industry
     from app.db.session import SessionLocal
-    from app.models.user import User
+    from app.models.user import User, Role
+    from app.core.security import get_password_hash
     # ... otros imports ...
     from app.models.portfolio import Portfolio, Account, AccountReturnSeries
     from app.models.asset import Asset, Trades, CashJournal, CorporateAction, PerformanceAttribution, Position, Industry, FXTransaction, IncomeProjection
@@ -83,7 +84,15 @@ def setup_dynamic_user_from_csv(db, folder_path):
     logger.info(f"👤 Procesando Usuario: {raw_name} | Cuenta Base: {account_code_base}")
 
     # ---------------------------------------------------------
-    # 2. CREAR / OBTENER USUARIO
+    # 2. OBTENER ROL INVESTOR (REQUERIDO)
+    # ---------------------------------------------------------
+    investor_role = db.query(Role).filter(Role.name == "INVESTOR").first()
+    if not investor_role:
+        logger.error("❌ No existe el rol INVESTOR. Ejecuta seed_roles.py primero.")
+        return None
+    
+    # ---------------------------------------------------------
+    # 3. CREAR / OBTENER USUARIO
     # ---------------------------------------------------------
     user = db.query(User).filter(User.username == raw_name).first()
     
@@ -95,15 +104,16 @@ def setup_dynamic_user_from_csv(db, folder_path):
         user = User(
             username=raw_name,
             email=dummy_email,
-            password_hash="password123", # Password genérico o hash real
+            password_hash=get_password_hash("password123"),  # ✅ Usar hash correcto
             full_name=raw_name,
             phone="000000000",
-            is_active=True
+            is_active=True,
+            role_id=investor_role.role_id  # ✅ Asignar rol INVESTOR
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-        logger.info(f"   ✅ Usuario creado: ID {user.user_id}")
+        logger.info(f"   ✅ Usuario creado: ID {user.user_id} (Rol: INVESTOR)")
     else:
         logger.info(f"   ℹ️ Usuario existente: ID {user.user_id}")
 
@@ -120,7 +130,6 @@ def setup_dynamic_user_from_csv(db, folder_path):
             owner_user_id=user.user_id,
             interface_code=port_interface_code,
             name=f"Portafolio {raw_name}",
-            type="risk portfolio",
             main_currency=base_currency, 
             residence_country="PE", # Default o extraer de otro lado si existe
             inception_date=datetime.today().date()
@@ -149,7 +158,7 @@ def setup_dynamic_user_from_csv(db, folder_path):
                 account_code=sub_account_code,
                 currency=currency,
                 institution="IBKR",
-                account_alias=alias,
+                account_alias=account_code_base,  # Solo el numero de cuenta sin sufijo de moneda
                 account_type="Individual" # O extraer de csv['AccountType']
             )
             db.add(acc)
@@ -314,7 +323,7 @@ def import_trades(db, acct_map, folder_path):
                     target_amount=target_amt,
                     exchange_rate=parse_decimal(row.get('Average Price Bought')),
                     side="BUY",
-                    #external_id=f"FX_B_{uuid.uuid4().hex[:8]}"
+                    external_id=f"FX_B_{uuid.uuid4().hex[:8]}"
                 )
                 db.add(fx_buy)
                 fx_count += 1
