@@ -255,7 +255,18 @@ class PositionCreate(PositionBase):
 
 class PositionRead(PositionBase):
     position_id: int
+    account_id: int
+    asset_id: int
     asset: Optional[AssetRead] = None # Para ver nombre del activo
+    class Config:
+        from_attributes = True
+
+class AccountBalanceRead(BaseModel):
+    """Schema para el balance agregado por cuenta."""
+    account_id: int
+    balance: Decimal
+    position_count: int
+    
     class Config:
         from_attributes = True
 

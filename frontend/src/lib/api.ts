@@ -335,3 +335,63 @@ export const portfoliosApi = {
   },
 };
 
+// Account Balance interface
+export interface AccountBalance {
+  account_id: number;
+  balance: string;
+  position_count: number;
+}
+
+// Position interface
+export interface Position {
+  position_id: number;
+  account_id: number;
+  asset_id: number;
+  report_date: string;
+  quantity: string;
+  mark_price: string | null;
+  position_value: string | null;
+  cost_basis_money: string | null;
+  cost_basis_price: string | null;
+  open_price: string | null;
+  fifo_pnl_unrealized: string | null;
+  percent_of_nav: string | null;
+  side: string | null;
+  level_of_detail: string | null;
+  open_date_time: string | null;
+  vesting_date: string | null;
+  accrued_interest: string | null;
+  fx_rate_to_base: string | null;
+  asset?: AssetApi | null;
+}
+
+// Positions API
+export const positionsApi = {
+  async getAccountBalances(accountIds?: number[]): Promise<AccountBalance[]> {
+    const params = new URLSearchParams();
+    if (accountIds?.length) {
+      accountIds.forEach(id => params.append('account_ids', String(id)));
+    }
+    const query = params.toString();
+    const response = await fetch(`${API_BASE_URL}/api/v1/positions/account-balances${query ? `?${query}` : ''}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch account balances');
+    }
+    return response.json();
+  },
+
+  async getPositions(accountId?: number, skip: number = 0, limit: number = 100): Promise<Position[]> {
+    const params = new URLSearchParams();
+    if (accountId !== undefined) {
+      params.set('account_id', String(accountId));
+    }
+    params.set('skip', String(skip));
+    params.set('limit', String(limit));
+    const query = params.toString();
+    const response = await fetch(`${API_BASE_URL}/api/v1/positions/${query ? `?${query}` : ''}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch positions');
+    }
+    return response.json();
+  },
+};

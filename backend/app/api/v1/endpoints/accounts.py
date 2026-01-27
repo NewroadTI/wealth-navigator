@@ -39,7 +39,8 @@ def create_account(
         account_code=account_in.account_code,
         account_alias=account_in.account_alias,
         account_type=account_in.account_type,
-        currency=account_in.currency
+        currency=account_in.currency,
+        investment_strategy_id=account_in.investment_strategy_id
     )
     
     db.add(new_account)
