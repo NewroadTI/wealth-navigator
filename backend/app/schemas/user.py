@@ -64,7 +64,7 @@ class UserUpdate(BaseModel):
 
 class UserRead(UserBase):
     user_id: int
-    role_id: int
+    role_id: Optional[int] = None
     created_at: datetime
     role: Optional[RoleRead] = None
     class Config:
