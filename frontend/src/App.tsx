@@ -7,6 +7,7 @@ import { NavigationHistoryProvider } from "@/contexts/NavigationHistoryContext";
 import Index from "./pages/Index";
 import Portfolios from "./pages/Portfolios";
 import PortfolioDetail from "./pages/PortfolioDetail";
+import PortfolioAccounts from "./pages/PortfolioAccounts";
 import PortfolioPerformance from "./pages/PortfolioPerformance";
 import Transactions from "./pages/Transactions";
 import Positions from "./pages/Positions";
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/portfolios" element={<Portfolios />} />
             <Route path="/portfolios/:id" element={<PortfolioDetail />} />
+            <Route path="/portfolios/:portfolioId/accounts/:accountId" element={<PortfolioAccounts />} />
             <Route path="/portfolios/:id/performance" element={<PortfolioPerformance />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/structured-notes" element={<StructuredNotes />} />

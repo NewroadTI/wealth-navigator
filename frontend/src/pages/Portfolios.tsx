@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Filter, Download, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, Filter, Download, LayoutGrid, List, User, Building2, Calendar, TrendingUp } from 'lucide-react';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { positionsApi, AccountBalance } from '@/lib/api';
 
 // Types
 type UserApi = {
@@ -134,6 +135,60 @@ const Portfolios = () => {
     };
     loadCountries();
   }, [apiBaseUrl]);
+
+  // Account balances state
+  const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
+
+  // Load account balances for all portfolios
+  useEffect(() => {
+    if (!portfolios || portfolios.length === 0) return;
+
+    const loadBalances = async () => {
+      try {
+        // Get all account IDs from all portfolios
+        const allAccountIds: number[] = [];
+        portfolios.forEach(p => {
+          if (p.accounts) {
+            p.accounts.forEach((a: any) => allAccountIds.push(a.account_id));
+          }
+        });
+
+        if (allAccountIds.length === 0) return;
+
+        const balances = await positionsApi.getAccountBalances(allAccountIds);
+        setAccountBalances(balances);
+      } catch (error) {
+        console.error('Error loading account balances:', error);
+      }
+    };
+
+    loadBalances();
+  }, [portfolios]);
+
+  // Create a map of account_id -> balance
+  const accountBalanceMap = useMemo(() => {
+    const map = new Map<number, number>();
+    accountBalances.forEach(b => {
+      map.set(b.account_id, parseFloat(b.balance) || 0);
+    });
+    return map;
+  }, [accountBalances]);
+
+  // Create a map of portfolio_id -> total value (sum of all account balances)
+  const portfolioTotalValues = useMemo(() => {
+    const map = new Map<number, number>();
+    portfolios.forEach(p => {
+      let total = 0;
+      if (p.accounts) {
+        p.accounts.forEach((a: any) => {
+          const balance = accountBalanceMap.get(a.account_id) || 0;
+          total += balance;
+        });
+      }
+      map.set(p.portfolio_id, total);
+    });
+    return map;
+  }, [portfolios, accountBalanceMap]);
 
   // Handle investor selection - auto-complete portfolio name
   const handleInvestorChange = (userId: string) => {
@@ -431,6 +486,7 @@ const Portfolios = () => {
           {filteredPortfolios.map((portfolio) => {
             const investorName = getInvestorName(portfolio.owner_user_id);
             const investorType = getInvestorType(portfolio.owner_user_id);
+            const totalValue = portfolioTotalValues.get(portfolio.portfolio_id) || 0;
 
             return (
               <Link
@@ -445,26 +501,15 @@ const Portfolios = () => {
                       <h3 className="font-semibold text-foreground">{portfolio.name}</h3>
                       <p className="text-xs text-muted-foreground">{portfolio.interface_code}</p>
                     </div>
-                    <div className="flex gap-1.5">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${portfolio.active_status
-                          ? 'bg-success/20 text-success border-success/30'
-                          : 'bg-warning/20 text-warning border-warning/30'
-                          }`}
-                      >
-                        {portfolio.active_status ? 'Active' : 'Pending'}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {investorType}
-                      </Badge>
-                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {investorType}
+                    </Badge>
                   </div>
 
                   {/* Value and Day Change */}
                   <div className="flex items-baseline gap-3 mb-4">
                     <span className="text-2xl font-bold mono text-foreground">
-                      {formatCurrency(2847532.45)}
+                      {formatCurrency(totalValue)}
                     </span>
                     <span className="text-sm font-medium text-success">
                       ↗ +0.44%
@@ -473,38 +518,43 @@ const Portfolios = () => {
 
                   {/* Investor and Advisor Row */}
                   <div className="grid grid-cols-2 gap-4 mb-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">👤</span>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <User className="h-3.5 w-3.5" />
                       <span className="text-foreground truncate">{investorName}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">⚙️</span>
-                      <span className="text-foreground">Sarah Chen</span>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Building2 className="h-3.5 w-3.5" />
+                      <span className="text-foreground truncate">Sarah Chen</span>
                     </div>
                   </div>
 
                   {/* Inception Date and YTD Row */}
                   <div className="grid grid-cols-2 gap-4 mb-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">📅</span>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5" />
                       <span className="text-foreground">
                         {portfolio.inception_date ? new Date(portfolio.inception_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">↗</span>
-                      <span className="text-foreground">YTD:</span>
-                      <span className="text-success font-medium">+8.72%</span>
+                      <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="mono text-success">YTD: +8.72%</span>
                     </div>
                   </div>
 
-                  {/* Currency, Benchmark and Risk Badge */}
+                  {/* Currency, Benchmark and Status Badge */}
                   <div className="flex items-center justify-between pt-3 border-t border-border">
                     <span className="text-xs text-muted-foreground">
                       {portfolio.main_currency} • S&P 500
                     </span>
-                    <Badge variant="outline" className="text-xs bg-chart-1/20 text-chart-1 border-chart-1/30">
-                      Moderate
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${portfolio.active_status
+                        ? 'bg-success/20 text-success border-success/30'
+                        : 'bg-warning/20 text-warning border-warning/30'
+                        }`}
+                    >
+                      {portfolio.active_status ? 'Active' : 'Pending'}
                     </Badge>
                   </div>
                 </div>
@@ -528,50 +578,53 @@ const Portfolios = () => {
           </div>
 
           {/* List Rows */}
-          {filteredPortfolios.map((portfolio) => (
-            <Link
-              key={portfolio.portfolio_id}
-              to={`/portfolios/${portfolio.portfolio_id}`}
-              className="grid grid-cols-12 gap-4 px-5 py-4 items-center border-b border-border hover:bg-muted/20 cursor-pointer transition-colors"
-            >
-              <div className="col-span-3">
-                <p className="font-medium text-foreground">{portfolio.name}</p>
-                <p className="text-xs text-muted-foreground">{portfolio.interface_code}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-foreground">{getInvestorName(portfolio.owner_user_id)}</p>
-              </div>
-              <div className="col-span-2">
-                <span className="text-sm text-foreground">Sarah Chen</span>
-              </div>
-              <div className="col-span-2 text-right">
-                <p className="font-mono font-medium text-foreground">
-                  {formatCurrency(1250000)}
-                </p>
-              </div>
-              <div className="col-span-1 text-right">
-                <span className="font-mono text-success">
-                  {formatPercent(0.0845)}
-                </span>
-              </div>
-              <div className="col-span-1 text-center">
-                <Badge
-                  variant="outline"
-                  className={`text-xs ${portfolio.active_status
-                    ? 'bg-success/20 text-success border-success/30'
-                    : 'bg-muted/20 text-muted-foreground border-border'
-                    }`}
-                >
-                  {portfolio.active_status ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-              <div className="col-span-1 text-center">
-                <Badge variant="outline" className="text-xs">
-                  {getInvestorType(portfolio.owner_user_id)}
-                </Badge>
-              </div>
-            </Link>
-          ))}
+          {filteredPortfolios.map((portfolio) => {
+            const totalValue = portfolioTotalValues.get(portfolio.portfolio_id) || 0;
+            return (
+              <Link
+                key={portfolio.portfolio_id}
+                to={`/portfolios/${portfolio.portfolio_id}`}
+                className="grid grid-cols-12 gap-4 px-5 py-4 items-center border-b border-border hover:bg-muted/20 cursor-pointer transition-colors"
+              >
+                <div className="col-span-3">
+                  <p className="font-medium text-foreground">{portfolio.name}</p>
+                  <p className="text-xs text-muted-foreground">{portfolio.interface_code}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-sm text-foreground">{getInvestorName(portfolio.owner_user_id)}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-sm text-foreground">Sarah Chen</span>
+                </div>
+                <div className="col-span-2 text-right">
+                  <p className="font-mono font-medium text-foreground">
+                    {formatCurrency(totalValue)}
+                  </p>
+                </div>
+                <div className="col-span-1 text-right">
+                  <span className="font-mono text-success">
+                    {formatPercent(0.0845)}
+                  </span>
+                </div>
+                <div className="col-span-1 text-center">
+                  <Badge
+                    variant="outline"
+                    className={`text-xs ${portfolio.active_status
+                      ? 'bg-success/20 text-success border-success/30'
+                      : 'bg-muted/20 text-muted-foreground border-border'
+                      }`}
+                  >
+                    {portfolio.active_status ? 'Active' : 'Inactive'}
+                  </Badge>
+                </div>
+                <div className="col-span-1 text-center">
+                  <Badge variant="outline" className="text-xs">
+                    {getInvestorType(portfolio.owner_user_id)}
+                  </Badge>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </AppLayout>

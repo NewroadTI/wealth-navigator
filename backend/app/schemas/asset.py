@@ -268,6 +268,15 @@ class PositionRead(PositionBase):
     class Config:
         from_attributes = True
 
+class AccountBalanceRead(BaseModel):
+    """Schema para el balance agregado por cuenta."""
+    account_id: int
+    balance: Decimal
+    position_count: int
+    
+    class Config:
+        from_attributes = True
+
 # --- MARKET PRICE SCHEMAS (Nuevo) ---
 class MarketPriceBase(BaseModel):
     date: date
