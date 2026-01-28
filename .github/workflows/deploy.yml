@@ -1,0 +1,42 @@
+name: Deploy Backend to Hetzner
+
+on:
+  push:
+    branches:
+      - develop  # Se activará automáticamente cuando hagas push a develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Copiar los archivos de configuración al servidor
+      - name: Copy files via SSH
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "backend/,docker-compose.prod.yml,Caddyfile"
+          target: "/root/wealth-navigator"
+
+      # 2. Conectarse por SSH y levantar Docker
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /root/wealth-navigator
+            
+            # Crear el archivo .env real usando el secreto de GitHub
+            echo "${{ secrets.ENV_FILE }}" > .env
+            
+            # Levantar los servicios (reconstruyendo el backend si cambió)
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            
+            # Limpiar imágenes viejas para no llenar el disco
+            docker image prune -f

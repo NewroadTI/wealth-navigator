@@ -1,3 +1,4 @@
 docker exec -it wealthroad-api python seed_data/initial_data.py
 python3 upload_assets.py
 docker exec -it wealthroad-api python seed_data/import_from_splits.py
+ssh -i ~/.ssh/id_ed25519_newroad root@178.156.215.84
