@@ -3,7 +3,7 @@ name: Deploy Backend to Hetzner
 on:
   push:
     branches:
-      - develop  # Se activará automáticamente cuando hagas push a develop
+      - main  # Se activará automáticamente cuando hagas push a develop
 
 jobs:
   deploy:
