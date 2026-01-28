@@ -370,6 +370,7 @@ export const positionsApi = {
   async getAccountBalances(accountIds?: number[]): Promise<AccountBalance[]> {
     const params = new URLSearchParams();
     if (accountIds?.length) {
+      // backend expects repeated `account_id` query params (one per id)
       accountIds.forEach(id => params.append('account_ids', String(id)));
     }
     const query = params.toString();
@@ -380,7 +381,7 @@ export const positionsApi = {
     return response.json();
   },
 
-  async getPositions(accountId?: number, skip: number = 0, limit: number = 100): Promise<Position[]> {
+  async get_positions(accountId?: number, skip: number = 0, limit: number = 100): Promise<Position[]> {
     const params = new URLSearchParams();
     if (accountId !== undefined) {
       params.set('account_id', String(accountId));
@@ -393,5 +394,9 @@ export const positionsApi = {
       throw new Error('Failed to fetch positions');
     }
     return response.json();
+  },
+  // Backwards-compatible camelCase alias used by some components
+  async getPositions(accountId?: number, skip: number = 0, limit: number = 100): Promise<Position[]> {
+    return this.get_positions(accountId, skip, limit);
   },
 };
