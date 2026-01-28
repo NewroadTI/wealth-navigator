@@ -37,6 +37,7 @@ class AccountUpdate(BaseModel):
     account_alias: Optional[str] = None
     account_type: Optional[str] = None
     currency: Optional[str] = None
+    investment_strategy_id: Optional[int] = None
     # Nota: No permitimos actualizar portfolio_id usualmente para no romper integridad, 
     # si se necesita mover una cuenta, es mejor borrar y crear.
 
