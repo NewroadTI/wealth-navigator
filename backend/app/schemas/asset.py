@@ -238,24 +238,33 @@ class CorporateActionRead(CorporateActionBase):
     class Config:
         from_attributes = True        
 # --- POSITION SCHEMAS (Nuevo - Vital para Snapshots) ---
-class PositionBase(BaseModel):
-    report_date: date
-    quantity: Decimal
-    cost_basis_money: Optional[Decimal] = None
-    cost_basis_price: Optional[Decimal] = None
-    mark_price: Optional[Decimal] = None
-    position_value: Optional[Decimal] = None
-    fifo_pnl_unrealized: Optional[Decimal] = None
-    percent_of_nav: Optional[Decimal] = None
-    accrued_interest: Optional[Decimal] = None
 
-class PositionCreate(PositionBase):
+
+class PositionBase(BaseModel):
     account_id: int
     asset_id: int
+    report_date: date
+    quantity: float
+    mark_price: Optional[float] = None
+    position_value: Optional[float] = None
+    cost_basis_money: Optional[float] = None
+    cost_basis_price: Optional[float] = None
+    open_price: Optional[float] = None
+    fifo_pnl_unrealized: Optional[float] = None
+    percent_of_nav: Optional[float] = None
+    side: Optional[str] = None
+    level_of_detail: Optional[str] = None
+    open_date_time: Optional[datetime] = None
+    vesting_date: Optional[date] = None
+    accrued_interest: Optional[float] = None
+    fx_rate_to_base: Optional[float] = 1.0
+
+class PositionCreate(PositionBase):
+    pass
 
 class PositionRead(PositionBase):
     position_id: int
-    asset: Optional[AssetRead] = None # Para ver nombre del activo
+    #asset: Optional[AssetRead] = None # Para ver nombre del activo
     class Config:
         from_attributes = True
 
