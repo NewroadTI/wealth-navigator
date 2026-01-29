@@ -7,7 +7,14 @@ export const getApiUrl = () => {
   
   if (envUrl) {
     // Asegurarse de que no termine en slash para evitar dobles //
-    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+    let url = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+    
+    // En producción, forzar HTTPS si viene de HTTP
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+      url = url.replace(/^http:/, 'https:');
+    }
+    
+    return url;
   }
 
   // 2. Fallback para desarrollo local si no hay variable
