@@ -6,23 +6,24 @@ export const getApiUrl = (): string => {
   // Detectar si estamos en producción (HTTPS)
   const isProduction = typeof window !== 'undefined' && window.location.protocol === 'https:';
   
-  // 1. Si estamos en producción HTTPS, usar HTTPS
+  // En producción, SIEMPRE usar HTTPS (ignore env vars que pueden tener HTTP)
   if (isProduction) {
-    // Intentar usar la variable de entorno primero
-    const envUrl = import.meta.env.VITE_API_BASE_URL;
-    if (envUrl) {
-      let url = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
-      // Garantizar que sea HTTPS en producción
-      url = url.replace(/^http:/, 'https:');
-      return url;
+    // Construir la URL HTTPS dinámicamente
+    // Usar el mismo dominio pero en subdomain 'api' si es newroadai.com
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'api.newroadai.com';
+    
+    if (hostname.includes('newroadai.com')) {
+      return 'https://api.newroadai.com';
+    }
+    if (hostname.includes('wealth-navigator.pages.dev')) {
+      return 'https://api.newroadai.com'; // Cloudflare Pages también usa api.newroadai.com
     }
     
-    // Fallback: asumir que la API está en el mismo dominio
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'api.newroadai.com';
-    return `https://api.${hostname === 'newroadai.com' ? 'newroadai.com' : hostname}`;
+    // Fallback: mismo hostname con 'api' subdomain
+    return `https://api.${hostname}`;
   }
   
-  // 2. En desarrollo, usar la variable de entorno o localhost
+  // En desarrollo, usar la variable de entorno o localhost
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl) {
     return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
