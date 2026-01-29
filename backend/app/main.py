@@ -19,11 +19,18 @@ app = FastAPI(
 )
 
 # ... Configuración de CORS ...
-# Allow local dev, Cloudflare Pages domains (including deployment subdomains) and production domains
-# Using regex to support dynamic Cloudflare Pages deployment URLs like https://531807c3.wealth-navigator.pages.dev
+# Allow local dev, Cloudflare Pages preview domain and the API hostname handled by Caddy
+origins = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "https://wealth-navigator.pages.dev",
+    "https://api.newroadai.com",
+    "https://newroadai.com",
+    "https://www.newroadai.com",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://[a-f0-9]{8}\.wealth-navigator\.pages\.dev|https://wealth-navigator\.pages\.dev|http://localhost:8080|http://127\.0\.0\.1:8080|https://api\.newroadai\.com|https://newroadai\.com|https://www\.newroadai\.com",
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
