@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { API_BASE_URL } from '@/lib/config';
+import { getApiBaseUrl } from '@/lib/config';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building, Globe, Factory, BarChart3, Coins, Search, Layers, Target } from 'lucide-react';
@@ -136,7 +136,7 @@ const BasicData = () => {
   const [strategyActionError, setStrategyActionError] = useState<string | null>(null);
   const [strategyToDelete, setStrategyToDelete] = useState<InvestmentStrategyApi | null>(null);
 
-  const apiBaseUrl = API_BASE_URL;
+  const apiBaseUrl = getApiBaseUrl();
 
   // Handle sort toggle
   const toggleSort = (setSort: React.Dispatch<React.SetStateAction<SortConfig>>, key: string) => {

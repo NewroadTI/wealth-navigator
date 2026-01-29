@@ -9,11 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { API_V1_URL } from '@/lib/config';
+import { getApiBaseUrl } from '@/lib/config';
 
 const ITEMS_PER_PAGE = 15;
-// API_V1_URL is imported from @/lib/config (see src/lib/config.ts)
-const API_BASE_URL = API_V1_URL;
+// getApiBaseUrl() returns the API URL with runtime protocol detection
 
 interface AggregatedAsset {
   asset_id: number;
@@ -74,7 +73,7 @@ const Positions = () => {
   useEffect(() => {
     const loadFilterOptions = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/analytics/filter-options`);
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/filter-options`);
         if (!response.ok) throw new Error('Failed to load filter options');
         const data = await response.json();
         setFilterOptions(data);
@@ -107,7 +106,7 @@ const Positions = () => {
           ...(selectedAsset && { asset_id: selectedAsset }),
         });
 
-        const response = await fetch(`${API_BASE_URL}/analytics/positions-report?${params}`);
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/positions-report?${params}`);
         if (!response.ok) throw new Error('Failed to load positions');
         const data = await response.json();
         setPositions(data);
@@ -133,7 +132,7 @@ const Positions = () => {
           limit: '5',
         });
 
-        const response = await fetch(`${API_BASE_URL}/analytics/movers?${params}`);
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/movers?${params}`);
         if (!response.ok) throw new Error('Failed to load movers');
         const data = await response.json();
         setMovers(data);
