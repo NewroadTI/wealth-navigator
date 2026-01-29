@@ -10,7 +10,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/api/v1` : 'http://localhost:8000/api/v1';
+// Get API URL - supports runtime configuration via window object
+const getApiUrl = () => {
+  if (typeof window !== 'undefined' && (window as any).__VITE_API_BASE_URL__) {
+    return `${(window as any).__VITE_API_BASE_URL__}/api/v1`;
+  }
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return `${import.meta.env.VITE_API_BASE_URL}/api/v1`;
+  }
+  return 'http://localhost:8000/api/v1';
+};
+
+const API_BASE_URL = getApiUrl();
 const ITEMS_PER_PAGE = 15;
 
 interface AggregatedAsset {
