@@ -9,10 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getApiBaseUrl } from '@/lib/config';
+import { getApiV1Url } from '@/lib/config';
 
 const ITEMS_PER_PAGE = 15;
-// getApiBaseUrl() returns the API URL with runtime protocol detection
+// getApiV1Url() returns the API URL with /api/v1 and runtime protocol detection
 
 interface AggregatedAsset {
   asset_id: number;
@@ -73,7 +73,7 @@ const Positions = () => {
   useEffect(() => {
     const loadFilterOptions = async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/filter-options`);
+        const response = await fetch(`${getApiV1Url()}/analytics/filter-options`);
         if (!response.ok) throw new Error('Failed to load filter options');
         const data = await response.json();
         setFilterOptions(data);
@@ -106,7 +106,7 @@ const Positions = () => {
           ...(selectedAsset && { asset_id: selectedAsset }),
         });
 
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/positions-report?${params}`);
+        const response = await fetch(`${getApiV1Url()}/analytics/positions-report?${params}`);
         if (!response.ok) throw new Error('Failed to load positions');
         const data = await response.json();
         setPositions(data);
@@ -132,7 +132,7 @@ const Positions = () => {
           limit: '5',
         });
 
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/movers?${params}`);
+        const response = await fetch(`${getApiV1Url()}/analytics/movers?${params}`);
         if (!response.ok) throw new Error('Failed to load movers');
         const data = await response.json();
         setMovers(data);
