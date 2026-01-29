@@ -19,13 +19,15 @@ app = FastAPI(
 )
 
 # ... Configuración de CORS ...
+# Allow local dev, Cloudflare Pages preview domain and the API hostname handled by Caddy
 origins = [
-    "http://localhost:8080", 
+    "http://localhost:8080",
     "http://127.0.0.1:8080",
-    "http://178.156.215.84:8080",
-    "http://178.156.215.84",
-    "*"  # Allow all origins (development only - disable in production)
-    ] 
+    "https://a32e6788.wealth-navigator.pages.dev",
+    "https://9dac7de3.wealth-navigator.pages.dev",
+    "https://wealth-navigator.pages.dev",
+    "https://api.newroadai.com",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

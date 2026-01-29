@@ -23,7 +23,8 @@
     <div id="root"></div>
     <!-- Runtime configuration (can be overridden by server) -->
     <script>
-      window.__VITE_API_BASE_URL__ = window.__VITE_API_BASE_URL__ || 'http://178.156.215.84';
+      // Default runtime API hostname (Caddy)
+      window.__VITE_API_BASE_URL__ = window.__VITE_API_BASE_URL__ || 'https://api.newroadai.com';
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
