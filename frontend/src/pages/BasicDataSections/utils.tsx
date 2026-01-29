@@ -1,6 +1,7 @@
 import type React from 'react';
 import { ArrowUpDown } from 'lucide-react';
 import type { SortConfig } from './types';
+import { forceHttpsApiUrl, safeFetch } from '../../lib/force-https';
 
 /**
  * Fetches all pages of data from a paginated API endpoint.
@@ -11,9 +12,16 @@ export const fetchAllPages = async <T,>(
     signal?: AbortSignal,
     pageSize: number = 500,
 ): Promise<T[]> => {
+    // HARDCODE FIX: Use forced HTTPS endpoint
+    const baseUrl = forceHttpsApiUrl();
+    console.log('[fetchAllPages] Using hardcoded HTTPS baseUrl:', baseUrl);
+    
     const results: T[] = [];
     for (let skip = 0; ; skip += pageSize) {
-        const response = await fetch(`${apiBaseUrl}${path}?skip=${skip}&limit=${pageSize}`, {
+        const fetchUrl = `${baseUrl}${path}?skip=${skip}&limit=${pageSize}`;
+        console.log('[fetchAllPages] Fetching:', fetchUrl);
+        
+        const response = await safeFetch(fetchUrl, {
             signal,
         });
         if (!response.ok) {
