@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PortfolioCard } from '@/components/portfolios/PortfolioCard';
 import { getApiBaseUrl } from '@/lib/config';
-import { forceHttpsApiUrl, safeFetch } from '@/lib/force-https';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -80,7 +79,7 @@ const Portfolios = () => {
     const loadPortfolios = async () => {
       try {
         setPortfoliosLoading(true);
-        const response = await safeFetch(`${forceHttpsApiUrl()}/api/v1/portfolios`);
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/portfolios`);
         if (!response.ok) throw new Error('Failed to load portfolios');
         const data = await response.json();
         setPortfolios(data);
@@ -97,7 +96,7 @@ const Portfolios = () => {
   useEffect(() => {
     const loadInvestors = async () => {
       try {
-        const response = await safeFetch(`${forceHttpsApiUrl()}/api/v1/users/investors`);
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/users/investors`);
         if (!response.ok) throw new Error('Failed to load investors');
         const data = await response.json();
         setInvestors(data);
@@ -112,7 +111,7 @@ const Portfolios = () => {
   useEffect(() => {
     const loadCurrencies = async () => {
       try {
-        const response = await safeFetch(`${forceHttpsApiUrl()}/api/v1/catalogs/currencies`);
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/catalogs/currencies`);
         if (!response.ok) throw new Error('Failed to load currencies');
         const data = await response.json();
         setCurrencies(data);
@@ -127,7 +126,7 @@ const Portfolios = () => {
   useEffect(() => {
     const loadCountries = async () => {
       try {
-        const response = await safeFetch(`${forceHttpsApiUrl()}/api/v1/catalogs/countries`);
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/catalogs/countries`);
         if (!response.ok) throw new Error('Failed to load countries');
         const data = await response.json();
         setCountries(data);
@@ -213,7 +212,7 @@ const Portfolios = () => {
       setFormLoading(true);
       setFormError(null);
 
-      const response = await safeFetch(`${forceHttpsApiUrl()}/api/v1/portfolios`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/portfolios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
