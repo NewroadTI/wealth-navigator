@@ -9,20 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { API_V1_URL } from '@/lib/config';
 
-// Get API URL - supports runtime configuration via window object
-const getApiUrl = () => {
-  if (typeof window !== 'undefined' && (window as any).__VITE_API_BASE_URL__) {
-    return `${(window as any).__VITE_API_BASE_URL__}/api/v1`;
-  }
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return `${import.meta.env.VITE_API_BASE_URL}/api/v1`;
-  }
-  return 'http://localhost:8000/api/v1';
-};
-
-const API_BASE_URL = getApiUrl();
 const ITEMS_PER_PAGE = 15;
+// API_V1_URL is imported from @/lib/config (see src/lib/config.ts)
+const API_BASE_URL = API_V1_URL;
 
 interface AggregatedAsset {
   asset_id: number;

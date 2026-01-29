@@ -1,20 +1,7 @@
 // API client configuration and services
+import { API_BASE_URL } from './config';
 
-// Get API base URL from environment or window config (supports runtime configuration)
-function getApiBaseUrl(): string {
-  // First try window config (set at runtime by server)
-  if (typeof window !== 'undefined' && (window as any).__VITE_API_BASE_URL__) {
-    return (window as any).__VITE_API_BASE_URL__;
-  }
-  // Fall back to environment variable (set at build time)
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
-  }
-  // Default fallback
-  return 'http://localhost:8000';
-}
-
-const API_BASE_URL = getApiBaseUrl();
+// API_BASE_URL is centrally configured in src/lib/config.ts
 
 // Asset Class and Sub-class interfaces
 export interface AssetSubClass {

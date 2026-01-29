@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { API_BASE_URL } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,7 +40,7 @@ const Advisors = () => {
   const [expandedAdvisors, setExpandedAdvisors] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+  const apiBaseUrl = API_BASE_URL;
 
   // State
   const [advisors, setAdvisors] = useState<UserApi[]>([]);

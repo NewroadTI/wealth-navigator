@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { API_BASE_URL } from '@/lib/config';
 import { PositionsTable } from '@/components/positions/PositionsTable';
 import { positions } from '@/lib/mockData';
 import { formatCurrency, formatPercent, formatDate, getChangeColor } from '@/lib/formatters';
@@ -176,7 +177,7 @@ const TX_DEFAULT_COLUMNS = ['table_type', 'account_id', 'asset_id', 'date', 'amo
 const PortfolioDetail = () => {
   const { id } = useParams();
   const { toast } = useToast();
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+  const apiBaseUrl = API_BASE_URL;
 
   // State
   const [portfolio, setPortfolio] = useState<PortfolioApi | null>(null);
