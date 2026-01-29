@@ -136,6 +136,7 @@ const BasicData = () => {
   const [strategyActionError, setStrategyActionError] = useState<string | null>(null);
   const [strategyToDelete, setStrategyToDelete] = useState<InvestmentStrategyApi | null>(null);
 
+  // Get fresh API URL on every call - no caching to ensure HTTPS in production
   const apiBaseUrl = getApiBaseUrl();
 
   // Handle sort toggle
@@ -160,7 +161,7 @@ const BasicData = () => {
   ): Promise<T[]> => {
     const results: T[] = [];
     for (let skip = 0; ; skip += pageSize) {
-      const response = await fetch(`${apiBaseUrl}${path}?skip=${skip}&limit=${pageSize}`, {
+      const response = await fetch(`${getApiBaseUrl()}${path}?skip=${skip}&limit=${pageSize}`, {
         signal,
       });
       if (!response.ok) {
@@ -299,7 +300,7 @@ const BasicData = () => {
       try {
         setAssetClassesLoading(true);
         setAssetClassesError(null);
-        const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/asset-classes`, { signal: controller.signal });
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/catalogs/asset-classes`, { signal: controller.signal });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -398,7 +399,7 @@ const BasicData = () => {
   };
 
   const refreshAssetClasses = async () => {
-    const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/asset-classes`);
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/catalogs/asset-classes`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -414,7 +415,7 @@ const BasicData = () => {
     try {
       setExchangeActionLoading(true);
       setExchangeActionError(null);
-      const response = await fetch(`${apiBaseUrl}/api/v1/catalogs/exchanges`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/catalogs/exchanges`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
