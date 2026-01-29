@@ -21,6 +21,10 @@
 
   <body>
     <div id="root"></div>
+    <!-- Runtime configuration (can be overridden by server) -->
+    <script>
+      window.__VITE_API_BASE_URL__ = window.__VITE_API_BASE_URL__ || 'http://178.156.215.84';
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
