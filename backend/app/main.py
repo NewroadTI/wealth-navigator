@@ -23,10 +23,10 @@ app = FastAPI(
 origins = [
     "http://localhost:8080",
     "http://127.0.0.1:8080",
-    "https://a32e6788.wealth-navigator.pages.dev",
-    "https://9dac7de3.wealth-navigator.pages.dev",
     "https://wealth-navigator.pages.dev",
     "https://api.newroadai.com",
+    "https://newroadai.com",
+    "https://www.newroadai.com",
 ]
 app.add_middleware(
     CORSMiddleware,
