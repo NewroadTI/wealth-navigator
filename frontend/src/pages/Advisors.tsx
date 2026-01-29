@@ -90,7 +90,7 @@ const Advisors = () => {
   useEffect(() => {
     const loadRoles = async () => {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/roles/`);
+        const response = await fetch(`${apiBaseUrl}/api/v1/roles/`);
         if (!response.ok) throw new Error('Failed to load roles');
         const data = await response.json();
         setRoles(data);
@@ -131,7 +131,7 @@ const Advisors = () => {
       setFormLoading(true);
       setFormError(null);
 
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/users/`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/users/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

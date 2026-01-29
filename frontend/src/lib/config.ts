@@ -3,57 +3,58 @@
 // Lógica centralizada para obtener la URL de la API
 // Esta función se ejecuta SOLO en RUNTIME del navegador
 export const getApiUrl = (): string => {
-  // For production builds, ALWAYS force HTTPS for newroadai.com domains
-  // This prevents any timing issues with window availability
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    
-    // Debug logging for troubleshooting
-    console.log('[getApiUrl] Detection:', {
-      hostname,
-      protocol,
-      href: window.location.href
-    });
-    
-    // Force HTTPS for ANY production domain
-    if (hostname.includes('newroadai.com') || hostname.includes('pages.dev')) {
-      console.log('[getApiUrl] Production domain detected, forcing HTTPS');
-      return 'https://api.newroadai.com';
-    }
-    
-    // For HTTPS sites (even if not known domains), use HTTPS
-    if (protocol === 'https:') {
-      console.log('[getApiUrl] HTTPS site detected, using HTTPS API');
-      return 'https://api.newroadai.com';
-    }
-    
-    // Development: check env vars
-    const envUrl = import.meta.env.VITE_API_BASE_URL;
-    if (envUrl) {
-      // Force HTTPS even for env vars in production builds
-      if (envUrl.includes('newroadai.com') && envUrl.startsWith('http://')) {
-        console.log('[getApiUrl] Converting env HTTP to HTTPS');
-        return envUrl.replace('http://', 'https://');
-      }
-      console.log('[getApiUrl] Using env URL:', envUrl);
-      return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
-    }
-    
-    console.log('[getApiUrl] Fallback to localhost for dev');
-    return 'http://localhost:8000';
+  // Force this function to ONLY run in browser context
+  if (typeof window === 'undefined') {
+    // During build/SSR, force return HTTPS - never allow HTTP in production builds
+    return 'https://api.newroadai.com';
+  }
+
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  
+  // Production detection: HTTPS or known production hostnames
+  const isProductionHostname = hostname.includes('newroadai.com') || 
+                                hostname.includes('pages.dev') ||
+                                hostname.includes('cloudflare');
+  const isHttps = protocol === 'https:';
+  const isProduction = isHttps || isProductionHostname;
+  
+  // Debug logging for troubleshooting
+  console.log('[config] API URL detection:', {
+    hostname,
+    protocol,
+    isProduction,
+    isProductionHostname,
+    isHttps,
+    'window.location.href': window.location.href
+  });
+  
+  // En producción, SIEMPRE usar HTTPS
+  if (isProduction) {
+    console.log('[config] Production detected, using HTTPS');
+    return 'https://api.newroadai.com';
   }
   
-  // During SSR/build (no window), always return HTTPS for production
-  console.log('[getApiUrl] No window context, forcing production HTTPS');
-  return 'https://api.newroadai.com';
+  // En desarrollo local
+  console.log('[config] Development detected, checking env vars');
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) {
+    // Force HTTPS even for env vars in production builds
+    if (envUrl.includes('newroadai.com') && envUrl.startsWith('http://')) {
+      console.log('[config] Converting env HTTP to HTTPS');
+      return envUrl.replace('http://', 'https://');
+    }
+    console.log('[config] Using env URL:', envUrl);
+    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+  }
+  
+  console.log('[config] Fallback to localhost');
+  return 'http://localhost:8000';
 };
 
-// Get API_BASE_URL with runtime evaluation - NO caching to ensure fresh evaluation every time
+// Get API_BASE_URL with runtime evaluation - NO caching to ensure fresh evaluation
 export const getApiBaseUrl = (): string => {
-  const url = getApiUrl();
-  console.log('[getApiBaseUrl] URL generated:', url);
-  return url;
+  return getApiUrl();
 };
 
 // Helper function for backwards compatibility - but prefer getApiBaseUrl()
