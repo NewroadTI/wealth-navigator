@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/api/v1` : 'http://localhost:8000/api/v1';
 const ITEMS_PER_PAGE = 15;
 
 interface AggregatedAsset {
