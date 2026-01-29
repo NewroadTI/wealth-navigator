@@ -32,6 +32,8 @@ def get_positions(
     positions = query.offset(skip).limit(limit).all()
     return positions
 
+
+
 @router.get("/account-balances", response_model=List[AccountBalanceRead])
 def get_account_balances(
     db: Session = Depends(deps.get_db),
@@ -68,24 +70,7 @@ def get_account_balances(
     
     return balances
 
-@router.get("/", response_model=List[PositionRead])
-def read_positions(
-    db: Session = Depends(deps.get_db),
-    skip: int = 0,
-    limit: int = 100,
-    account_id: int | None = None  # Filtro opcional por cuenta
-) -> Any:
-    """
-    Recuperar posiciones.
-    """
-    query = db.query(Position)
-    
-    # Si quieres filtrar por cuenta específica (útil en el futuro)
-    if account_id:
-        query = query.filter(Position.account_id == account_id)
-        
-    positions = query.offset(skip).limit(limit).all()
-    return positions
+
 
 @router.get("/{position_id}", response_model=PositionRead)
 def read_position_by_id(
