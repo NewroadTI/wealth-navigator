@@ -79,7 +79,7 @@ const Portfolios = () => {
     const loadPortfolios = async () => {
       try {
         setPortfoliosLoading(true);
-        const response = await fetch(`${apiBaseUrl}/api/v1/portfolios`);
+        const response = await fetch(`${apiBaseUrl}/api/v1/portfolios/`);
         if (!response.ok) throw new Error('Failed to load portfolios');
         const data = await response.json();
         setPortfolios(data);

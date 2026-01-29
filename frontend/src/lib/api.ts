@@ -290,7 +290,7 @@ export const transactionsApi = {
 // Account API
 export const accountsApi = {
   async getAccounts(): Promise<Account[]> {
-    const response = await fetch(`${getBaseUrl()}/api/v1/accounts`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/accounts/`);
     if (!response.ok) {
       throw new Error('Failed to fetch accounts');
     }
@@ -301,7 +301,7 @@ export const accountsApi = {
 // Users API
 export const usersApi = {
   async getUsers(): Promise<User[]> {
-    const response = await fetch(`${getBaseUrl()}/api/v1/users`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/users/`);
     if (!response.ok) {
       throw new Error('Failed to fetch users');
     }
@@ -312,7 +312,7 @@ export const usersApi = {
 // Portfolio API
 export const portfoliosApi = {
   async getPortfolios(): Promise<Portfolio[]> {
-    const response = await fetch(`${getBaseUrl()}/api/v1/portfolios`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/portfolios/`);
     if (!response.ok) {
       throw new Error('Failed to fetch portfolios');
     }

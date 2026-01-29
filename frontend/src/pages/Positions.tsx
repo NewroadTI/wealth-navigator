@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { Fragment, useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { formatCurrency, formatNumber, formatPercent, getChangeColor } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
@@ -510,9 +510,8 @@ const Positions = () => {
                   const isPositiveDay = asset.day_change_pct >= 0;
 
                   return (
-                    <>
+                    <Fragment key={asset.asset_id}>
                       <tr 
-                        key={`row-${asset.asset_id}`}
                         className={cn("group cursor-pointer", isSelected && "bg-muted/50")}
                         onClick={() => setSelectedAssetInTable(isSelected ? null : asset.asset_id)}
                       >
@@ -583,7 +582,7 @@ const Positions = () => {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 }) : (
                   <tr>

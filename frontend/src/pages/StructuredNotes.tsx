@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -253,9 +253,8 @@ const StructuredNotes = () => {
                 {filteredNotes.map((note) => {
                   const isExpanded = expandedIsin === note.isin;
                   return (
-                    <>
-                      <tr 
-                        key={note.isin} 
+                    <Fragment key={note.isin}>
+                      <tr
                         className={cn(
                           "cursor-pointer hover:bg-muted/50 transition-colors",
                           isExpanded && "bg-muted/30"
@@ -310,7 +309,7 @@ const StructuredNotes = () => {
                                     const purchaseValue = (holder.quantity / 100) * holder.purchasePrice;
                                     const pnl = currentValue - purchaseValue;
                                     return (
-                                      <tr key={holder.userId + idx} className="border-b border-border last:border-0 hover:bg-muted/30">
+                                      <tr key={`${holder.userId}-${idx}`} className="border-b border-border last:border-0 hover:bg-muted/30">
                                         <td className="px-4 py-2 font-medium">{holder.name}</td>
                                         <td className="px-4 py-2 text-muted-foreground">{holder.portfolioName}</td>
                                         <td className="px-4 py-2 text-right mono">{formatCurrency(holder.quantity)}</td>
@@ -331,7 +330,7 @@ const StructuredNotes = () => {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
