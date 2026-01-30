@@ -1,4 +1,5 @@
-import { Bell, Search, RefreshCw } from 'lucide-react';
+import { Bell, Search, RefreshCw, ChevronLeft } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -8,9 +9,33 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const path = location.pathname;
+  const isPortfolioPerformance = /^\/portfolios\/[^/]+\/performance$/.test(path);
+  const isPortfolioAccount = /^\/portfolios\/[^/]+\/accounts\/[^/]+$/.test(path);
+  const isPortfolioDetail = /^\/portfolios\/[^/]+$/.test(path);
+  const showBackButton = isPortfolioPerformance || isPortfolioAccount || isPortfolioDetail;
+  const backTarget = isPortfolioPerformance
+    ? path.replace(/\/performance$/, '')
+    : isPortfolioAccount
+      ? path.replace(/\/accounts\/[^/]+$/, '')
+      : '/portfolios';
+
   return (
     <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center justify-between border-b border-border bg-background/95 backdrop-blur px-3 md:px-6 pl-14 md:pl-6">
-      <div>
+      <div className="flex items-center gap-2">
+        {showBackButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
+            onClick={() => navigate(backTarget)}
+            aria-label="Back"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        )}
         <h1 className="text-base md:text-xl font-semibold text-foreground">{title}</h1>
         {subtitle && <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">{subtitle}</p>}
       </div>

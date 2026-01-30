@@ -1,4 +1,3 @@
-import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
@@ -10,6 +9,8 @@ export interface TransactionDisplay {
   date: string;
   data: any;
 }
+
+type SortConfig = { key: string; direction: 'asc' | 'desc' };
 
 interface TransactionsTableProps {
   transactions: TransactionDisplay[];
@@ -25,6 +26,8 @@ interface TransactionsTableProps {
   // Funciones helper pasadas desde el padre para renderizar datos complejos
   getColumnValue: (transaction: TransactionDisplay, key: string) => string;
   getTypeColor: (typeValue: string) => { bg: string; text: string; icon: string };
+  sortConfig: SortConfig;
+  onSort: (key: string) => void;
 }
 
 export const TransactionsTable = ({
@@ -40,6 +43,8 @@ export const TransactionsTable = ({
   onPageChange,
   getColumnValue,
   getTypeColor,
+  sortConfig,
+  onSort,
 }: TransactionsTableProps) => {
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden mb-4 md:mb-6">
@@ -99,9 +104,13 @@ export const TransactionsTable = ({
                   return (
                     <th
                       key={colKey}
-                      className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+                      className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                      onClick={() => onSort(colKey)}
                     >
-                      {col ? col.label : colKey}
+                      <div className="flex items-center gap-1">
+                        {col ? col.label : colKey}
+                        <ArrowUpDown className={`h-3 w-3 ${sortConfig.key === colKey ? 'opacity-100' : 'opacity-40'}`} />
+                      </div>
                     </th>
                   );
                 })}
