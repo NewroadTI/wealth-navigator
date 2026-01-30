@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { API_BASE_URL } from '@/lib/config';
+import { getApiBaseUrl } from '@/lib/config';
 import { formatCurrency, formatPercent, formatDate, getChangeColor } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -181,7 +181,7 @@ const POSITION_DEFAULT_COLUMNS = [
 const PortfolioAccounts = () => {
     const { portfolioId, accountId } = useParams();
     const { toast } = useToast();
-    const apiBaseUrl = API_BASE_URL;
+    const apiBaseUrl = getApiBaseUrl();
 
     // State
     const [portfolio, setPortfolio] = useState<PortfolioApi | null>(null);

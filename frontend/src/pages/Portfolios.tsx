@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PortfolioCard } from '@/components/portfolios/PortfolioCard';
-import { API_BASE_URL } from '@/lib/config';
+import { getApiBaseUrl } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -72,14 +72,14 @@ const Portfolios = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const apiBaseUrl = API_BASE_URL;
+  const apiBaseUrl = getApiBaseUrl();
 
   // Load portfolios
   useEffect(() => {
     const loadPortfolios = async () => {
       try {
         setPortfoliosLoading(true);
-        const response = await fetch(`${apiBaseUrl}/api/v1/portfolios`);
+        const response = await fetch(`${apiBaseUrl}/api/v1/portfolios/`);
         if (!response.ok) throw new Error('Failed to load portfolios');
         const data = await response.json();
         setPortfolios(data);

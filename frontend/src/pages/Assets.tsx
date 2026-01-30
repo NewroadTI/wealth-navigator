@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { API_BASE_URL } from '@/lib/config';
+import { getApiBaseUrl } from '@/lib/config';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable';
 import { portfolios, getPortfolioTransactions } from '@/lib/mockData';
@@ -58,7 +58,7 @@ const Assets = () => {
   ]);
   const pageSize = 100;
   const maxAssets = 3000;
-  const apiBaseUrl = API_BASE_URL;
+  const apiBaseUrl = getApiBaseUrl();
 
   const [newAssetDraft, setNewAssetDraft] = useState<AssetFormState>(defaultAssetFormState);
   const [editAssetDraft, setEditAssetDraft] = useState<AssetFormState>(defaultAssetFormState);

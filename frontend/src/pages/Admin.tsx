@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { API_BASE_URL } from '@/lib/config';
+import { getApiBaseUrl } from '@/lib/config';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, Users, Eye } from 'lucide-react';
@@ -13,7 +13,7 @@ import type { RoleApi, UserApi } from './AdminSections';
 
 const Admin = () => {
   const { toast } = useToast();
-  const apiBaseUrl = API_BASE_URL;
+  const apiBaseUrl = getApiBaseUrl();
 
   // --- ROLES STATE ---
   const [roles, setRoles] = useState<RoleApi[]>([]);

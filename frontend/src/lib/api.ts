@@ -1,5 +1,8 @@
 // API client configuration and services
-import { API_BASE_URL } from './config';
+import { getApiBaseUrl } from './config';
+
+// Helper function to get API base URL - ensures runtime evaluation
+const getBaseUrl = () => getApiBaseUrl();
 
 // API_BASE_URL is centrally configured in src/lib/config.ts
 
@@ -57,7 +60,7 @@ export interface AssetApi {
 // Catalogs API
 export const catalogsApi = {
   async getAssetClasses(): Promise<AssetClass[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/catalogs/asset-classes`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/catalogs/asset-classes`);
     if (!response.ok) {
       throw new Error('Failed to fetch asset classes');
     }
@@ -75,7 +78,7 @@ export const assetsApi = {
       params.set('limit', String(options.limit));
     }
     const query = params.toString();
-    const response = await fetch(`${API_BASE_URL}/api/v1/assets/${query ? `?${query}` : ''}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/assets/${query ? `?${query}` : ''}`);
     if (!response.ok) {
       throw new Error('Failed to fetch assets');
     }
@@ -83,7 +86,7 @@ export const assetsApi = {
   },
 
   async getAssetById(assetId: number): Promise<AssetApi> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/assets/${assetId}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/assets/${assetId}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch asset ${assetId}`);
     }
@@ -231,7 +234,7 @@ export const transactionsApi = {
     if (accountId !== undefined) {
       params.set('account_id', String(accountId));
     }
-    const response = await fetch(`${API_BASE_URL}/api/v1/transactions/trades?${params.toString()}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/transactions/trades?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to fetch trades');
     }
@@ -248,7 +251,7 @@ export const transactionsApi = {
     if (type !== undefined) {
       params.set('type', type);
     }
-    const response = await fetch(`${API_BASE_URL}/api/v1/transactions/cash-journal?${params.toString()}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/transactions/cash-journal?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to fetch cash journal');
     }
@@ -262,7 +265,7 @@ export const transactionsApi = {
     if (accountId !== undefined) {
       params.set('account_id', String(accountId));
     }
-    const response = await fetch(`${API_BASE_URL}/api/v1/transactions/fx-transactions?${params.toString()}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/transactions/fx-transactions?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to fetch FX transactions');
     }
@@ -276,7 +279,7 @@ export const transactionsApi = {
     if (accountId !== undefined) {
       params.set('account_id', String(accountId));
     }
-    const response = await fetch(`${API_BASE_URL}/api/v1/transactions/corporate-actions?${params.toString()}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/transactions/corporate-actions?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to fetch corporate actions');
     }
@@ -287,7 +290,7 @@ export const transactionsApi = {
 // Account API
 export const accountsApi = {
   async getAccounts(): Promise<Account[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/accounts`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/accounts/`);
     if (!response.ok) {
       throw new Error('Failed to fetch accounts');
     }
@@ -298,7 +301,7 @@ export const accountsApi = {
 // Users API
 export const usersApi = {
   async getUsers(): Promise<User[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/users`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/users/`);
     if (!response.ok) {
       throw new Error('Failed to fetch users');
     }
@@ -309,7 +312,7 @@ export const usersApi = {
 // Portfolio API
 export const portfoliosApi = {
   async getPortfolios(): Promise<Portfolio[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/portfolios/`);
     if (!response.ok) {
       throw new Error('Failed to fetch portfolios');
     }
@@ -328,7 +331,7 @@ export const portfoliosApi = {
       params.set('active_only', String(options.active_only));
     }
     const query = params.toString();
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/simple${query ? `?${query}` : ''}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/portfolios/simple${query ? `?${query}` : ''}`);
     if (!response.ok) {
       throw new Error('Failed to fetch portfolios simple');
     }
@@ -375,7 +378,7 @@ export const positionsApi = {
       accountIds.forEach(id => params.append('account_ids', String(id)));
     }
     const query = params.toString();
-    const response = await fetch(`${API_BASE_URL}/api/v1/positions/account-balances${query ? `?${query}` : ''}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/positions/account-balances${query ? `?${query}` : ''}`);
     if (!response.ok) {
       throw new Error('Failed to fetch account balances');
     }
@@ -390,7 +393,7 @@ export const positionsApi = {
     params.set('skip', String(skip));
     params.set('limit', String(limit));
     const query = params.toString();
-    const response = await fetch(`${API_BASE_URL}/api/v1/positions/${query ? `?${query}` : ''}`);
+    const response = await fetch(`${getBaseUrl()}/api/v1/positions/${query ? `?${query}` : ''}`);
     if (!response.ok) {
       throw new Error('Failed to fetch positions');
     }
