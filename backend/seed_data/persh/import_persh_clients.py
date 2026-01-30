@@ -154,10 +154,45 @@ def run_import():
              print("[ERROR] Role INVESTOR not found. Please seed roles first.")
              return
 
+        # Pre-scan for collisions
+        # We need to know BEFORE processing if a code will collide.
+        
+        counts = {}
+        # We need to peek at what the code WOULD be for all known clients
+        client_names = list(client_data.keys())
+        temp_code_map = {} # raw_name -> default_code
+
+        for raw_name in client_names:
+             default_code = generate_interface_code(raw_name)
+             temp_code_map[raw_name] = default_code
+             counts[default_code] = counts.get(default_code, 0) + 1
+             
+        colliding_codes = {code for code, count in counts.items() if count > 1}
+        
+        if colliding_codes:
+            print(f"⚠️  Detected {len(colliding_codes)} colliding portfolio codes. Will apply resolution strategy.")
+
         for raw_name, accounts in client_data.items():
             # Check Match
             match = fuzzy_match_user(db, raw_name)
             
+            # Prepare the portfolio code with collision logic
+            base_code = generate_interface_code(raw_name)
+            final_p_code = base_code
+            
+            if base_code in colliding_codes:
+                # Collision detected: Append First Name
+                # Format: "Surname1 Surname2, Name" -> We want "Name"
+                # User instruction: "separando la primera palabra despues de la ','"
+                if ',' in raw_name:
+                    parts = raw_name.split(',')
+                    if len(parts) > 1:
+                        first_name_part = parts[1].strip().split()[0] # Take first token after comma
+                        # Remove non-alphanumeric just in case
+                        first_name_clean = re.sub(r'[^a-zA-Z0-9]', '', first_name_part)
+                        final_p_code = f"{base_code}{first_name_clean}".upper()
+                        print(f"   🔧 Resolving collision for '{raw_name}': {base_code} -> {final_p_code}")
+
             if match:
                 # User Exists
                 print(f"🔹 MATCH: '{raw_name}' -> DB: '{match.full_name}' (ID: {match.user_id})")
@@ -177,7 +212,7 @@ def run_import():
                     # I will assume we should create it if missing, using the same naming logic.
                     
                     p_name = f"{match.full_name}'s Portfolio" # Fallback to DB name
-                    p_code = generate_interface_code(match.full_name)
+                    p_code = final_p_code
                     actions.append({
                         "type": "create_portfolio_and_accounts",
                         "user": match,
@@ -219,7 +254,7 @@ def run_import():
                     p_base_name = clean_name_for_port
                 
                 p_name = f"{p_base_name}'s Portfolio"
-                p_code = generate_interface_code(raw_name)
+                p_code = final_p_code
                 
                 print(f"   Plan: Create User -> Port '{p_name}' ({p_code}) -> {len(accounts)} Accounts")
                 
