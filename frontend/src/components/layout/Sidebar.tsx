@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -47,6 +48,7 @@ const navigation: NavItem[] = [
   { name: 'CRM', href: '/crm', icon: Contact },
   { name: 'Basic Data', href: '/basic-data', icon: Database },
   { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'ETL Sync', href: '/etl', icon: RefreshCw },
   { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

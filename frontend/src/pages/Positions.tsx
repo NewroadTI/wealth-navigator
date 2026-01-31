@@ -24,10 +24,24 @@ interface AggregatedAsset {
   total_market_value: number;
   total_pnl_unrealized: number;
   day_change_pct: number;
+  // Distribución de rendimiento
+  gainers_count: number;
+  losers_count: number;
+  neutral_count: number;
+  best_pnl_pct: number | null;
+  worst_pnl_pct: number | null;
+  median_pnl_pct: number | null;
+  // Desglose por cuenta
   institutions: Array<{
     institution: string;
     account_id: number;
     user_name: string | null;
+    quantity: number | null;
+    avg_cost_price: number | null;
+    market_price: number | null;
+    market_value: number | null;
+    unrealized_pnl: number | null;
+    day_change_pct: number | null;
   }>;
   account_ids: number[];
 }
@@ -156,7 +170,7 @@ const Positions = () => {
     );
   }, [filterOptions?.assets, assetSearchQuery]);
 
-  // Filter positions by table search and selected asset
+  // Filter positions by table search (NOT by selected asset - selection only expands)
   const filteredPositions = useMemo(() => {
     let result = [...positions];
 
@@ -173,12 +187,11 @@ const Positions = () => {
       );
     }
 
-    if (selectedAssetInTable) {
-      result = result.filter(p => p.asset_id === selectedAssetInTable);
-    }
+    // Ordenar por número de accounts (mayor a menor)
+    result.sort((a, b) => b.institutions.length - a.institutions.length);
 
     return result;
-  }, [positions, tableSearchQuery, selectedAssetInTable]);
+  }, [positions, tableSearchQuery]);
 
   // Paginate
   const totalPages = Math.ceil(filteredPositions.length / ITEMS_PER_PAGE);
@@ -499,8 +512,9 @@ const Positions = () => {
                   <th className="text-right">Market Price</th>
                   <th className="text-right">Market Value</th>
                   <th className="text-right">Unrealized P&L</th>
+                  <th className="text-center">Distribution</th>
                   <th className="text-right">Day Chg %</th>
-                  <th className="text-right">Institutions</th>
+                  <th className="text-right">Accounts</th>
                 </tr>
               </thead>
               <tbody>
@@ -538,6 +552,20 @@ const Positions = () => {
                             </p>
                           </div>
                         </td>
+                        <td className="text-center">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex items-center gap-1 text-xs">
+                              <span className="text-gain font-medium">▲{asset.gainers_count}</span>
+                              <span className="text-muted-foreground">|</span>
+                              <span className="text-loss font-medium">▼{asset.losers_count}</span>
+                            </div>
+                            {asset.median_pnl_pct !== null && (
+                              <span className={cn('text-[10px] mono', getChangeColor(asset.median_pnl_pct))}>
+                                Med: {asset.median_pnl_pct >= 0 ? '+' : ''}{asset.median_pnl_pct.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="text-right">
                           <span className={cn('text-sm mono', getChangeColor(asset.day_change_pct))}>
                             {isPositiveDay ? '+' : ''}{formatPercent(asset.day_change_pct)}
@@ -552,31 +580,99 @@ const Positions = () => {
                       {/* Expanded Account Details */}
                       {isSelected && (
                         <tr key={`expand-${asset.asset_id}`} className="bg-muted/30">
-                          <td colSpan={8} className="p-0">
+                          <td colSpan={9} className="p-0">
                             <div className="p-4 border-t border-border">
+                              {/* Resumen de distribución */}
+                              <div className="mb-4 p-3 bg-card rounded-lg border border-border">
+                                <p className="text-xs font-medium text-muted-foreground mb-2">Performance Distribution</p>
+                                <div className="flex flex-wrap gap-4 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gain font-medium">▲ {asset.gainers_count} gaining</span>
+                                    <span className="text-muted-foreground">|</span>
+                                    <span className="text-loss font-medium">▼ {asset.losers_count} losing</span>
+                                    {asset.neutral_count > 0 && (
+                                      <>
+                                        <span className="text-muted-foreground">|</span>
+                                        <span className="text-muted-foreground">{asset.neutral_count} neutral</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <span>Range:</span>
+                                    {asset.best_pnl_pct !== null && (
+                                      <span className="text-gain mono">+{asset.best_pnl_pct.toFixed(2)}%</span>
+                                    )}
+                                    <span>to</span>
+                                    {asset.worst_pnl_pct !== null && (
+                                      <span className="text-loss mono">{asset.worst_pnl_pct.toFixed(2)}%</span>
+                                    )}
+                                  </div>
+                                  {asset.median_pnl_pct !== null && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">Median:</span>
+                                      <span className={cn('mono font-medium', getChangeColor(asset.median_pnl_pct))}>
+                                        {asset.median_pnl_pct >= 0 ? '+' : ''}{asset.median_pnl_pct.toFixed(2)}%
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
                               <p className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-2">
                                 <Building2 className="h-3.5 w-3.5" />
-                                Institutions holding {asset.asset_symbol}
+                                Accounts holding {asset.asset_symbol} ({asset.institutions.length})
                               </p>
-                              <div className="grid gap-2">
-                                {asset.institutions.map((inst) => {
-                                  const displayName = inst.user_name 
-                                    ? `${inst.institution.toLowerCase()}-${inst.user_name}`
-                                    : inst.institution.toLowerCase();
-                                  
-                                  return (
-                                    <div 
-                                      key={`${inst.institution}-${inst.account_id}`}
-                                      className="flex items-center justify-between p-3 bg-card rounded-lg border border-border"
-                                    >
-                                      <div className="flex items-center gap-4">
-                                        <div>
-                                          <p className="text-sm font-medium text-foreground">{displayName}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b border-border">
+                                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Account</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Qty</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Avg Price</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Mkt Price</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Mkt Value</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unrealized P&L</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Day Chg %</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {asset.institutions.map((inst) => {
+                                      const displayName = inst.user_name 
+                                        ? `${inst.institution.toLowerCase()}-${inst.user_name}`
+                                        : inst.institution.toLowerCase();
+                                      const instPnlPositive = (inst.unrealized_pnl ?? 0) >= 0;
+                                      const instDayPositive = (inst.day_change_pct ?? 0) >= 0;
+                                      
+                                      return (
+                                        <tr 
+                                          key={`${inst.institution}-${inst.account_id}`}
+                                          className="border-b border-border/50 hover:bg-muted/30"
+                                        >
+                                          <td className="py-2 px-3 font-medium text-foreground">{displayName}</td>
+                                          <td className="text-right py-2 px-3 mono">{formatNumber(inst.quantity ?? 0)}</td>
+                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.avg_cost_price ?? 0)}</td>
+                                          <td className="text-right py-2 px-3 mono text-muted-foreground">
+                                            {inst.market_price ? formatCurrency(inst.market_price) : '—'}
+                                          </td>
+                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.market_value ?? 0)}</td>
+                                          <td className="text-right py-2 px-3">
+                                            <span className={cn('mono', getChangeColor(inst.unrealized_pnl ?? 0))}>
+                                              {instPnlPositive ? '+' : ''}{formatCurrency(inst.unrealized_pnl ?? 0)}
+                                            </span>
+                                          </td>
+                                          <td className="text-right py-2 px-3">
+                                            <span className={cn('mono', getChangeColor(inst.day_change_pct ?? 0))}>
+                                              {inst.day_change_pct !== null && inst.day_change_pct !== 0 
+                                                ? `${instDayPositive ? '+' : ''}${formatPercent(inst.day_change_pct)}`
+                                                : '—'
+                                              }
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
                               </div>
                             </div>
                           </td>
@@ -586,7 +682,7 @@ const Positions = () => {
                   );
                 }) : (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={9} className="text-center py-8 text-muted-foreground">
                       {loading ? 'Loading positions...' : 'No positions found'}
                     </td>
                   </tr>

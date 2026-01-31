@@ -425,6 +425,85 @@ class InvestmentStrategy(Base):
     name = Column(String, nullable=False, unique=True)
     description = Column(Text, nullable=True)
 
+
+# ==========================================================================
+# ETL JOB TRACKING
+# ==========================================================================
+
+class ETLJobLog(Base):
+    """
+    Registro de ejecuciones de jobs ETL para monitoreo y debugging.
+    """
+    __tablename__ = "etl_job_logs"
+    
+    job_id = Column(Integer, primary_key=True, index=True)
+    
+    # Identificación del job
+    job_type = Column(String, nullable=False, index=True)  # CORPORATES, TRADES, POSITIONS, etc.
+    job_name = Column(String, nullable=True)  # Nombre descriptivo
+    
+    # Estado del job
+    status = Column(String, nullable=False, default="pending")  # pending, running, success, failed, partial
+    
+    # Timestamps
+    started_at = Column(DateTime, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Métricas
+    records_processed = Column(Integer, default=0)
+    records_created = Column(Integer, default=0)
+    records_updated = Column(Integer, default=0)
+    records_skipped = Column(Integer, default=0)
+    records_failed = Column(Integer, default=0)
+    
+    # Detalles del archivo procesado
+    file_name = Column(String, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    
+    # Logs y errores (JSONB para flexibilidad)
+    error_message = Column(Text, nullable=True)
+    error_details = Column(JSONB, nullable=True)  # Lista de errores detallados
+    
+    # Metadata adicional
+    execution_time_seconds = Column(Numeric, nullable=True)
+    created_assets = Column(JSONB, nullable=True)  # Assets creados automáticamente
+    extra_data = Column(JSONB, nullable=True)  # Datos adicionales flexibles
+
+
+class ETLSyncStatus(Base):
+    """
+    Estado actual de sincronización por tipo de reporte.
+    Una fila por tipo de reporte, se actualiza con cada ejecución.
+    """
+    __tablename__ = "etl_sync_status"
+    
+    status_id = Column(Integer, primary_key=True, index=True)
+    report_type = Column(String, unique=True, nullable=False, index=True)  # CORPORATES, TRADES, etc.
+    
+    # Última ejecución exitosa
+    last_success_at = Column(DateTime, nullable=True)
+    last_success_records = Column(Integer, default=0)
+    
+    # Última ejecución (cualquier estado)
+    last_run_at = Column(DateTime, nullable=True)
+    last_run_status = Column(String, nullable=True)  # success, failed, partial
+    last_run_job_id = Column(Integer, ForeignKey("etl_job_logs.job_id"), nullable=True)
+    
+    # Estadísticas acumuladas
+    total_runs_today = Column(Integer, default=0)
+    total_records_today = Column(Integer, default=0)
+    success_rate_today = Column(Numeric, default=100)
+    
+    # Última fecha del reporte de datos
+    last_data_date = Column(Date, nullable=True)  # Fecha más reciente en los datos procesados
+    
+    # Configuración
+    is_enabled = Column(Boolean, default=True)
+    auto_sync_enabled = Column(Boolean, default=False)
+    
+    last_job = relationship("ETLJobLog", foreign_keys=[last_run_job_id])
+
+
 event.listen(
     MarketPrice.__table__, 
     'after_create', 

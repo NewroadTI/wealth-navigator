@@ -20,6 +20,13 @@ class InstitutionInfo(BaseModel):
     institution: str
     account_id: int
     user_name: Optional[str] = None  # Ej: "roberto_sr" (4 letras nombre-3 letras apellido)
+    # Datos específicos de esta cuenta para el asset
+    quantity: Optional[float] = None
+    avg_cost_price: Optional[float] = None
+    market_price: Optional[float] = None  # Para futura implementación con API IBKR
+    market_value: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+    day_change_pct: Optional[float] = None  # Calculado vs día anterior
 
 # --- SCHEMA PARA TABLA AGREGADA ---
 class PositionAggregated(BaseModel):
@@ -36,6 +43,14 @@ class PositionAggregated(BaseModel):
     # PnL y Rendimiento
     total_pnl_unrealized: float
     day_change_pct: Optional[float] = None # Comparación con día anterior
+    
+    # Distribución de rendimiento (para ver si el agregado es representativo)
+    gainers_count: int = 0          # Cuentas con PnL positivo
+    losers_count: int = 0           # Cuentas con PnL negativo
+    neutral_count: int = 0          # Cuentas con PnL = 0
+    best_pnl_pct: Optional[float] = None   # Mejor rendimiento % individual
+    worst_pnl_pct: Optional[float] = None  # Peor rendimiento % individual
+    median_pnl_pct: Optional[float] = None # Mediana de rendimientos %
     
     # Desglose
     institutions: List[InstitutionInfo]    # Lista de instituciones con info de usuario
