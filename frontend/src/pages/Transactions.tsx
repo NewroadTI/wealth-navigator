@@ -10,11 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { transactionsApi, accountsApi, usersApi, portfoliosApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, User, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
+import { transactionsApi, accountsApi, portfoliosApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable'; // Ajusta la ruta
 
 
@@ -29,6 +29,13 @@ interface TransactionDisplay {
 
 const transactionTypeFilters = ['Trade', 'CashJournal', 'FX', 'CorporateAction'];
 
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+  key: string;
+  direction: SortDirection;
+}
+
 // Define columns for each transaction type
 interface ColumnDef {
   key: string;
@@ -40,6 +47,14 @@ interface ColumnDef {
 // All available columns organized by data
 const ALL_COLUMNS: ColumnDef[] = [
   // Common columns
+  { key: 'table_type', label: 'Type', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+    if ('transaction_id' in d && 'side' in d) return `trade/${(d as Trade).side.toLowerCase()}`;
+    if ('journal_id' in d) return `cj:${(d as CashJournal).type.toLowerCase()}`;
+    if ('fx_id' in d) return 'fx/fxtrade';
+    if ('action_id' in d) return `ca:${(d as CorporateAction).action_type.toLowerCase()}`;
+    return '';
+  }},
+  { key: 'portfolio', label: 'Portfolio', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: () => '' },
   { key: 'account_id', label: 'Account ID', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
     if ('account_id' in d) return (d as any).account_id || '';
     return '';
@@ -62,14 +77,6 @@ const ALL_COLUMNS: ColumnDef[] = [
     if ('journal_id' in d && 'amount' in d) return (d as CashJournal).amount || '';
     if ('fx_id' in d && 'source_amount' in d) return (d as FxTransaction).source_amount || '';
     if ('action_id' in d && 'amount' in d) return (d as CorporateAction).amount || '';
-    return '';
-  }},
-  // Type of table (fx/fxtrade, cj:dividend, etc.)
-  { key: 'table_type', label: 'Type', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d && 'side' in d) return `trade/${(d as Trade).side.toLowerCase()}`;
-    if ('journal_id' in d) return `cj:${(d as CashJournal).type.toLowerCase()}`;
-    if ('fx_id' in d) return 'fx/fxtrade';
-    if ('action_id' in d) return `ca:${(d as CorporateAction).action_type.toLowerCase()}`;
     return '';
   }},
   // Currency columns (unified)
@@ -132,14 +139,31 @@ const ALL_COLUMNS: ColumnDef[] = [
 ];
 
 // Default visible columns
-const DEFAULT_VISIBLE_COLUMNS = ['table_type', 'account_id', 'asset_id', 'date', 'amount', 'currency', 'description', 'quantity', 'side'];
+const DEFAULT_VISIBLE_COLUMNS = ['table_type', 'portfolio', 'account_id', 'asset_id', 'date', 'amount', 'currency', 'description', 'quantity', 'side'];
+const COLUMN_ORDER = ALL_COLUMNS.map((col) => col.key);
+
+const SORTABLE_DATE_COLUMNS = new Set(['date', 'settlement_date', 'report_date', 'ex_date']);
+const SORTABLE_NUMERIC_COLUMNS = new Set([
+  'amount',
+  'quantity',
+  'price',
+  'gross_amount',
+  'net_amount',
+  'commission',
+  'tax',
+  'rate_per_share',
+  'source_amount',
+  'target_amount',
+  'exchange_rate',
+  'ratio_old',
+  'ratio_new',
+]);
 
 const Transactions = () => {
   // Component for displaying and filtering transactions
   const location = useLocation();
   const [allTransactions, setAllTransactions] = useState<TransactionDisplay[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [portfoliosSimple, setPortfoliosSimple] = useState<PortfolioSimple[]>([]);
   const [assetCache, setAssetCache] = useState<Map<number, { symbol: string; class_id?: number; sub_class_id?: number }>>(new Map()); // Cache asset_id -> {symbol, class_id, sub_class_id}
@@ -163,6 +187,7 @@ const Transactions = () => {
 
   // Column visibility
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -179,7 +204,7 @@ const Transactions = () => {
         setLoading(true);
         setError(null);
 
-        const [trades, cashJournal, fxTransactions, corporateActions, accountsData, usersData, portfoliosData] = await Promise.all([
+        const [trades, cashJournal, fxTransactions, corporateActions, accountsData, portfoliosData] = await Promise.all([
           transactionsApi.getTrades(0, 1000),
           transactionsApi.getCashJournal(0, 1000),
           transactionsApi.getFxTransactions(0, 1000),
@@ -190,7 +215,6 @@ const Transactions = () => {
         ]);
 
         setAccounts(accountsData);
-        setUsers(usersData);
         setPortfolios(portfoliosData);
 
         // Build transaction list with type identification
@@ -221,7 +245,7 @@ const Transactions = () => {
           })),
         ];
 
-        // Sort by date (most recent first)
+        // Sort by date (most recent first) - default order
         txList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setAllTransactions(txList);
       } catch (err) {
@@ -330,12 +354,6 @@ const Transactions = () => {
     return map;
   }, [portfolios]);
 
-  const userMap = useMemo(() => {
-    const map = new Map<number, User>();
-    users.forEach(u => map.set(u.user_id, u));
-    return map;
-  }, [users]);
-
   // Filter transactions with optimized lookups
   const filteredTransactions = useMemo(() => {
     const selectedClassId = selectedAssetClass === 'all' ? null : Number(selectedAssetClass);
@@ -430,25 +448,18 @@ const Transactions = () => {
   const getColumnValue = (transaction: TransactionDisplay, columnKey: string): string => {
     const data = transaction.data;
 
-    // Special case: account_id should show institution-username
+    // Special case: account_id should show account alias
     if (columnKey === 'account_id' && 'account_id' in data) {
       const account = accountMap.get((data as any).account_id);
-      if (account) {
-        const portfolio = portfolioMap.get(account.portfolio_id);
-        if (portfolio) {
-          const user = userMap.get(portfolio.owner_user_id);
-          if (user) {
-            const nameParts = user.full_name.split(' ').filter(p => p.length > 0);
-            if (nameParts.length > 0) {
-              const firstName = nameParts[0].toLowerCase();
-              const lastName = nameParts[nameParts.length - 1];
-              const lastNameAbbr = lastName.substring(0, 3).toLowerCase();
-              return `${account.institution.toLowerCase()}-${firstName}_${lastNameAbbr}`;
-            }
-          }
-        }
-      }
-      return '';
+      return account?.account_alias || '';
+    }
+
+    // Portfolio interface code
+    if (columnKey === 'portfolio' && 'account_id' in data) {
+      const account = accountMap.get((data as any).account_id);
+      if (!account) return '';
+      const portfolio = portfolioMap.get(account.portfolio_id);
+      return portfolio?.interface_code || '';
     }
 
     // Special case: asset_id - fetch symbol from cache
@@ -494,14 +505,48 @@ const Transactions = () => {
     return { bg: 'bg-gray-100/80 dark:bg-gray-950/40', text: 'text-gray-700 dark:text-gray-400', icon: '◆' };
   };
 
+  const getSortableValue = (transaction: TransactionDisplay, columnKey: string): number | string | null => {
+    if (columnKey === 'date') {
+      const ts = new Date(transaction.date).getTime();
+      return Number.isFinite(ts) ? ts : null;
+    }
+    const value = getColumnValue(transaction, columnKey);
+    if (SORTABLE_DATE_COLUMNS.has(columnKey)) {
+      const ts = Date.parse(value);
+      return Number.isFinite(ts) ? ts : null;
+    }
+    if (SORTABLE_NUMERIC_COLUMNS.has(columnKey)) {
+      const num = Number.parseFloat(String(value));
+      return Number.isFinite(num) ? num : null;
+    }
+    return String(value || '').toLowerCase();
+  };
+
+  const sortedTransactions = useMemo(() => {
+    const rows = [...filteredTransactions];
+    const { key, direction } = sortConfig;
+    rows.sort((a, b) => {
+      const aVal = getSortableValue(a, key);
+      const bVal = getSortableValue(b, key);
+      const dir = direction === 'asc' ? 1 : -1;
+      if (aVal === null || aVal === '') return 1;
+      if (bVal === null || bVal === '') return -1;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return (aVal - bVal) * dir;
+      }
+      return String(aVal).localeCompare(String(bVal)) * dir;
+    });
+    return rows;
+  }, [filteredTransactions, sortConfig, accountMap, portfolioMap, assetCache]);
+
   // Pagination - computed once per render
   const paginationData = useMemo(() => {
-    const total = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+    const total = Math.max(1, Math.ceil(sortedTransactions.length / pageSize));
     const safe = Math.min(currentPage, total);
-    const start = filteredTransactions.length === 0 ? 0 : (safe - 1) * pageSize + 1;
-    const end = Math.min(safe * pageSize, filteredTransactions.length);
-    return { totalPages: total, safePage: safe, pageStart: start, pageEnd: end, paginatedTransactions: filteredTransactions.slice((safe - 1) * pageSize, (safe - 1) * pageSize + pageSize) };
-  }, [filteredTransactions, currentPage, pageSize]);
+    const start = sortedTransactions.length === 0 ? 0 : (safe - 1) * pageSize + 1;
+    const end = Math.min(safe * pageSize, sortedTransactions.length);
+    return { totalPages: total, safePage: safe, pageStart: start, pageEnd: end, paginatedTransactions: sortedTransactions.slice((safe - 1) * pageSize, (safe - 1) * pageSize + pageSize) };
+  }, [sortedTransactions, currentPage, pageSize]);
 
   const { totalPages, safePage, pageStart, pageEnd, paginatedTransactions } = paginationData;
 
@@ -514,11 +559,20 @@ const Transactions = () => {
   };
 
   const toggleColumnVisibility = (columnKey: string) => {
-    setVisibleColumns((prev) =>
-      prev.includes(columnKey)
+    setVisibleColumns((prev) => {
+      const next = prev.includes(columnKey)
         ? prev.filter((c) => c !== columnKey)
-        : [...prev, columnKey]
-    );
+        : [...prev, columnKey];
+      return [...next].sort((a, b) => COLUMN_ORDER.indexOf(a) - COLUMN_ORDER.indexOf(b));
+    });
+  };
+
+  const toggleSort = (columnKey: string) => {
+    setSortConfig((prev) => ({
+      key: columnKey,
+      direction: prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+    setCurrentPage(1);
   };
 
   const handleSumIncome = () => {
@@ -901,6 +955,8 @@ const Transactions = () => {
         onPageChange={setCurrentPage}
         getColumnValue={getColumnValue}
         getTypeColor={getTypeColor}
+        sortConfig={sortConfig}
+        onSort={toggleSort}
       />
 
       {/* Sum Display - Below Table */}

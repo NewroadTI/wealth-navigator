@@ -9,6 +9,7 @@ python-jose[cryptography]
 email-validator
 pandas
 requests
+openpyxl
 apscheduler
 requests
 pandas

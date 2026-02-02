@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { getApiBaseUrl } from '@/lib/config';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { TransactionsTable } from '@/components/transactions/TransactionsTable';
-import { portfolios, getPortfolioTransactions } from '@/lib/mockData';
+import { portfolios } from '@/lib/mockData';
 import { assetsApi, catalogsApi, AssetApi, AssetClass } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -198,13 +197,6 @@ const Assets = () => {
   const selectedClassId = selectedAssetClass === 'all' ? null : Number(selectedAssetClass);
   const selectedSubClassId = selectedAssetSubclass === 'all' ? null : Number(selectedAssetSubclass);
   const selectedClassName = selectedClassId ? classNameById.get(selectedClassId) : undefined;
-
-  // Get transactions filtered by portfolio and asset class
-  const filteredTransactions = selectedPortfolio === 'all'
-    ? []
-    : getPortfolioTransactions(selectedPortfolio).filter(
-      t => (selectedAssetClass === 'all' || (selectedClassName ? t.assetClass === selectedClassName : true))
-    );
 
   const portfolio = portfolios.find(p => p.id === selectedPortfolio);
 
@@ -757,23 +749,6 @@ const Assets = () => {
         onDeleteCancel={() => setAssetToDelete(null)}
       />
 
-      {/* Transactions by Asset */}
-      {selectedPortfolio !== 'all' && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="p-3 md:p-4 border-b border-border">
-            <h3 className="font-semibold text-foreground text-sm md:text-base">
-              Transactions {selectedAssetClass !== 'all' && `- ${selectedAssetClass}`}
-            </h3>
-          </div>
-          {filteredTransactions.length > 0 ? (
-            <TransactionsTable transactions={filteredTransactions} />
-          ) : (
-            <div className="p-8 text-center text-muted-foreground text-sm">
-              No transactions found for the selected filters
-            </div>
-          )}
-        </div>
-      )}
     </AppLayout>
   );
 };

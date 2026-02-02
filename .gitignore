@@ -40,5 +40,7 @@ scripts/
 
 backend/seed_data/insertion_summary.json
 
+#github
+.github/
 
 *csv
