@@ -111,9 +111,9 @@ const getStatusBadge = (status: string) => {
     pending: { variant: 'secondary', label: 'Pending' },
     never_run: { variant: 'outline', label: 'Never Run' },
   };
-  
+
   const { variant, label } = variants[status] || { variant: 'outline' as const, label: status };
-  
+
   return (
     <Badge variant={variant} className="text-xs">
       {label}
@@ -136,19 +136,19 @@ const getReportIcon = (reportType: string) => {
 
 const formatRelativeTime = (dateString: string | null) => {
   if (!dateString) return 'Never';
-  
+
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
-  
+
   return date.toLocaleDateString();
 };
 
@@ -169,15 +169,15 @@ const formatDuration = (seconds: number | null) => {
 // COMPONENTS
 // ==========================================================================
 
-const StatsCard = ({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon 
-}: { 
-  title: string; 
-  value: string | number; 
-  subtitle?: string; 
+const StatsCard = ({
+  title,
+  value,
+  subtitle,
+  icon: Icon
+}: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
   icon: React.ElementType;
 }) => (
   <Card>
@@ -198,11 +198,11 @@ const StatsCard = ({
   </Card>
 );
 
-const ReportStatusCard = ({ 
-  report, 
-  onTrigger 
-}: { 
-  report: ETLReportStatus; 
+const ReportStatusCard = ({
+  report,
+  onTrigger
+}: {
+  report: ETLReportStatus;
   onTrigger: (reportType: string) => void;
 }) => (
   <Card className="hover:shadow-md transition-shadow">
@@ -239,8 +239,8 @@ const ReportStatusCard = ({
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={() => onTrigger(report.report_type)}
               disabled={report.status === 'running'}
@@ -297,10 +297,10 @@ const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => (
 // MAIN COMPONENT
 // ==========================================================================
 
-const ETLDashboard = () => {
+const IBKRDashboard = () => {
   const { toast } = useToast();
   const apiBaseUrl = getApiBaseUrl();
-  
+
   const [data, setData] = useState<ETLDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -308,14 +308,14 @@ const ETLDashboard = () => {
 
   const fetchDashboard = async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
-    
+
     try {
       const response = await fetch(`${apiBaseUrl}/api/v1/etl/dashboard`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch dashboard data');
       }
-      
+
       const dashboardData = await response.json();
       setData(dashboardData);
     } catch (error) {
@@ -333,7 +333,7 @@ const ETLDashboard = () => {
 
   const triggerJob = async (reportType: string) => {
     setTriggeringJob(reportType);
-    
+
     try {
       const response = await fetch(`${apiBaseUrl}/api/v1/etl/trigger`, {
         method: 'POST',
@@ -342,21 +342,21 @@ const ETLDashboard = () => {
         },
         body: JSON.stringify({ report_type: reportType }),
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to trigger job');
       }
-      
+
       const result = await response.json();
-      
+
       toast({
         title: 'Job Started',
         description: `ETL job for ${reportType} has been started (ID: ${result.job_id})`,
       });
-      
+
       // Refresh after a short delay
       setTimeout(() => fetchDashboard(true), 1000);
-      
+
     } catch (error) {
       console.error('Error triggering job:', error);
       toast({
@@ -371,7 +371,7 @@ const ETLDashboard = () => {
 
   useEffect(() => {
     fetchDashboard();
-    
+
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => fetchDashboard(), 30000);
     return () => clearInterval(interval);
@@ -379,7 +379,7 @@ const ETLDashboard = () => {
 
   if (loading) {
     return (
-      <AppLayout title="ETL Dashboard" subtitle="Monitor IBKR data synchronization">
+      <AppLayout title="IBKR ETL Dashboard" subtitle="Monitor IBKR data synchronization">
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <Skeleton className="h-8 w-48" />
@@ -402,7 +402,7 @@ const ETLDashboard = () => {
   }
 
   return (
-    <AppLayout title="ETL Dashboard" subtitle="Monitor IBKR data synchronization">
+    <AppLayout title="IBKR ETL Dashboard" subtitle="Monitor IBKR data synchronization">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -412,8 +412,8 @@ const ETLDashboard = () => {
                 Updated: {formatRelativeTime(data.last_updated)}
               </span>
             )}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => fetchDashboard(true)}
               disabled={refreshing}
@@ -513,4 +513,4 @@ const ETLDashboard = () => {
   );
 };
 
-export default ETLDashboard;
+export default IBKRDashboard;

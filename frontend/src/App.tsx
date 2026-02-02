@@ -19,7 +19,8 @@ import BasicData from "./pages/BasicData";
 import Admin from "./pages/Admin";
 import CRM from "./pages/CRM";
 import StructuredNotes from "./pages/StructuredNotes";
-import ETLDashboard from "./pages/ETLDashboard";
+import IBKRDashboard from "./pages/IBKRDashboard";
+import PershingDashboard from "./pages/PershingDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,7 +48,8 @@ const App = () => (
             <Route path="/basic-data" element={<BasicData />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/crm" element={<CRM />} />
-            <Route path="/etl" element={<ETLDashboard />} />
+            <Route path="/etl/ibkr" element={<IBKRDashboard />} />
+            <Route path="/etl/pershing" element={<PershingDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </NavigationHistoryProvider>
