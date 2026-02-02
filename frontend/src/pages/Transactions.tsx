@@ -14,7 +14,7 @@ import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle } fro
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { transactionsApi, accountsApi, portfoliosApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
+import { transactionsApi, accountsApi, portfoliosApi,usersApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable'; // Ajusta la ruta
 
 
