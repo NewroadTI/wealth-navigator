@@ -5,8 +5,8 @@ import glob
 def convert_excel_to_csv():
     # Get the directory where the script is located
     directory = os.path.dirname(os.path.abspath(__file__))
-    data_directory = os.path.join(directory, "data/all_transactions")
-    output_directory = os.path.join(directory, "transactions_csv")
+    data_directory = os.path.join(directory, "data/daily")
+    output_directory = os.path.join(directory, "daily_transactions_csv")
     
     # Create output directory if it doesn't exist
     if not os.path.exists(output_directory):
