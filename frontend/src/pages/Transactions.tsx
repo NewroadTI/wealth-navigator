@@ -184,7 +184,7 @@ const Transactions = () => {
           transactionsApi.getCashJournal(0, 1000),
           transactionsApi.getFxTransactions(0, 1000),
           transactionsApi.getCorporateActions(0, 1000),
-          accountsApi.getAccounts(),
+          accountsApi.getAccounts({ limit: 10000 }),  // Cargar todas las cuentas
           usersApi.getUsers(),
           portfoliosApi.getPortfolios(),
         ]);

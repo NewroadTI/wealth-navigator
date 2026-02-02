@@ -7,6 +7,7 @@ import pandas as pd
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from difflib import SequenceMatcher
 
 # Configuración de ruta
 sys.path.append("seed_data")
@@ -35,36 +36,227 @@ if not os.path.exists(SPLIT_DIR):
 
 JSON_OUTPUT_FILE = os.path.join(BASE_DIR, "insertion_summary.json")
 
-# Asumiendo que ya tienes tus imports de modelos y DB
-# from app.models.user import User
-# from app.models.portfolio import Portfolio, Account
+# Institución para este importador (solo IBKR)
+INSTITUTION = "IBKR"
+
+# Umbral de similaridad para matching de usuarios (0.0 a 1.0)
+SIMILARITY_THRESHOLD = 0.65
+
 CURRENCY_MAP = {
     "United States Dollar": "USD", "Hong Kong Dollar": "HKD", "Great British Pound": "GBP",
     "Euro": "EUR", "Canadian Dollar": "CAD", "Swiss Franc": "CHF",
     "Japanese Yen": "JPY", "Australian Dollar": "AUD", "Chinese Renminbi": "CNH",
-    "USD": "USD", "HKD": "HKD", "GBP": "GBP", "EUR": "EUR"
+    "Taiwan Dollar": "TWD", "New Taiwan Dollar": "TWD", "Singapore Dollar": "SGD",
+    "Mexican Peso": "MXN", "South Korean Won": "KRW", "Indian Rupee": "INR",
+    "USD": "USD", "HKD": "HKD", "GBP": "GBP", "EUR": "EUR", "TWD": "TWD",
+    "SGD": "SGD", "MXN": "MXN", "KRW": "KRW", "INR": "INR"
 }
-# Mapa de monedas global
+# Mapa de monedas global - incluyendo monedas adicionales para FX
 MONEDAS_SUPPORTED = [
-    "USD", "HKD", "GBP", "EUR", "CAD", "CHF", "JPY", "AUD", "CNH"
+    "USD", "HKD", "GBP", "EUR", "CAD", "CHF", "JPY", "AUD", "CNH",
+    "TWD", "SGD", "MXN", "KRW", "INR"  # Monedas adicionales para FX
 ]
+
+# --- ERROR TRACKING ---
+import_errors = []
+
+def log_error(error_type, message, details=None):
+    """Registra un error para el reporte final."""
+    error_entry = {
+        "type": error_type,
+        "message": message,
+        "details": details,
+        "timestamp": datetime.now().isoformat()
+    }
+    import_errors.append(error_entry)
+    logger.error(f"❌ [{error_type}] {message}")
+    if details:
+        logger.error(f"   Detalles: {details}")
+
+def print_error_summary():
+    """Imprime un resumen de todos los errores al final."""
+    if not import_errors:
+        logger.info("✅ No se registraron errores durante la importación.")
+        return
+    
+    print("\n" + "="*60)
+    print("📋 RESUMEN DE ERRORES")
+    print("="*60)
+    
+    # Agrupar por tipo
+    errors_by_type = {}
+    for err in import_errors:
+        t = err["type"]
+        if t not in errors_by_type:
+            errors_by_type[t] = []
+        errors_by_type[t].append(err)
+    
+    for error_type, errors in errors_by_type.items():
+        print(f"\n🔴 {error_type}: {len(errors)} errores")
+        for err in errors[:5]:  # Mostrar solo los primeros 5 de cada tipo
+            print(f"   - {err['message']}")
+        if len(errors) > 5:
+            print(f"   ... y {len(errors) - 5} más")
+    
+    print(f"\n📊 Total de errores: {len(import_errors)}")
+    print("="*60)
+
+# --- FUNCIONES DE NORMALIZACIÓN Y SIMILARIDAD ---
+
+def normalize_name(name):
+    """
+    Normaliza un nombre para comparación:
+    - Convierte a minúsculas
+    - Remueve acentos/tildes
+    - Remueve caracteres especiales
+    - Normaliza espacios
+    """
+    if not name:
+        return ""
+    
+    # Convertir a minúsculas
+    name = name.lower()
+    
+    # Mapeo de acentos
+    accent_map = {
+        'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+        'ñ': 'n', 'ü': 'u', 'à': 'a', 'è': 'e', 'ì': 'i',
+        'ò': 'o', 'ù': 'u', 'ä': 'a', 'ë': 'e', 'ï': 'i',
+        'ö': 'o', 'ç': 'c'
+    }
+    for accent, replacement in accent_map.items():
+        name = name.replace(accent, replacement)
+    
+    # Remover "and" y conectores comunes (para cuentas conjuntas)
+    name = re.sub(r'\band\b', ' ', name)
+    name = re.sub(r'\by\b', ' ', name)
+    name = re.sub(r'\b(sr|jr|sra|de|la|del|vda|los|las)\b', ' ', name)
+    
+    # Remover puntuación y caracteres especiales
+    name = re.sub(r'[^a-z0-9\s]', ' ', name)
+    
+    # Normalizar espacios múltiples
+    name = re.sub(r'\s+', ' ', name).strip()
+    
+    return name
+
+def extract_primary_name(full_name):
+    """
+    Extrae el nombre principal de una cuenta (primer titular).
+    Para "Santiago C Pardo Barrena and Rocio Diaz Garcia" -> "Santiago C Pardo Barrena"
+    """
+    if not full_name:
+        return ""
+    
+    # Separar por "and" o "&"
+    parts = re.split(r'\s+and\s+|\s*&\s*', full_name, flags=re.IGNORECASE)
+    return parts[0].strip() if parts else full_name
+
+def calculate_name_similarity(name1, name2):
+    """
+    Calcula la similaridad entre dos nombres usando múltiples estrategias.
+    Retorna un score de 0.0 a 1.0
+    """
+    # Normalizar ambos nombres
+    norm1 = normalize_name(name1)
+    norm2 = normalize_name(name2)
+    
+    if not norm1 or not norm2:
+        return 0.0
+    
+    # Estrategia 1: SequenceMatcher directo
+    direct_ratio = SequenceMatcher(None, norm1, norm2).ratio()
+    
+    # Estrategia 2: Comparación de tokens (palabras)
+    tokens1 = set(norm1.split())
+    tokens2 = set(norm2.split())
+    
+    if not tokens1 or not tokens2:
+        return direct_ratio
+    
+    # Jaccard similarity de tokens
+    intersection = len(tokens1 & tokens2)
+    union = len(tokens1 | tokens2)
+    token_ratio = intersection / union if union > 0 else 0
+    
+    # Estrategia 3: Tokens ordenados
+    sorted1 = ' '.join(sorted(tokens1))
+    sorted2 = ' '.join(sorted(tokens2))
+    sorted_ratio = SequenceMatcher(None, sorted1, sorted2).ratio()
+    
+    # Combinar scores (dar más peso a token matching)
+    final_score = (direct_ratio * 0.3) + (token_ratio * 0.4) + (sorted_ratio * 0.3)
+    
+    return final_score
+
+def find_existing_user(db, raw_name):
+    """
+    Busca un usuario existente en la DB por similaridad de nombre.
+    Retorna (user, match_score, match_type) o (None, 0, None) si no encuentra.
+    """
+    if not raw_name:
+        return None, 0, None
+    
+    # Extraer nombre principal (primer titular)
+    primary_name = extract_primary_name(raw_name)
+    normalized_input = normalize_name(primary_name)
+    
+    # Obtener todos los usuarios de la DB
+    all_users = db.query(User).all()
+    
+    best_match = None
+    best_score = 0
+    match_type = None
+    
+    for user in all_users:
+        # Comparar con full_name
+        if user.full_name:
+            score_full = calculate_name_similarity(primary_name, user.full_name)
+            if score_full > best_score:
+                best_score = score_full
+                best_match = user
+                match_type = "full_name"
+        
+        # Comparar con username
+        if user.username:
+            score_user = calculate_name_similarity(primary_name, user.username)
+            if score_user > best_score:
+                best_score = score_user
+                best_match = user
+                match_type = "username"
+    
+    # Solo retornar si supera el umbral
+    if best_score >= SIMILARITY_THRESHOLD:
+        return best_match, best_score, match_type
+    
+    return None, best_score, None
 
 def setup_dynamic_user_from_csv(db, folder_path):
     """
-    Lee Introduction_0.csv de la carpeta dada, crea Usuario, Portafolio y Cuentas,
-    y retorna el mapa de IDs de cuentas { 'USD': 1, 'EUR': 2 ... }.
+    Lee Introduction_0.csv de la carpeta dada, busca o crea Usuario, 
+    Portafolio y Cuentas IBKR.
+    
+    LÓGICA:
+    1. Buscar usuario existente por similaridad de nombre
+    2. Si existe, usar ese usuario
+    3. Buscar si ya tiene un portfolio
+    4. Si tiene portfolio, añadir las cuentas IBKR a ese portfolio
+    5. Si no tiene portfolio, crear uno nuevo
+    6. Crear sub-cuentas por cada moneda soportada
+    
+    Retorna el mapa de IDs de cuentas { 'USD': 1, 'EUR': 2 ... } o None si hay error.
     """
     intro_file = os.path.join(folder_path, "Introduction_0.csv")
     
     # 1. Validar existencia del archivo
     if not os.path.exists(intro_file):
-        logger.warning(f"⚠️ No se encontró Introduction_0.csv en: {folder_path}")
+        log_error("FILE_NOT_FOUND", f"No se encontró Introduction_0.csv en: {folder_path}")
         return None
 
     try:
         df = pd.read_csv(intro_file)
         if df.empty:
-            logger.error(f"❌ El archivo Introduction_0.csv está vacío en: {folder_path}")
+            log_error("EMPTY_FILE", f"El archivo Introduction_0.csv está vacío en: {folder_path}")
             return None
             
         # Tomamos la primera fila de datos
@@ -75,100 +267,159 @@ def setup_dynamic_user_from_csv(db, folder_path):
         account_code_base = str(row.get("Account", "U0000000")).strip()
         base_currency = str(row.get("BaseCurrency", "USD")).strip()
         alias = str(row.get("Alias", "")).strip()
-        if alias == "nan": alias = "" # Limpieza pandas
+        if alias == "nan": alias = ""
 
     except Exception as e:
-        logger.error(f"❌ Error leyendo Introduction_0.csv: {e}")
+        log_error("CSV_READ_ERROR", f"Error leyendo Introduction_0.csv: {e}", {"folder": folder_path})
         return None
 
-    logger.info(f"👤 Procesando Usuario: {raw_name} | Cuenta Base: {account_code_base}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"👤 Procesando: {raw_name}")
+    logger.info(f"📋 Cuenta IBKR: {account_code_base}")
+    logger.info(f"💰 Moneda Base: {base_currency}")
+    logger.info(f"{'='*60}")
 
     # ---------------------------------------------------------
     # 2. OBTENER ROL INVESTOR (REQUERIDO)
     # ---------------------------------------------------------
     investor_role = db.query(Role).filter(Role.name == "INVESTOR").first()
     if not investor_role:
-        logger.error("❌ No existe el rol INVESTOR. Ejecuta seed_roles.py primero.")
+        log_error("MISSING_ROLE", "No existe el rol INVESTOR. Ejecuta seed_roles.py primero.")
         return None
     
     # ---------------------------------------------------------
-    # 3. CREAR / OBTENER USUARIO
+    # 3. BUSCAR USUARIO EXISTENTE POR SIMILARIDAD
     # ---------------------------------------------------------
-    user = db.query(User).filter(User.username == raw_name).first()
+    existing_user, match_score, match_type = find_existing_user(db, raw_name)
     
-    if not user:
-        # Generar un email dummy limpio: "Daniel E Cicirello..." -> "daniel.e.cicirello...@example.com"
-        clean_email_name = re.sub(r'[^a-zA-Z0-9]', '.', raw_name.lower()).strip('.')
+    if existing_user:
+        user = existing_user
+        logger.info(f"   🔍 Usuario encontrado por similaridad:")
+        logger.info(f"      - ID: {user.user_id}")
+        logger.info(f"      - Nombre DB: {user.full_name}")
+        logger.info(f"      - Score: {match_score:.2%}")
+        logger.info(f"      - Match por: {match_type}")
+    else:
+        # No se encontró usuario similar, crear uno nuevo
+        primary_name = extract_primary_name(raw_name)
+        
+        # Generar username y email únicos
+        clean_username = re.sub(r'[^a-zA-Z0-9]', '.', primary_name.lower()).strip('.')
+        clean_email_name = clean_username.replace('.', '')
+        
+        # Verificar unicidad de username
+        base_username = clean_username
+        counter = 1
+        while db.query(User).filter(User.username == clean_username).first():
+            clean_username = f"{base_username}_{counter}"
+            counter += 1
+        
+        # Verificar unicidad de email
         dummy_email = f"{clean_email_name}@example.com"
+        base_email = dummy_email
+        counter = 1
+        while db.query(User).filter(User.email == dummy_email).first():
+            dummy_email = f"{clean_email_name}_{counter}@example.com"
+            counter += 1
         
         user = User(
-            username=raw_name,
+            username=clean_username,
             email=dummy_email,
-            password_hash=get_password_hash("password123"),  # ✅ Usar hash correcto
-            full_name=raw_name,
+            password_hash=get_password_hash("password123"),
+            full_name=primary_name,
             phone="000000000",
             is_active=True,
-            role_id=investor_role.role_id  # ✅ Asignar rol INVESTOR
+            role_id=investor_role.role_id
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"   ✅ Usuario creado: ID {user.user_id} (Rol: INVESTOR)")
-    else:
-        logger.info(f"   ℹ️ Usuario existente: ID {user.user_id}")
+        try:
+            db.commit()
+            db.refresh(user)
+            logger.info(f"   ✅ Usuario NUEVO creado:")
+            logger.info(f"      - ID: {user.user_id}")
+            logger.info(f"      - Username: {user.username}")
+            logger.info(f"      - Full Name: {user.full_name}")
+        except Exception as e:
+            db.rollback()
+            log_error("USER_CREATE_ERROR", f"Error creando usuario: {e}", {"name": raw_name})
+            return None
 
     # ---------------------------------------------------------
-    # 3. CREAR / OBTENER PORTAFOLIO
+    # 4. BUSCAR O CREAR PORTAFOLIO
     # ---------------------------------------------------------
-    # Usamos el código de cuenta base como identificador único del portafolio
-    port_interface_code = f"port_{account_code_base.lower()}"
+    # Buscar si el usuario ya tiene un portfolio
+    existing_portfolio = db.query(Portfolio).filter(Portfolio.owner_user_id == user.user_id).first()
     
-    port = db.query(Portfolio).filter(Portfolio.interface_code == port_interface_code).first()
-    
-    if not port:
+    if existing_portfolio:
+        port = existing_portfolio
+        logger.info(f"   📂 Portfolio existente encontrado:")
+        logger.info(f"      - ID: {port.portfolio_id}")
+        logger.info(f"      - Nombre: {port.name}")
+    else:
+        # Crear nuevo portfolio
+        port_interface_code = f"port_{user.user_id}_{account_code_base.lower()}"
+        
         port = Portfolio(
             owner_user_id=user.user_id,
             interface_code=port_interface_code,
-            name=f"Portafolio {raw_name}",
+            name=f"Portfolio {user.full_name or user.username}",
             main_currency=base_currency, 
-            residence_country="PE", # Default o extraer de otro lado si existe
+            residence_country="PE",
             inception_date=datetime.today().date()
         )
         db.add(port)
-        db.commit()
-        db.refresh(port)
-        logger.info(f"   ✅ Portafolio creado: ID {port.portfolio_id}")
-    else:
-        logger.info(f"   ℹ️ Portafolio existente: ID {port.portfolio_id}")
+        try:
+            db.commit()
+            db.refresh(port)
+            logger.info(f"   ✅ Portfolio NUEVO creado:")
+            logger.info(f"      - ID: {port.portfolio_id}")
+            logger.info(f"      - Nombre: {port.name}")
+        except Exception as e:
+            db.rollback()
+            log_error("PORTFOLIO_CREATE_ERROR", f"Error creando portfolio: {e}", {"user_id": user.user_id})
+            return None
 
     # ---------------------------------------------------------
-    # 4. CREAR / OBTENER CUENTAS (Multi-Moneda)
+    # 5. CREAR / OBTENER CUENTAS IBKR (Multi-Moneda)
     # ---------------------------------------------------------
     acct_map = {}
+    accounts_created = 0
+    accounts_existing = 0
     
     for currency in MONEDAS_SUPPORTED:
         # Formato estándar: U6177570_USD, U6177570_EUR, etc.
         sub_account_code = f"{account_code_base}_{currency}"
         
+        # Buscar si ya existe esta cuenta específica
         acc = db.query(Account).filter(Account.account_code == sub_account_code).first()
         
-        if not acc:
+        if acc:
+            accounts_existing += 1
+        else:
             acc = Account(
                 portfolio_id=port.portfolio_id,
                 account_code=sub_account_code,
                 currency=currency,
-                institution="IBKR",
-                account_alias=account_code_base,  # Solo el numero de cuenta sin sufijo de moneda
-                account_type="Individual" # O extraer de csv['AccountType']
+                institution=INSTITUTION,  # Siempre IBKR para este importador
+                account_alias=account_code_base,
+                account_type="Individual"
             )
             db.add(acc)
-            db.commit()
-            db.refresh(acc)
+            try:
+                db.commit()
+                db.refresh(acc)
+                accounts_created += 1
+            except Exception as e:
+                db.rollback()
+                log_error("ACCOUNT_CREATE_ERROR", f"Error creando cuenta {sub_account_code}: {e}")
+                continue
         
-        # Guardamos el ID en el mapa para usarlo en imports posteriores
         acct_map[currency] = acc.account_id
 
-    logger.info(f"   ✅ Cuentas configuradas para {len(acct_map)} monedas.")
+    logger.info(f"   💳 Cuentas IBKR configuradas:")
+    logger.info(f"      - Nuevas: {accounts_created}")
+    logger.info(f"      - Existentes: {accounts_existing}")
+    logger.info(f"      - Total monedas: {len(acct_map)}")
     
     return acct_map
 # --- ACUMULADORES ---
@@ -234,35 +485,6 @@ def get_asset_id(db, symbol):
 
 # --- MÓDULOS ---
 
-def setup_user_and_accounts(db):
-    logger.info("👤 Configurando Usuario y Cuentas...")
-    user = db.query(User).filter(User.username == USER_DATA["username"]).first()
-    if not user:
-        u_data = USER_DATA.copy()
-        pwd = u_data.pop("password")
-        user = User(**u_data, password_hash=pwd, is_active=True)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    port = db.query(Portfolio).filter(Portfolio.interface_code == PORTFOLIO_DATA["interface_code"]).first()
-    if not port:
-        port = Portfolio(owner_user_id=user.user_id, **PORTFOLIO_DATA)
-        db.add(port)
-        db.commit()
-        db.refresh(port)
-
-    acct_map = {}
-    for curr in MONEDAS:
-        code = f"{IBKR_ACCOUNT_CODE}_{curr}"
-        acc = db.query(Account).filter(Account.account_code == code).first()
-        if not acc:
-            acc = Account(portfolio_id=port.portfolio_id, account_code=code, currency=curr, institution="IBKR")
-            db.add(acc)
-            db.commit()
-            db.refresh(acc)
-        acct_map[curr] = acc.account_id
-    return acct_map
 
 def import_trades(db, acct_map, folder_path):
     fpath = os.path.join(folder_path, "Trade_Summary_0.csv")
@@ -1066,6 +1288,10 @@ class DateTimeEncoder(json.JSONEncoder):
         return super().default(o)
 
 def run_all():
+    # Limpiar errores de ejecuciones anteriores
+    global import_errors
+    import_errors = []
+    
     db = SessionLocal()
     try:
         # Definir ruta base
@@ -1073,13 +1299,20 @@ def run_all():
         if not os.path.exists(base_folders_path):
              base_folders_path = "seed_data/inceptioncsvs" # Fallback por si ejecutas desde otro lado
 
-        # Listar directorios (usuarios)
+        # Listar directorios (usuarios) - Filtrar solo carpetas de usuarios (empiezan con U)
         subfolders = [
             f.path for f in os.scandir(base_folders_path) 
-            if f.is_dir() and f.name != "example"
+            if f.is_dir() and f.name.startswith('U') and f.name != "example"
         ]
 
-        logger.info(f"📂 Carpetas encontradas para procesar: {len(subfolders)}")
+        logger.info(f"📂 Carpetas de usuarios encontradas: {len(subfolders)}")
+        
+        if not subfolders:
+            logger.warning("⚠️ No se encontraron carpetas de usuarios (deben comenzar con 'U')")
+            return
+
+        processed_count = 0
+        error_count = 0
 
         # --- BUCLE PRINCIPAL POR USUARIO ---
         for folder in subfolders:
@@ -1091,7 +1324,8 @@ def run_all():
             acct_map = setup_dynamic_user_from_csv(db, folder)
             
             if not acct_map:
-                logger.error(f"❌ Saltando carpeta {folder_name} por error en configuración de usuario.")
+                log_error("USER_SETUP_FAILED", f"Saltando carpeta {folder_name} por error en configuración de usuario.")
+                error_count += 1
                 continue
 
             # 2. Ejecutar importaciones PARA ESTE USUARIO (Pasando 'folder' como ruta)
@@ -1103,16 +1337,22 @@ def run_all():
             import_performance(db, acct_map, folder)
             import_positions(db, acct_map, folder) 
             
+            processed_count += 1
             #import_income_projections(db, acct_map, folder)
 
         # --- REPORTE FINAL (Al terminar todos los usuarios) ---
         print("\n" + "="*60)
         print("📊 RESUMEN GLOBAL DE IMPORTACIÓN")
         print("="*60)
+        print(f"👥 Usuarios procesados:    {processed_count}")
+        print(f"❌ Usuarios con errores:   {error_count}")
         print(f"📄 Total Filas Leídas (CSV): {stats['CSV_Rows']}")
         print(f"💾 Total Insertado en DB:  {stats['DB_Inserted']}")
         print(f"🗑️  Total Ignorado:        {len(skipped_log)}")
         print("="*60)
+        
+        # Mostrar resumen de errores estructurados
+        print_error_summary()
         
         if skipped_log:
             print("\n🔍 DETALLE DE FILAS IGNORADAS (Muestra):")
@@ -1139,5 +1379,59 @@ def run_all():
     finally:
         db.close()
 
-if __name__ == "__main__":
+
+def run_full_pipeline():
+    """
+    Ejecuta el pipeline completo:
+    1. Primero procesa los CSVs crudos de all_data_users con createscvsuser.py
+    2. Luego importa los datos procesados a la DB
+    """
+    import subprocess
+    
+    print("="*60)
+    print("🚀 PIPELINE COMPLETO DE IMPORTACIÓN IBKR")
+    print("="*60)
+    
+    # Paso 1: Ejecutar createscvsuser.py para procesar los CSVs crudos
+    print("\n📋 PASO 1: Procesando archivos CSV crudos...")
+    createcsv_path = os.path.join(BASE_DIR, "createscvsuser.py")
+    
+    if os.path.exists(createcsv_path):
+        try:
+            result = subprocess.run(
+                [sys.executable, createcsv_path],
+                cwd=BASE_DIR,
+                capture_output=True,
+                text=True
+            )
+            print(result.stdout)
+            if result.stderr:
+                print(f"⚠️ Warnings: {result.stderr}")
+        except Exception as e:
+            print(f"❌ Error ejecutando createscvsuser.py: {e}")
+            return
+    else:
+        print(f"⚠️ No se encontró createscvsuser.py en {BASE_DIR}")
+        print("   Continuando con los CSVs ya procesados...")
+    
+    # Paso 2: Ejecutar la importación a DB
+    print("\n📋 PASO 2: Importando datos a la base de datos...")
     run_all()
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Importador de datos IBKR')
+    parser.add_argument('--full', action='store_true', 
+                        help='Ejecutar pipeline completo (procesar CSVs + importar)')
+    parser.add_argument('--import-only', action='store_true', 
+                        help='Solo importar (CSVs ya procesados)')
+    
+    args = parser.parse_args()
+    
+    if args.full:
+        run_full_pipeline()
+    else:
+        # Por defecto, solo importar
+        run_all()
