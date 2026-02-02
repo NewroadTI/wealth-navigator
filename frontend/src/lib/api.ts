@@ -289,8 +289,16 @@ export const transactionsApi = {
 
 // Account API
 export const accountsApi = {
-  async getAccounts(): Promise<Account[]> {
-    const response = await fetch(`${getBaseUrl()}/api/v1/accounts/`);
+  async getAccounts(options?: { skip?: number; limit?: number }): Promise<Account[]> {
+    const params = new URLSearchParams();
+    if (options?.skip !== undefined) {
+      params.set('skip', String(options.skip));
+    }
+    if (options?.limit !== undefined) {
+      params.set('limit', String(options.limit));
+    }
+    const query = params.toString();
+    const response = await fetch(`${getBaseUrl()}/api/v1/accounts/${query ? `?${query}` : ''}`);
     if (!response.ok) {
       throw new Error('Failed to fetch accounts');
     }

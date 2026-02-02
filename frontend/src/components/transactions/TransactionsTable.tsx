@@ -125,7 +125,25 @@ export const TransactionsTable = ({
                   {visibleColumns.map((colKey) => (
                     <td key={`${transaction.id}-${colKey}`} className="px-4 py-3 text-xs">
                       {colKey === 'date' ? (
-                        format(new Date(transaction.date), 'yyyy-MM-dd HH:mm')
+                        // Fix: Parse date without timezone conversion
+                        // If date is YYYY-MM-DD, show just the date without time
+                        (() => {
+                          const dateStr = transaction.date;
+                          // If it's already just a date (YYYY-MM-DD), show as-is
+                          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                            return dateStr;
+                          }
+                          // If it includes time, parse and format with time
+                          try {
+                            // Parse as local time by appending T00:00:00 for dates without time
+                            const dateVal = dateStr.includes('T') 
+                              ? new Date(dateStr)
+                              : new Date(dateStr + 'T00:00:00');
+                            return format(dateVal, 'yyyy-MM-dd HH:mm');
+                          } catch {
+                            return dateStr || '';
+                          }
+                        })()
                       ) : colKey === 'table_type' ? (
                         (() => {
                           const typeValue = getColumnValue(transaction, colKey);

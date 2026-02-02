@@ -91,24 +91,29 @@ def get_positions_aggregated_report(
                 "market_value": 0.0,
                 "cost_money": 0.0,
                 "pnl": 0.0,
-                "institution_accounts": {},  # Dict para guardar institución -> (account_id, user_name)
+                "account_holders": {},  # Dict para guardar account_id -> datos completos
                 "accounts": [],
                 "mark_prices": []  # Lista de mkt_prices para calcular promedio
             }
         
-        # Sumatorias
+        # Sumatorias agregadas
         data = aggregated[aid]
         qty = float(pos.quantity or 0)
+        cost_money = float(pos.cost_basis_money or 0)
+        market_value = float(pos.position_value or 0)
+        pnl = float(pos.fifo_pnl_unrealized or 0)
+        mark_price = float(pos.mark_price or 0)
         
         data["qty"] += qty
-        data["market_value"] += float(pos.position_value or 0)
-        data["cost_money"] += float(pos.cost_basis_money or 0)
-        data["pnl"] += float(pos.fifo_pnl_unrealized or 0)
-        data["mark_prices"].append(float(pos.mark_price or 0))
+        data["market_value"] += market_value
+        data["cost_money"] += cost_money
+        data["pnl"] += pnl
+        data["mark_prices"].append(mark_price)
         
-        # Guardar institución con info del usuario
-        institution = pos.account.institution  # Ej: IBKR
-        if institution not in data["institution_accounts"]:
+        # Guardar CADA CUENTA única con todos sus datos
+        account_id = pos.account_id
+        if account_id not in data["account_holders"]:
+            institution = pos.account.institution  # Ej: IBKR
             # Obtener el usuario del portfolio propietario
             portfolio = db.query(Portfolio).filter(Portfolio.portfolio_id == pos.account.portfolio_id).first()
             user_name = None
@@ -119,36 +124,97 @@ def get_positions_aggregated_report(
                     first_name = parts[0][:4].lower()  # 4 letras primer nombre
                     last_name = parts[-1][:3].lower()  # 3 letras último apellido
                     user_name = f"{first_name}_{last_name}"
-            data["institution_accounts"][institution] = (pos.account_id, user_name)
+            
+            # Calcular avg_cost_price para esta cuenta
+            acct_avg_price = cost_money / qty if qty != 0 else 0
+            
+            data["account_holders"][account_id] = {
+                "institution": institution,
+                "user_name": user_name,
+                "quantity": qty,
+                "cost_money": cost_money,
+                "avg_cost_price": acct_avg_price,
+                "market_price": mark_price,  # Para futura implementación
+                "market_value": market_value,
+                "unrealized_pnl": pnl,
+            }
+        else:
+            # Acumular si hay múltiples posiciones del mismo asset en la misma cuenta
+            holder = data["account_holders"][account_id]
+            holder["quantity"] += qty
+            holder["cost_money"] += cost_money
+            holder["market_value"] += market_value
+            holder["unrealized_pnl"] += pnl
+            # Recalcular avg_cost_price
+            holder["avg_cost_price"] = holder["cost_money"] / holder["quantity"] if holder["quantity"] != 0 else 0
         
-        data["accounts"].append(pos.account_id)
+        if account_id not in data["accounts"]:
+            data["accounts"].append(account_id)
 
     # 4. Construir respuesta final calculando promedios y cambios
     from app.schemas.analytics import InstitutionInfo
+    import statistics
+    
     results = []
     
     for aid, data in aggregated.items():
-        # Calcular Avg Price Ponderado
+        # Calcular Avg Price Ponderado (agregado)
         avg_price = data["cost_money"] / data["qty"] if data["qty"] != 0 else 0
         
         # Calcular promedio de mkt_price de hoy (en caso de múltiples custodios)
         price_today = sum(data["mark_prices"]) / len(data["mark_prices"]) if data["mark_prices"] else 0
         
-        # Calcular Day Change %
+        # Calcular Day Change % (agregado)
         price_yesterday = float(prev_prices_map.get(aid, 0))
         
         day_change_pct = 0.0
         if price_yesterday > 0:
             day_change_pct = ((price_today - price_yesterday) / price_yesterday) * 100
         
-        # Construir lista de instituciones con info de usuario
+        # Construir lista de account holders con datos completos
+        # Y calcular distribución de rendimientos
         institutions_list = []
-        for institution, (account_id, user_name) in data["institution_accounts"].items():
+        pnl_percentages = []  # Lista de PnL % por cuenta para calcular distribución
+        gainers = 0
+        losers = 0
+        neutrals = 0
+        
+        for account_id, holder_data in data["account_holders"].items():
+            # Calcular day_change_pct por cuenta (usando el mark_price de la cuenta vs promedio del día anterior)
+            acct_day_change = 0.0
+            if price_yesterday > 0 and holder_data.get("market_price", 0) > 0:
+                acct_day_change = ((holder_data["market_price"] - price_yesterday) / price_yesterday) * 100
+            
+            # Calcular PnL % para esta cuenta (unrealized_pnl / cost_money * 100)
+            acct_pnl_pct = 0.0
+            if holder_data.get("cost_money", 0) > 0:
+                acct_pnl_pct = (holder_data["unrealized_pnl"] / holder_data["cost_money"]) * 100
+            pnl_percentages.append(acct_pnl_pct)
+            
+            # Contar gainers/losers
+            if holder_data["unrealized_pnl"] > 0:
+                gainers += 1
+            elif holder_data["unrealized_pnl"] < 0:
+                losers += 1
+            else:
+                neutrals += 1
+            
             institutions_list.append(InstitutionInfo(
-                institution=institution,
+                institution=holder_data["institution"],
                 account_id=account_id,
-                user_name=user_name
+                user_name=holder_data["user_name"],
+                quantity=holder_data["quantity"],
+                avg_cost_price=holder_data["avg_cost_price"],
+                market_price=holder_data["market_price"],
+                market_value=holder_data["market_value"],
+                unrealized_pnl=holder_data["unrealized_pnl"],
+                day_change_pct=acct_day_change
             ))
+        
+        # Calcular estadísticas de distribución
+        best_pnl_pct = max(pnl_percentages) if pnl_percentages else None
+        worst_pnl_pct = min(pnl_percentages) if pnl_percentages else None
+        median_pnl_pct = statistics.median(pnl_percentages) if pnl_percentages else None
             
         # Crear objeto de respuesta
         item = PositionAggregated(
@@ -163,6 +229,14 @@ def get_positions_aggregated_report(
             
             total_pnl_unrealized=data["pnl"],
             day_change_pct=day_change_pct,
+            
+            # Distribución de rendimiento
+            gainers_count=gainers,
+            losers_count=losers,
+            neutral_count=neutrals,
+            best_pnl_pct=best_pnl_pct,
+            worst_pnl_pct=worst_pnl_pct,
+            median_pnl_pct=median_pnl_pct,
             
             institutions=institutions_list,
             account_ids=data["accounts"]

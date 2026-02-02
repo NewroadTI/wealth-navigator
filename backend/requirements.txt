@@ -10,3 +10,6 @@ email-validator
 pandas
 requests
 openpyxl
+apscheduler
+requests
+pandas

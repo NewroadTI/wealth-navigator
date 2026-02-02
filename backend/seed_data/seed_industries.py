@@ -210,6 +210,11 @@ Consumer Discretionary
 Consumer Staples
 Bonds
 Structured Note
+Broad
+Consumer Non-Cyc
+Consumer Cyclicals
+Telecomm
+Financials
 """
 
 # Mapa heurístico para asignar sectores automáticamente
@@ -251,13 +256,34 @@ def seed_industries():
         count_updated = 0
         
         # --- SOLUCIÓN AL ERROR: SET DE CÓDIGOS PROCESADOS ---
-        # Esto evita intentar insertar el mismo código dos veces en la misma transacción
         seen_codes = set()
+
+        # ==============================================================================
+        # INICIO AGREGADO MANUAL
+        # ==============================================================================
+        cash_data = {"industry_code": "CASH", "name": "Cash", "sector": "Financial"}
+        
+        # 1. Bloqueamos el código en seen_codes para evitar duplicados en el bucle siguiente
+        seen_codes.add(cash_data["industry_code"])
+
+        # 2. Upsert manual
+        obj_cash = db.query(Industry).filter(Industry.industry_code == cash_data["industry_code"]).first()
+        if not obj_cash:
+            obj_cash = Industry(**cash_data)
+            db.add(obj_cash)
+            count_new += 1
+        else:
+            obj_cash.name = cash_data["name"]
+            obj_cash.sector = cash_data["sector"]
+            count_updated += 1
+        # ==============================================================================
+        # FIN AGREGADO MANUAL
+        # ==============================================================================
         
         for name in unique_names:
             code = generate_code(name)
             
-            # Si ya procesamos este código en este bucle (ej: venía de una variante del nombre), saltar
+            # Si ya procesamos este código (incluyendo el CASH manual), saltar
             if code in seen_codes:
                 continue
             
