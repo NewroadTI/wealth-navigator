@@ -1,6 +1,6 @@
 import { Fragment, useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { formatCurrency, formatNumber, formatPercent, getChangeColor } from '@/lib/formatters';
+import { formatCurrency, formatNumber, formatPercent, getChangeColor, formatDate } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -265,7 +265,7 @@ const Positions = () => {
               <SelectContent>
                 {filterOptions?.available_dates.map(date => (
                   <SelectItem key={date} value={date}>
-                    {new Date(date).toLocaleDateString()}
+                    {formatDate(date)}
                   </SelectItem>
                 ))}
               </SelectContent>

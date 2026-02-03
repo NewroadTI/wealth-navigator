@@ -2,6 +2,7 @@ import { Bell, Search, RefreshCw, ChevronLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
 interface HeaderProps {
   title: string;
@@ -68,12 +69,7 @@ export function Header({ title, subtitle }: HeaderProps) {
         </Button>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative h-8 w-8 md:h-9 md:w-9 text-muted-foreground hover:text-foreground">
-          <Bell className="h-4 w-4" />
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-            3
-          </span>
-        </Button>
+        <NotificationsBell />
       </div>
     </header>
   );
