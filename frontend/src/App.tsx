@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { NavigationHistoryProvider } from "@/contexts/NavigationHistoryContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import Index from "./pages/Index";
 import Portfolios from "./pages/Portfolios";
 import PortfolioDetail from "./pages/PortfolioDetail";
@@ -27,31 +28,33 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <NavigationHistoryProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/portfolios" element={<Portfolios />} />
-            <Route path="/portfolios/:id" element={<PortfolioDetail />} />
-            <Route path="/portfolios/:portfolioId/accounts/:accountId" element={<PortfolioAccounts />} />
-            <Route path="/portfolios/:id/performance" element={<PortfolioPerformance />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/structured-notes" element={<StructuredNotes />} />
-            <Route path="/positions" element={<Positions />} />
-            <Route path="/assets" element={<Assets />} />
-            <Route path="/advisors" element={<Advisors />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/basic-data" element={<BasicData />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/crm" element={<CRM />} />
-            <Route path="/etl" element={<ETLDashboard />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </NavigationHistoryProvider>
-      </BrowserRouter>
+      <NotificationsProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <NavigationHistoryProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/portfolios" element={<Portfolios />} />
+              <Route path="/portfolios/:id" element={<PortfolioDetail />} />
+              <Route path="/portfolios/:portfolioId/accounts/:accountId" element={<PortfolioAccounts />} />
+              <Route path="/portfolios/:id/performance" element={<PortfolioPerformance />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/structured-notes" element={<StructuredNotes />} />
+              <Route path="/positions" element={<Positions />} />
+              <Route path="/assets" element={<Assets />} />
+              <Route path="/advisors" element={<Advisors />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/basic-data" element={<BasicData />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/crm" element={<CRM />} />
+              <Route path="/etl" element={<ETLDashboard />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </NavigationHistoryProvider>
+        </BrowserRouter>
+      </NotificationsProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

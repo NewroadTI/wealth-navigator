@@ -28,7 +28,10 @@ class DBClient:
         
         # Cache for frequently looked up data
         self._account_cache: Dict[str, int] = {}  # account_code -> account_id
+        self._account_base_cache: Dict[str, int] = {}  # base account_code (without currency suffix) -> account_id
         self._asset_cache: Dict[str, int] = {}    # symbol -> asset_id
+        self._asset_isin_cache: Dict[str, int] = {}  # isin -> asset_id
+        self._asset_description_cache: Dict[str, int] = {}  # description (lowercase) -> asset_id
     
     @property
     def db(self) -> Session:
@@ -59,11 +62,15 @@ class DBClient:
         if not account_code:
             return None
             
-        # Check cache first
+        # Check exact match cache first
         if account_code in self._account_cache:
             return self._account_cache[account_code]
         
-        # Query DB
+        # Check base code cache (for codes without currency suffix)
+        if account_code in self._account_base_cache:
+            return self._account_base_cache[account_code]
+        
+        # Query DB - exact match
         account = self.db.query(Account).filter(
             Account.account_code == account_code
         ).first()
@@ -72,21 +79,39 @@ class DBClient:
             self._account_cache[account_code] = account.account_id
             return account.account_id
         
+        # Try base code (remove currency suffix if present)
+        base_code = account_code.split('_')[0]
+        if base_code != account_code and base_code in self._account_base_cache:
+            return self._account_base_cache[base_code]
+        
         return None
     
     def preload_accounts(self):
         """Preload all accounts into cache."""
         accounts = self.db.query(Account).all()
         for acc in accounts:
+            # Cache full account code
             self._account_cache[acc.account_code] = acc.account_id
-        logger.info(f"Preloaded {len(self._account_cache)} accounts into cache")
+            
+            # Also cache base code (without currency suffix)
+            # If account code has format U12345678_USD, cache U12345678
+            if '_' in acc.account_code:
+                base_code = acc.account_code.split('_')[0]
+                # Only cache if not already present (use first occurrence)
+                if base_code not in self._account_base_cache:
+                    self._account_base_cache[base_code] = acc.account_id
+        
+        logger.info(
+            f"Preloaded {len(self._account_cache)} accounts into cache "
+            f"({len(self._account_base_cache)} unique base codes)"
+        )
     
     # ==========================================================================
     # ASSET OPERATIONS
     # ==========================================================================
     
     def get_asset_id(self, symbol: str) -> Optional[int]:
-        """Get asset_id from symbol."""
+        """Get asset_id from symbol (exact match only)."""
         if not symbol:
             return None
             
@@ -94,14 +119,9 @@ class DBClient:
         if symbol in self._asset_cache:
             return self._asset_cache[symbol]
         
-        # Query DB - try exact match first
+        # Query DB - exact match only (no cleaning)
+        # Options like "AAPL  260220C00265000" must be stored as-is
         asset = self.db.query(Asset).filter(Asset.symbol == symbol).first()
-        
-        if not asset:
-            # Try cleaning the symbol (remove suffix)
-            clean_symbol = symbol.split()[0].strip()
-            if clean_symbol != symbol:
-                asset = self.db.query(Asset).filter(Asset.symbol == clean_symbol).first()
         
         if asset:
             self._asset_cache[symbol] = asset.asset_id
@@ -109,12 +129,103 @@ class DBClient:
         
         return None
     
+    def get_asset_id_flexible(
+        self, 
+        security_id: str = None, 
+        symbol: str = None, 
+        description: str = None
+    ) -> Optional[int]:
+        """
+        Find asset_id using flexible search strategy:
+        1. First try to match security_id (ISIN) against assets.isin
+        2. If not found, try security_id against assets.symbol
+        3. If not found, try security_id against assets.description
+        4. If not found, try CSV symbol against assets.symbol (fallback)
+        5. If still not found, return None
+        
+        Args:
+            security_id: The SecurityID from IBKR CSV (usually ISIN)
+            symbol: The Symbol from CSV (for fallback search)
+            description: The Description from CSV (for logging)
+        
+        Returns:
+            asset_id if found, None otherwise
+        """
+        # Try security_id based searches first
+        if security_id:
+            security_id_clean = security_id.strip()
+            security_id_upper = security_id_clean.upper()
+            security_id_lower = security_id_clean.lower()
+            
+            # 1. Try ISIN cache first
+            if security_id_upper in self._asset_isin_cache:
+                return self._asset_isin_cache[security_id_upper]
+            
+            # 2. Try symbol cache with security_id
+            if security_id_clean in self._asset_cache:
+                return self._asset_cache[security_id_clean]
+            
+            # 3. Try description cache (case-insensitive)
+            if security_id_lower in self._asset_description_cache:
+                return self._asset_description_cache[security_id_lower]
+            
+            # If not in cache, query DB directly
+            # Try ISIN
+            asset = self.db.query(Asset).filter(Asset.isin == security_id_upper).first()
+            if asset:
+                self._asset_isin_cache[security_id_upper] = asset.asset_id
+                return asset.asset_id
+            
+            # Try symbol with security_id
+            asset = self.db.query(Asset).filter(Asset.symbol == security_id_clean).first()
+            if asset:
+                self._asset_cache[security_id_clean] = asset.asset_id
+                return asset.asset_id
+            
+            # Try description (case-insensitive)
+            asset = self.db.query(Asset).filter(
+                Asset.description.ilike(security_id_clean)
+            ).first()
+            if asset:
+                self._asset_description_cache[security_id_lower] = asset.asset_id
+                return asset.asset_id
+        
+        # 4. FALLBACK: Try CSV symbol against DB symbol
+        if symbol:
+            symbol_clean = symbol.strip()
+            
+            # Check symbol cache
+            if symbol_clean in self._asset_cache:
+                return self._asset_cache[symbol_clean]
+            
+            # Query DB by symbol
+            asset = self.db.query(Asset).filter(Asset.symbol == symbol_clean).first()
+            if asset:
+                self._asset_cache[symbol_clean] = asset.asset_id
+                return asset.asset_id
+        
+        return None
+    
     def preload_assets(self):
-        """Preload all assets into cache."""
+        """Preload all assets into caches (symbol, isin, description)."""
         assets = self.db.query(Asset).all()
         for asset in assets:
-            self._asset_cache[asset.symbol] = asset.asset_id
-        logger.info(f"Preloaded {len(self._asset_cache)} assets into cache")
+            # Cache by symbol
+            if asset.symbol:
+                self._asset_cache[asset.symbol] = asset.asset_id
+            
+            # Cache by ISIN (uppercase)
+            if asset.isin:
+                self._asset_isin_cache[asset.isin.upper()] = asset.asset_id
+            
+            # Cache by description (lowercase for case-insensitive matching)
+            if asset.description:
+                self._asset_description_cache[asset.description.lower()] = asset.asset_id
+        
+        logger.info(
+            f"Preloaded {len(self._asset_cache)} assets into cache "
+            f"({len(self._asset_isin_cache)} ISINs, {len(self._asset_description_cache)} descriptions)"
+        )
     
     def create_asset(
         self,
@@ -292,7 +403,10 @@ class DBClient:
     def clear_cache(self):
         """Clear all internal caches."""
         self._account_cache.clear()
+        self._account_base_cache.clear()
         self._asset_cache.clear()
+        self._asset_isin_cache.clear()
+        self._asset_description_cache.clear()
     
     def commit(self):
         """Commit the current transaction."""

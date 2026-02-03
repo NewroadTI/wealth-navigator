@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -11,10 +11,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle } from 'lucide-react';
+import { ColumnConfigurator } from '@/components/transactions/ColumnConfigurator';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { transactionsApi, accountsApi, portfoliosApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
+import { transactionsApi, accountsApi, portfoliosApi,usersApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable'; // Ajusta la ruta
 
 
@@ -138,9 +139,8 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'isin', label: 'ISIN', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).isin || '' },
 ];
 
-// Default visible columns
-const DEFAULT_VISIBLE_COLUMNS = ['table_type', 'portfolio', 'account_id', 'asset_id', 'date', 'amount', 'currency', 'description', 'quantity', 'side'];
-const COLUMN_ORDER = ALL_COLUMNS.map((col) => col.key);
+// Default visible columns (exported for use in ColumnConfigurator)
+export const DEFAULT_VISIBLE_COLUMNS = ['table_type', 'account_id', 'asset_id', 'date', 'amount', 'currency', 'description', 'quantity', 'side'];
 
 const SORTABLE_DATE_COLUMNS = new Set(['date', 'settlement_date', 'report_date', 'ex_date']);
 const SORTABLE_NUMERIC_COLUMNS = new Set([
@@ -165,6 +165,7 @@ const Transactions = () => {
   const [allTransactions, setAllTransactions] = useState<TransactionDisplay[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [users, setUsers] = useState<any[]>([]);  // Add users state
   const [portfoliosSimple, setPortfoliosSimple] = useState<PortfolioSimple[]>([]);
   const [assetCache, setAssetCache] = useState<Map<number, { symbol: string; class_id?: number; sub_class_id?: number }>>(new Map()); // Cache asset_id -> {symbol, class_id, sub_class_id}
   const [loading, setLoading] = useState(true);
@@ -185,9 +186,50 @@ const Transactions = () => {
   const [searchText, setSearchText] = useState('');
   const [showSum, setShowSum] = useState(false);
 
-  // Column visibility
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
+  // Column visibility - initially empty, will be set by ColumnConfigurator from localStorage or defaults
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'desc' });
+
+  // Handler for column configuration changes from ColumnConfigurator
+  const handleColumnConfigChange = useCallback((columns: string[]) => {
+    setVisibleColumns(columns);
+  }, []);
+
+  // Handler for column reordering from table drag & drop
+  const handleColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
+    const newColumns = [...visibleColumns];
+    const [removed] = newColumns.splice(fromIndex, 1);
+    newColumns.splice(toIndex, 0, removed);
+    setVisibleColumns(newColumns);
+    
+    // Also update the ColumnConfigurator's localStorage data
+    const storageKey = 'transactions_column_config_transactions_main';
+    const savedConfig = localStorage.getItem(storageKey);
+    if (savedConfig) {
+      try {
+        const config = JSON.parse(savedConfig);
+        // Reorder the config array to match the new order
+        const newConfig = [...config];
+        const visibleConfig = config.filter((c: any) => c.visible);
+        const reorderedItem = visibleConfig[fromIndex];
+        
+        if (reorderedItem) {
+          // Find the item in the full config and get its position
+          const fullConfigFromIndex = config.findIndex((c: any) => c.key === reorderedItem.key);
+          const targetConfig = visibleConfig[toIndex];
+          const fullConfigToIndex = config.findIndex((c: any) => c.key === targetConfig.key);
+          
+          // Move the item in the full config
+          const [movedItem] = newConfig.splice(fullConfigFromIndex, 1);
+          newConfig.splice(fullConfigToIndex, 0, movedItem);
+          
+          localStorage.setItem(storageKey, JSON.stringify(newConfig));
+        }
+      } catch (error) {
+        console.error('Error updating column order in localStorage:', error);
+      }
+    }
+  }, [visibleColumns]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,18 +246,24 @@ const Transactions = () => {
         setLoading(true);
         setError(null);
 
-        const [trades, cashJournal, fxTransactions, corporateActions, accountsData, portfoliosData] = await Promise.all([
+        const [trades, cashJournal, fxTransactions, corporateActions, accountsData, usersData, portfoliosData] = await Promise.all([
           transactionsApi.getTrades(0, 1000),
           transactionsApi.getCashJournal(0, 1000),
           transactionsApi.getFxTransactions(0, 1000),
           transactionsApi.getCorporateActions(0, 1000),
           accountsApi.getAccounts({ limit: 10000 }),  // Cargar todas las cuentas
-          usersApi.getUsers(),
+          usersApi.getUsers(),  // Cargar todos los usuarios
           portfoliosApi.getPortfolios(),
         ]);
 
         setAccounts(accountsData);
+        setUsers(usersData);
         setPortfolios(portfoliosData);
+
+        // Debug: Log the data to see what we're receiving
+        console.log('Accounts sample:', accountsData.slice(0, 2));
+        console.log('Users sample:', usersData.slice(0, 2));
+        console.log('Portfolios sample:', portfoliosData.slice(0, 2));
 
         // Build transaction list with type identification
         const txList: TransactionDisplay[] = [
@@ -354,6 +402,13 @@ const Transactions = () => {
     return map;
   }, [portfolios]);
 
+  // Create users map for efficient user lookups
+  const userMap = useMemo(() => {
+    const map = new Map<number, any>();
+    users.forEach(u => map.set(u.user_id, u));
+    return map;
+  }, [users]);
+
   // Filter transactions with optimized lookups
   const filteredTransactions = useMemo(() => {
     const selectedClassId = selectedAssetClass === 'all' ? null : Number(selectedAssetClass);
@@ -448,18 +503,66 @@ const Transactions = () => {
   const getColumnValue = (transaction: TransactionDisplay, columnKey: string): string => {
     const data = transaction.data;
 
-    // Special case: account_id should show account alias
+    // Special case: account_id should show institution-username format (like positions)
     if (columnKey === 'account_id' && 'account_id' in data) {
       const account = accountMap.get((data as any).account_id);
-      return account?.account_alias || '';
+      if (!account) return '';
+      
+      // Get portfolio and then user data
+      const portfolio = portfolioMap.get(account.portfolio_id);
+      if (!portfolio) return account.account_alias || '';
+      
+      const user = userMap.get(portfolio.owner_user_id);
+      if (!user) return account.account_alias || '';
+      
+      // Format: institution.toLowerCase()-abbreviated_name
+      // Create abbreviated name from full_name or use username
+      let userName = '';
+      if (user.full_name) {
+        // Extract abbreviated format from full_name (e.g., "Roberto Sarmiento" -> "robe_sr.")
+        const names = user.full_name.trim().split(/\s+/);
+        if (names.length >= 2) {
+          const firstName = names[0].toLowerCase().slice(0, 4);
+          const lastName = names[names.length - 1].toLowerCase().slice(0, 2);
+          userName = `${firstName}_${lastName}.`;
+        } else {
+          userName = names[0].toLowerCase().slice(0, 7);
+        }
+      } else if (user.username) {
+        userName = user.username.toLowerCase();
+      }
+      
+      if (userName) {
+        return `${account.institution.toLowerCase()}-${userName}`;
+      }
+      
+      return account.account_alias || account.account_code || '';
     }
 
-    // Portfolio interface code
+    // Portfolio - show owner name extracted from portfolio name or user data
     if (columnKey === 'portfolio' && 'account_id' in data) {
       const account = accountMap.get((data as any).account_id);
       if (!account) return '';
       const portfolio = portfolioMap.get(account.portfolio_id);
-      return portfolio?.interface_code || '';
+      if (!portfolio) return '';
+      
+      // Try to get user full name from users table first
+      const user = userMap.get(portfolio.owner_user_id);
+      if (user && user.full_name) {
+        console.log('Showing user full_name:', user.full_name, 'for portfolio:', portfolio.portfolio_id);
+        return user.full_name.trim();
+      }
+      
+      // Fallback: extract name from portfolio.name (e.g., "Portfolio Katia R Arana Pimentel" -> "Katia R Arana Pimentel")
+      if (portfolio.name) {
+        const name = portfolio.name.replace(/^Portfolio\s+/i, '').trim();
+        if (name && name !== portfolio.name) {
+          console.log('Extracted name from portfolio.name:', name);
+          return name;
+        }
+      }
+      
+      return portfolio.interface_code || '';
     }
 
     // Special case: asset_id - fetch symbol from cache
@@ -537,7 +640,7 @@ const Transactions = () => {
       return String(aVal).localeCompare(String(bVal)) * dir;
     });
     return rows;
-  }, [filteredTransactions, sortConfig, accountMap, portfolioMap, assetCache]);
+  }, [filteredTransactions, sortConfig, accountMap, portfolioMap, assetCache, userMap]);
 
   // Pagination - computed once per render
   const paginationData = useMemo(() => {
@@ -558,14 +661,7 @@ const Transactions = () => {
     setCurrentPage(1);
   };
 
-  const toggleColumnVisibility = (columnKey: string) => {
-    setVisibleColumns((prev) => {
-      const next = prev.includes(columnKey)
-        ? prev.filter((c) => c !== columnKey)
-        : [...prev, columnKey];
-      return [...next].sort((a, b) => COLUMN_ORDER.indexOf(a) - COLUMN_ORDER.indexOf(b));
-    });
-  };
+
 
   const toggleSort = (columnKey: string) => {
     setSortConfig((prev) => ({
@@ -899,34 +995,13 @@ const Transactions = () => {
             </PopoverContent>
           </Popover>
 
-          {/* Columns Filter */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="border-border h-8 md:h-9 text-xs md:text-sm">
-                <Filter className="h-3.5 w-3.5 mr-1.5" />
-                Columns ({visibleColumns.length})
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-96 p-3 max-h-96 overflow-y-auto" align="start">
-              <div className="space-y-3">
-                {ALL_COLUMNS.map((col) => (
-                  <div key={col.key} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`col-${col.key}`}
-                      checked={visibleColumns.includes(col.key)}
-                      onCheckedChange={() => toggleColumnVisibility(col.key)}
-                    />
-                    <Label htmlFor={`col-${col.key}`} className="text-xs cursor-pointer flex-1">
-                      {col.label}
-                      <span className="text-muted-foreground ml-2 text-xs">
-                        ({col.tables.join(', ')})
-                      </span>
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+          {/* Columns Configurator - with drag & drop reordering and localStorage persistence */}
+          <ColumnConfigurator
+            allColumns={ALL_COLUMNS}
+            defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
+            onConfigChange={handleColumnConfigChange}
+            storageKey="transactions_main"
+          />
 
           {/* Sum Income Button */}
           <Button
@@ -957,6 +1032,7 @@ const Transactions = () => {
         getTypeColor={getTypeColor}
         sortConfig={sortConfig}
         onSort={toggleSort}
+        onColumnReorder={handleColumnReorder}
       />
 
       {/* Sum Display - Below Table */}

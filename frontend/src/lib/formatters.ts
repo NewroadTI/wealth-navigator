@@ -50,6 +50,19 @@ export function formatCompactNumber(value: number): string {
 }
 
 export function formatDate(dateString: string): string {
+  // Handle date-only strings (YYYY-MM-DD) to avoid timezone issues
+  // If the string contains only date (no time), parse it as local date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // months are 0-indexed
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+  
+  // For datetime strings, use normal parsing
   return new Date(dateString).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',

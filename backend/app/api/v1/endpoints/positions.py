@@ -86,6 +86,65 @@ def read_position_by_id(
     return position
 
 
+@router.get("/check")
+def check_position_exists(
+    account_id: int = Query(...),
+    asset_id: int = Query(...),
+    report_date: str = Query(...),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Check if a position exists for the given account, asset, and report date.
+    Returns {"exists": bool, "position_id": int | None}
+    """
+    position = db.query(Position).filter(
+        Position.account_id == account_id,
+        Position.asset_id == asset_id,
+        Position.report_date == report_date
+    ).first()
+    
+    if position:
+        return {"exists": True, "position_id": position.position_id}
+    return {"exists": False, "position_id": None}
+
+
+@router.post("/", response_model=PositionRead)
+def create_position(
+    position_data: dict,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Create a new position.
+    """
+    position = Position(**position_data)
+    db.add(position)
+    db.commit()
+    db.refresh(position)
+    return position
+
+
+@router.put("/{position_id}", response_model=PositionRead)
+def update_position(
+    position_id: int,
+    position_data: dict,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Update an existing position.
+    """
+    position = db.query(Position).filter(Position.position_id == position_id).first()
+    if not position:
+        raise HTTPException(status_code=404, detail="Position not found")
+    
+    for key, value in position_data.items():
+        setattr(position, key, value)
+    
+    db.commit()
+    db.refresh(position)
+    return position
+
+
+
 
 
 

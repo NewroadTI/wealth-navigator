@@ -201,6 +201,12 @@ class CashJournal(Base):
     extra_details = Column(JSONB, nullable=True)
     account = relationship("Account", back_populates="cash_journal")
     asset = relationship("Asset")
+    # En tu modelo CashJournal (app/models/asset.py)
+
+    # 1. Para guardar el ID único de IBKR y evitar duplicados al correr diario
+    external_transaction_id = Column(String, unique=True, index=True, nullable=True) 
+    # 3. Para agrupar transacciones relacionadas (ej. el Dividendo y su Impuesto tienen IDs cercanos o logicamente vinculados)
+    action_id = Column(String, nullable=True)
 
 class FXTransaction(Base):
     __tablename__ = "fx_transactions"
@@ -347,7 +353,8 @@ class Position(Base):
     # --- EXTRAS Y RENTA FIJA ---
     accrued_interest = Column(Numeric, nullable=True)   # 'AccruedInterest' (T2)
     fx_rate_to_base = Column(Numeric, default=1, nullable=True) # 'FXRateToBase' (T1 & T2)
-    
+    currency = Column(CHAR(3), nullable=True) # 'Currency' (T1 & T2)
+
 
     # Relaciones
     account = relationship("Account", back_populates="positions")

@@ -309,6 +309,7 @@ def get_etl_dashboard(db: Session = Depends(get_db)):
             completed_at=job.completed_at,
             records_processed=job.records_processed or 0,
             records_created=job.records_created or 0,
+            records_skipped=job.records_skipped or 0,
             records_failed=job.records_failed or 0,
             error_message=job.error_message,
             duration_seconds=duration
@@ -453,12 +454,17 @@ def _run_single_etl_job(job_id: int, report_type: str):
                 processor = CorporateActionsProcessor(db_client)
                 result = processor.process_file(file_path)
         
+        elif report_type == "OPENPOSITIONS":
+            from app.jobs.processors.open_positions import OpenPositionsProcessor
+            from app.jobs.db_client import DBClient
+            
+            with DBClient() as db_client:
+                processor = OpenPositionsProcessor(db_client)
+                result = processor.process_file(file_path)
+        
         # TODO: Add other report type processors here
         # elif report_type == "TRADES":
         #     processor = TradesProcessor()
-        #     result = processor.process_file(file_path)
-        # elif report_type == "OPENPOSITIONS":
-        #     processor = PositionsProcessor()
         #     result = processor.process_file(file_path)
         else:
             logger.warning(f"No processor implemented for {report_type}")
@@ -475,6 +481,7 @@ def _run_single_etl_job(job_id: int, report_type: str):
         job.completed_at = datetime.now()
         job.records_processed = result.get("records_processed", 0)
         job.records_created = result.get("records_created", 0)
+        job.records_updated = result.get("records_updated", 0)
         job.records_failed = result.get("records_failed", 0)
         job.records_skipped = result.get("records_skipped", 0)
         
@@ -483,6 +490,15 @@ def _run_single_etl_job(job_id: int, report_type: str):
         
         if result.get("created_assets"):
             job.created_assets = [{"symbol": s} for s in result.get("created_assets", [])]
+        
+        # Store missing assets/accounts in extra_data for frontend to display
+        extra_data = {}
+        if result.get("missing_assets"):
+            extra_data["missing_assets"] = result.get("missing_assets")
+        if result.get("missing_accounts"):
+            extra_data["missing_accounts"] = result.get("missing_accounts")
+        if extra_data:
+            job.extra_data = extra_data
         
         if job.started_at and job.completed_at:
             job.execution_time_seconds = Decimal(str((job.completed_at - job.started_at).total_seconds()))

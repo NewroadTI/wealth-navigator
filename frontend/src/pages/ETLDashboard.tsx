@@ -32,6 +32,7 @@ import {
   Layers,
   ChevronRight,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   Tooltip,
   TooltipContent,
@@ -71,9 +72,14 @@ interface ETLActivityLog {
   completed_at: string | null;
   records_processed: number;
   records_created: number;
+  records_skipped: number;
   records_failed: number;
   error_message: string | null;
   duration_seconds: number | null;
+  report_type?: string;
+  extra_data?: {
+    missing_assets?: Array<{ symbol: string }>;
+  };
 }
 
 interface ETLDashboardResponse {
@@ -138,18 +144,15 @@ const formatRelativeTime = (dateString: string | null) => {
   if (!dateString) return 'Never';
   
   const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
   
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  
-  return date.toLocaleDateString();
+  // Always show the date and time for better tracking
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 };
 
 const formatDateTime = (dateString: string | null) => {
@@ -257,41 +260,69 @@ const ReportStatusCard = ({
   </Card>
 );
 
-const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => (
-  <div className="flex items-start gap-3 py-3">
-    <div className="mt-1">{getStatusIcon(log.status)}</div>
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center justify-between">
-        <p className="font-medium text-sm">{log.job_type}</p>
-        <span className="text-xs text-muted-foreground">
-          {formatRelativeTime(log.started_at)}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 mt-1">
-        {log.status === 'success' && (
-          <span className="text-xs text-green-600">
-            +{log.records_created} created
-          </span>
-        )}
-        {log.records_failed > 0 && (
-          <span className="text-xs text-red-500">
-            {log.records_failed} failed
-          </span>
-        )}
-        {log.duration_seconds && (
+const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
+  const isOpenPositions = log.job_type === 'OPENPOSITIONS' || log.report_type === 'OPENPOSITIONS';
+  const hasMissingAssets = Boolean(log.extra_data?.missing_assets && log.extra_data.missing_assets.length > 0);
+
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <div className="mt-1">{getStatusIcon(log.status)}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-sm">{log.job_type} job id #{log.job_id}</p>
+            {isOpenPositions && hasMissingAssets && (
+              <Link
+                to={`/assets?show_missing=true&job_id=${log.job_id}`}
+                className="inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 underline-offset-2 hover:underline"
+              >
+                View missing assets
+                <ChevronRight className="h-3 w-3" />
+              </Link>
+            )}
+          </div>
           <span className="text-xs text-muted-foreground">
-            ({formatDuration(log.duration_seconds)})
+            {formatRelativeTime(log.started_at)}
           </span>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          {log.status === 'success' && (
+            <>
+              <span className="text-xs text-muted-foreground">
+                {log.records_processed} processed
+              </span>
+              {log.records_created > 0 && (
+                <span className="text-xs text-green-600">
+                  +{log.records_created} created
+                </span>
+              )}
+              {log.records_skipped > 0 && (
+                <span className="text-xs text-amber-600">
+                  {log.records_skipped} skipped
+                </span>
+              )}
+            </>
+          )}
+          {log.records_failed > 0 && (
+            <span className="text-xs text-red-500">
+              {log.records_failed} failed
+            </span>
+          )}
+          {log.duration_seconds && (
+            <span className="text-xs text-muted-foreground">
+              ({formatDuration(log.duration_seconds)})
+            </span>
+          )}
+        </div>
+        {log.error_message && (
+          <p className="text-xs text-red-500 mt-1 line-clamp-1">
+            {log.error_message}
+          </p>
         )}
       </div>
-      {log.error_message && (
-        <p className="text-xs text-red-500 mt-1 line-clamp-1">
-          {log.error_message}
-        </p>
-      )}
     </div>
-  </div>
-);
+  );
+};
 
 // ==========================================================================
 // MAIN COMPONENT

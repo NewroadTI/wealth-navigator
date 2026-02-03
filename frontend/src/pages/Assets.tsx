@@ -28,6 +28,8 @@ import {
   createColumnDefinitions,
 } from './AssetsSection';
 
+import { MissingAssetsAlert } from '@/components/positions/MissingAssetsAlert';
+
 const Assets = () => {
   const { toast } = useToast();
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all');
@@ -65,6 +67,7 @@ const Assets = () => {
   const [editingAsset, setEditingAsset] = useState<AssetApi | null>(null);
   const [assetActionError, setAssetActionError] = useState<string | null>(null);
   const [assetActionLoading, setAssetActionLoading] = useState(false);
+  const [missingAssetsKey, setMissingAssetsKey] = useState(0); // Force re-render of MissingAssetsAlert
 
   // Cargar asset classes desde el API
   useEffect(() => {
@@ -397,6 +400,10 @@ const Assets = () => {
       await loadAssets();
       setIsNewAssetOpen(false);
       setNewAssetDraft(defaultAssetFormState);
+      
+      // Force refresh of missing assets to remove the newly created asset
+      setMissingAssetsKey(prev => prev + 1);
+      
       toast({
         title: 'Asset created',
         description: `Asset "${newAssetDraft.symbol.trim()}" has been created successfully.`,
@@ -506,6 +513,25 @@ const Assets = () => {
 
   return (
     <AppLayout title="Assets" subtitle="Manage and filter assets by portfolio and type">
+      {/* Missing Assets Alert from ETL */}
+      <MissingAssetsAlert
+        key={missingAssetsKey}
+        onCreateAsset={(asset) => {
+          // Pre-fill the new asset form with the missing asset data
+          setNewAssetDraft({
+            ...defaultAssetFormState,
+            symbol: asset.symbol || '',
+            description: asset.description || '',
+            isin: asset.isin || asset.security_id || '',
+            currency: asset.currency || 'USD',
+          });
+          setIsNewAssetOpen(true);
+        }}
+        onRefresh={() => {
+          // Reload assets when missing assets are refreshed
+          loadAssets();
+        }}      />
+      
       {/* Filters Row */}
       <div className="flex flex-col gap-3 md:gap-4 mb-4 md:mb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
