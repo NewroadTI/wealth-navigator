@@ -44,3 +44,7 @@ backend/seed_data/insertion_summary.json
 .github/
 
 *csv
+*xlsx
+
+backend/seed_data/persh/data
+

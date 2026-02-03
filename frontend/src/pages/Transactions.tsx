@@ -15,7 +15,7 @@ import { ColumnConfigurator } from '@/components/transactions/ColumnConfigurator
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { transactionsApi, accountsApi, portfoliosApi,usersApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
+import { transactionsApi, accountsApi, portfoliosApi, usersApi, assetsApi, catalogsApi, Trade, CashJournal, FxTransaction, CorporateAction, Account, Portfolio, PortfolioSimple, AssetClass } from '@/lib/api';
 import { TransactionsTable } from '@/components/transactions/TransactionsTable'; // Ajusta la ruta
 
 
@@ -48,65 +48,83 @@ interface ColumnDef {
 // All available columns organized by data
 const ALL_COLUMNS: ColumnDef[] = [
   // Common columns
-  { key: 'table_type', label: 'Type', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d && 'side' in d) return `trade/${(d as Trade).side.toLowerCase()}`;
-    if ('journal_id' in d) return `cj:${(d as CashJournal).type.toLowerCase()}`;
-    if ('fx_id' in d) return 'fx/fxtrade';
-    if ('action_id' in d) return `ca:${(d as CorporateAction).action_type.toLowerCase()}`;
-    return '';
-  }},
+  {
+    key: 'table_type', label: 'Type', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d && 'side' in d) return `trade/${(d as Trade).side.toLowerCase()}`;
+      if ('journal_id' in d) return `cj:${(d as CashJournal).type.toLowerCase()}`;
+      if ('fx_id' in d) return 'fx/fxtrade';
+      if ('action_id' in d) return `ca:${(d as CorporateAction).action_type.toLowerCase()}`;
+      return '';
+    }
+  },
   { key: 'portfolio', label: 'Portfolio', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: () => '' },
-  { key: 'account_id', label: 'Account ID', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-    if ('account_id' in d) return (d as any).account_id || '';
-    return '';
-  }},
-  { key: 'asset_id', label: 'Asset ID', tables: ['Trade', 'CashJournal', 'CorporateAction'], getValue: (d) => {
-    if ('asset_id' in d) return (d as any).asset_id || '';
-    return '';
-  }},
+  {
+    key: 'account_id', label: 'Account ID', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+      if ('account_id' in d) return (d as any).account_id || '';
+      return '';
+    }
+  },
+  {
+    key: 'asset_id', label: 'Asset ID', tables: ['Trade', 'CashJournal', 'CorporateAction'], getValue: (d) => {
+      if ('asset_id' in d) return (d as any).asset_id || '';
+      return '';
+    }
+  },
   // Date columns (unified)
-  { key: 'date', label: 'Date', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d && 'trade_date' in d) return (d as Trade).trade_date || '';
-    if ('journal_id' in d && 'date' in d) return (d as CashJournal).date || '';
-    if ('fx_id' in d && 'trade_date' in d) return (d as FxTransaction).trade_date || '';
-    if ('action_id' in d && 'execution_date' in d) return (d as CorporateAction).execution_date || '';
-    return '';
-  }},
+  {
+    key: 'date', label: 'Date', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d && 'trade_date' in d) return (d as Trade).trade_date || '';
+      if ('journal_id' in d && 'date' in d) return (d as CashJournal).date || '';
+      if ('fx_id' in d && 'trade_date' in d) return (d as FxTransaction).trade_date || '';
+      if ('action_id' in d && 'execution_date' in d) return (d as CorporateAction).execution_date || '';
+      return '';
+    }
+  },
   // Amount columns (unified)
-  { key: 'amount', label: 'Amount', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d && 'gross_amount' in d) return (d as Trade).gross_amount || '';
-    if ('journal_id' in d && 'amount' in d) return (d as CashJournal).amount || '';
-    if ('fx_id' in d && 'source_amount' in d) return (d as FxTransaction).source_amount || '';
-    if ('action_id' in d && 'amount' in d) return (d as CorporateAction).amount || '';
-    return '';
-  }},
+  {
+    key: 'amount', label: 'Amount', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d && 'gross_amount' in d) return (d as Trade).gross_amount || '';
+      if ('journal_id' in d && 'amount' in d) return (d as CashJournal).amount || '';
+      if ('fx_id' in d && 'source_amount' in d) return (d as FxTransaction).source_amount || '';
+      if ('action_id' in d && 'amount' in d) return (d as CorporateAction).amount || '';
+      return '';
+    }
+  },
   // Currency columns (unified)
-  { key: 'currency', label: 'Currency', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d && 'currency' in d) return (d as Trade).currency || '';
-    if ('journal_id' in d && 'currency' in d) return (d as CashJournal).currency || '';
-    if ('fx_id' in d && 'source_currency' in d) return (d as FxTransaction).source_currency || '';
-    if ('action_id' in d && 'currency' in d) return (d as CorporateAction).currency || '';
-    return '';
-  }},
+  {
+    key: 'currency', label: 'Currency', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d && 'currency' in d) return (d as Trade).currency || '';
+      if ('journal_id' in d && 'currency' in d) return (d as CashJournal).currency || '';
+      if ('fx_id' in d && 'source_currency' in d) return (d as FxTransaction).source_currency || '';
+      if ('action_id' in d && 'currency' in d) return (d as CorporateAction).currency || '';
+      return '';
+    }
+  },
   // Description
-  { key: 'description', label: 'Description', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-    if ('description' in d) return (d as any).description || '';
-    return '';
-  }},
+  {
+    key: 'description', label: 'Description', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+      if ('description' in d) return (d as any).description || '';
+      return '';
+    }
+  },
   // Quantity
-  { key: 'quantity', label: 'Quantity', tables: ['Trade', 'CashJournal', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d && 'quantity' in d) return (d as Trade).quantity || '';
-    if ('journal_id' in d && 'quantity' in d) return (d as CashJournal).quantity || '';
-    if ('action_id' in d && 'quantity_adjustment' in d) return (d as CorporateAction).quantity_adjustment || '';
-    return '';
-  }},
+  {
+    key: 'quantity', label: 'Quantity', tables: ['Trade', 'CashJournal', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d && 'quantity' in d) return (d as Trade).quantity || '';
+      if ('journal_id' in d && 'quantity' in d) return (d as CashJournal).quantity || '';
+      if ('action_id' in d && 'quantity_adjustment' in d) return (d as CorporateAction).quantity_adjustment || '';
+      return '';
+    }
+  },
   // Side
-  { key: 'side', label: 'Side', tables: ['Trade', 'FX'], getValue: (d) => {
-    if ('transaction_id' in d && 'side' in d) return (d as Trade).side || '';
-    if ('fx_id' in d && 'side' in d) return (d as FxTransaction).side || '';
-    return '';
-  }},
-  
+  {
+    key: 'side', label: 'Side', tables: ['Trade', 'FX'], getValue: (d) => {
+      if ('transaction_id' in d && 'side' in d) return (d as Trade).side || '';
+      if ('fx_id' in d && 'side' in d) return (d as FxTransaction).side || '';
+      return '';
+    }
+  },
+
   // Trade-specific columns
   { key: 'settlement_date', label: 'Settlement Date', tables: ['Trade'], getValue: (d) => (d as Trade).settlement_date || '' },
   { key: 'report_date', label: 'Report Date', tables: ['Trade'], getValue: (d) => (d as Trade).report_date || '' },
@@ -116,12 +134,12 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'commission', label: 'Commission', tables: ['Trade'], getValue: (d) => (d as Trade).commission || '' },
   { key: 'tax', label: 'Tax', tables: ['Trade'], getValue: (d) => (d as Trade).tax || '' },
   { key: 'ib_exec_id', label: 'IB Exec ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_exec_id || '' },
-  
+
   // Cash Journal-specific columns
   { key: 'ex_date', label: 'Ex Date', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).ex_date || '' },
   { key: 'cash_type', label: 'Cash Type', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).type || '' },
   { key: 'rate_per_share', label: 'Rate Per Share', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).rate_per_share || '' },
-  
+
   // FX-specific columns
   { key: 'source_currency', label: 'Source Currency', tables: ['FX'], getValue: (d) => (d as FxTransaction).source_currency || '' },
   { key: 'source_amount', label: 'Source Amount', tables: ['FX'], getValue: (d) => (d as FxTransaction).source_amount || '' },
@@ -130,7 +148,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'exchange_rate', label: 'Exchange Rate', tables: ['FX'], getValue: (d) => (d as FxTransaction).exchange_rate || '' },
   { key: 'target_account_id', label: 'Target Account ID', tables: ['FX'], getValue: (d) => (d as FxTransaction).target_account_id || '' },
   { key: 'external_id', label: 'External ID', tables: ['FX'], getValue: (d) => (d as FxTransaction).external_id || '' },
-  
+
   // Corporate Action-specific columns
   { key: 'action_type', label: 'Action Type', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).action_type || '' },
   { key: 'ratio_old', label: 'Ratio Old', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).ratio_old || '' },
@@ -348,10 +366,10 @@ const Transactions = () => {
         let skip = 0;
         let hasMore = true;
         const newCache = new Map(assetCache);
-        
+
         while (hasMore) {
           const assetsBatch = await assetsApi.getAssets({ skip, limit: BATCH_SIZE });
-          
+
           if (!assetsBatch || assetsBatch.length === 0) {
             hasMore = false;
             break;
@@ -371,7 +389,7 @@ const Transactions = () => {
             skip += BATCH_SIZE;
           }
         }
-        
+
         setAssetCache(newCache);
       } catch (err) {
         console.error("Error building asset dictionary:", err);
@@ -424,13 +442,13 @@ const Transactions = () => {
     return allTransactions.filter((t) => {
       // Type filter
       if (!selectedTypes.includes(t.type)) return false;
-      
+
       // Date filters
       if (startDate && new Date(t.date) < startDate) return false;
       if (endDate && new Date(t.date) > endDate) return false;
-      
+
       const data = t.data;
-      
+
       // Portfolio filter with O(1) lookup
       if (filterByPortfolio) {
         if ('account_id' in data) {
@@ -440,23 +458,23 @@ const Transactions = () => {
           return false;
         }
       }
-      
+
       // Asset class/subclass filter
       if (filterByAssetClass) {
         if ('asset_id' in data) {
           const assetId = (data as any).asset_id;
           if (assetId === null || assetId === undefined) return false;
-          
+
           const assetInfo = assetCache.get(assetId);
           if (!assetInfo) return false;
-          
+
           if (selectedClassId !== null && assetInfo.class_id !== selectedClassId) return false;
           if (selectedSubClassId !== null && assetInfo.sub_class_id !== selectedSubClassId) return false;
         } else {
           return false;
         }
       }
-      
+
       // Asset symbol filter
       if (filterByAsset) {
         if ('description' in data) {
@@ -466,13 +484,13 @@ const Transactions = () => {
           return false;
         }
       }
-      
+
       // Text search filter
       if (filterBySearch) {
         const dataStr = JSON.stringify(data).toLowerCase();
         if (!dataStr.includes(searchLower)) return false;
       }
-      
+
       return true;
     });
   }, [allTransactions, selectedTypes, startDate, endDate, searchText, selectedAsset, selectedAssetClass, selectedAssetSubclass, selectedPortfolio, accountMap, assetCache]);
@@ -589,7 +607,7 @@ const Transactions = () => {
   const getTypeColor = (typeValue: string): { bg: string; text: string; icon: string } => {
     if (typeValue.startsWith('trade/')) {
       const side = typeValue.split('/')[1];
-      return side === 'buy' 
+      return side === 'buy'
         ? { bg: 'bg-purple-100/80 dark:bg-purple-950/40', text: 'text-purple-700 dark:text-purple-400', icon: '' }
         : { bg: 'bg-orange-100/80 dark:bg-orange-950/40', text: 'text-orange-700 dark:text-orange-400', icon: '' };
     }
@@ -903,15 +921,15 @@ const Transactions = () => {
           {/* Date Range */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className={`border-border h-8 md:h-9 text-xs md:text-sm ${startDate && endDate ? 'border-primary text-primary' : ''}`}
               >
                 <Calendar className="h-3.5 w-3.5 mr-1.5" />
                 <span className="hidden sm:inline">
-                  {startDate && endDate 
-                    ? `${format(startDate, 'MMM dd, yyyy')} - ${format(endDate, 'MMM dd, yyyy')}` 
+                  {startDate && endDate
+                    ? `${format(startDate, 'MMM dd, yyyy')} - ${format(endDate, 'MMM dd, yyyy')}`
                     : 'Date Range'}
                 </span>
               </Button>
@@ -1017,7 +1035,7 @@ const Transactions = () => {
       </div>
 
       {/* Transactions Table */}
-      <TransactionsTable 
+      <TransactionsTable
         transactions={paginatedTransactions}
         visibleColumns={visibleColumns}
         allColumns={ALL_COLUMNS}

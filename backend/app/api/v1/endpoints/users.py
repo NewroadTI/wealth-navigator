@@ -126,8 +126,31 @@ def create_user(
         role_id=user_in.role_id
     )
     
-    db.add(user)
-    db.commit()
+    try:
+        db.add(user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        # Check for IntegrityError
+        error_msg = str(e).lower()
+        if "unique constraint" in error_msg:
+             if "tax_id" in error_msg:
+                 detail = f"El Tax ID {user_in.tax_id} ya está registrado."
+             elif "username" in error_msg:
+                 detail = f"El username '{user_in.username}' ya está en uso."
+             elif "email" in error_msg:
+                 detail = f"El email '{user_in.email}' ya está registrado."
+             else:
+                 detail = "Error de integridad: Un campo único ya existe."
+             
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail
+            )
+        else:
+            # Re-raise standard 500
+            raise e
+            
     db.refresh(user)
     
     return user

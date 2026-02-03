@@ -5,7 +5,13 @@ import glob
 def convert_excel_to_csv():
     # Get the directory where the script is located
     directory = os.path.dirname(os.path.abspath(__file__))
-    data_directory = os.path.join(directory, "data")
+    data_directory = os.path.join(directory, "data/daily")
+    output_directory = os.path.join(directory, "daily_transactions_csv")
+    
+    # Create output directory if it doesn't exist
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+        print(f"Created output directory: {output_directory}")
     
     # Find all .xls and .xlsx files in the data directory
     excel_files = glob.glob(os.path.join(data_directory, "*.xls*"))
@@ -21,7 +27,7 @@ def convert_excel_to_csv():
             
         file_name = os.path.basename(file_path)
         base_name = os.path.splitext(file_name)[0]
-        output_file = os.path.join(data_directory, f"{base_name}.csv")
+        output_file = os.path.join(output_directory, f"{base_name}.csv")
         
         print(f"Converting '{file_name}' to '{base_name}.csv'...")
         

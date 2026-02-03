@@ -48,14 +48,21 @@ const navigation: NavItem[] = [
   { name: 'CRM', href: '/crm', icon: Contact },
   { name: 'Basic Data', href: '/basic-data', icon: Database },
   { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'ETL Sync', href: '/etl', icon: RefreshCw },
+  {
+    name: 'ETL Sync',
+    icon: RefreshCw,
+    children: [
+      { name: 'IBKR', href: '/etl/ibkr', icon: Database },
+      { name: 'Pershing', href: '/etl/pershing', icon: FileSpreadsheet },
+    ],
+  },
   { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
   const location = useLocation();
-  const [openSubmenus, setOpenSubmenus] = useState<string[]>(['Investors & Portfolios']);
+  const [openSubmenus, setOpenSubmenus] = useState<string[]>(['Investors & Portfolios', 'ETL Sync']);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const toggleSubmenu = (name: string) => {
