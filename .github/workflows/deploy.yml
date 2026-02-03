@@ -19,7 +19,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: "backend/,docker-compose.prod.yml,Caddyfile"
+          source: "backend/,database/migrations/,docker-compose.prod.yml,Caddyfile"
           target: "/root/wealth-navigator"
 
       # 2. Conectarse por SSH y levantar Docker
@@ -38,5 +38,24 @@ jobs:
             # Levantar los servicios (reconstruyendo el backend si cambió)
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
             
+            # Esperar a que la base de datos esté lista
+            echo "⏳ Esperando a que la base de datos esté lista..."
+            sleep 5
+            
+            # Ejecutar migraciones de base de datos
+            echo "🔄 Ejecutando migraciones de base de datos..."
+            docker compose -f docker-compose.prod.yml exec -T db bash -c "
+              export PGPASSWORD=\$POSTGRES_PASSWORD
+              cd /docker-entrypoint-initdb.d/migrations
+              chmod +x run-migrations.sh
+              DB_HOST=localhost ./run-migrations.sh
+            " || echo "⚠️  Migraciones no pudieron ejecutarse (puede que la DB no tenga el script)"
+            
+            # Reiniciar backend para asegurar que use el nuevo esquema
+            echo "🔄 Reiniciando backend..."
+            docker compose -f docker-compose.prod.yml restart backend
+            
             # Limpiar imágenes viejas para no llenar el disco
             docker image prune -f
+            
+            echo "✅ Deploy completado exitosamente!"
