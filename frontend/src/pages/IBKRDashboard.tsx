@@ -144,21 +144,7 @@ const formatRelativeTime = (dateString: string | null) => {
   if (!dateString) return 'Never';
 
   const date = new Date(dateString);
-<<<<<<< HEAD:frontend/src/pages/IBKRDashboard.tsx
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-
-  return date.toLocaleDateString();
-=======
-  
   // Always show the date and time for better tracking
   return date.toLocaleString('en-US', {
     month: 'short',
@@ -167,7 +153,6 @@ const formatRelativeTime = (dateString: string | null) => {
     minute: '2-digit',
     hour12: false
   });
->>>>>>> develop:frontend/src/pages/ETLDashboard.tsx
 };
 
 const formatDateTime = (dateString: string | null) => {
@@ -448,7 +433,7 @@ const IBKRDashboard = () => {
   }
 
   return (
-    <AppLayout title="IBKR ETL Dashboard" subtitle="Monitor IBKR data synchronization">
+    <AppLayout title="ETL Dashboard" subtitle="Monitor IBKR data synchronization">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
