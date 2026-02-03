@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUpDown, GripVertical } from 'lucide-react';
 import { format } from 'date-fns';
+import { useState, useRef } from 'react';
+import { cn } from '@/lib/utils';
 
 // Tipos necesarios (puedes importarlos si ya los tienes centralizados)
 export interface TransactionDisplay {
@@ -28,6 +30,7 @@ interface TransactionsTableProps {
   getTypeColor: (typeValue: string) => { bg: string; text: string; icon: string };
   sortConfig: SortConfig;
   onSort: (key: string) => void;
+  onColumnReorder?: (fromIndex: number, toIndex: number) => void; // Nueva prop para reordenar columnas
 }
 
 export const TransactionsTable = ({
@@ -45,7 +48,62 @@ export const TransactionsTable = ({
   getTypeColor,
   sortConfig,
   onSort,
+  onColumnReorder,
 }: TransactionsTableProps) => {
+  // Drag and drop state for column reordering
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const dragCounter = useRef(0);
+
+  // Drag and Drop handlers for column headers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (!onColumnReorder) return; // Only allow drag if onColumnReorder is provided
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    dragCounter.current = 0;
+  };
+
+  const handleDragEnter = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (!onColumnReorder) return;
+    dragCounter.current++;
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    if (!onColumnReorder) return;
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (!onColumnReorder || draggedIndex === null || draggedIndex === targetIndex) {
+      setDragOverIndex(null);
+      return;
+    }
+
+    onColumnReorder(draggedIndex, targetIndex);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    dragCounter.current = 0;
+  };
+
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden mb-4 md:mb-6">
       {/* --- AQUÍ ESTÁ LA MAGIA DEL PAGINADOR SUPERIOR --- */}
@@ -54,6 +112,11 @@ export const TransactionsTable = ({
         <div className="flex items-center gap-2">
           <ArrowUpDown className="h-4 w-4 md:h-5 md:w-5 text-primary" />
           <h3 className="font-semibold text-foreground text-sm md:text-base">Transaction List</h3>
+          {onColumnReorder && (
+            <span className="text-xs text-muted-foreground ml-2 hidden sm:inline">
+              • Drag column headers to reorder
+            </span>
+          )}
         </div>
 
         {/* Lado Derecho: Paginador Idéntico a Assets */}
@@ -99,17 +162,37 @@ export const TransactionsTable = ({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                {visibleColumns.map((colKey) => {
+                {visibleColumns.map((colKey, index) => {
                   const col = allColumns.find((c) => c.key === colKey);
+                  const isDraggable = onColumnReorder !== undefined;
+                  const isDragged = draggedIndex === index;
+                  const isDraggedOver = dragOverIndex === index;
+                  
                   return (
                     <th
                       key={colKey}
-                      className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
-                      onClick={() => onSort(colKey)}
+                      className={cn(
+                        "px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap select-none transition-all duration-150",
+                        isDraggable && "cursor-grab hover:bg-muted/70",
+                        isDragged && "opacity-50 cursor-grabbing",
+                        isDraggedOver && "bg-primary/10 border-l-2 border-primary",
+                        !isDraggable && "cursor-pointer hover:bg-muted/50"
+                      )}
+                      draggable={isDraggable}
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragEnd={handleDragEnd}
+                      onDragEnter={(e) => handleDragEnter(e, index)}
+                      onDragLeave={handleDragLeave}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onClick={() => !isDragged && onSort(colKey)}
                     >
                       <div className="flex items-center gap-1">
-                        {col ? col.label : colKey}
-                        <ArrowUpDown className={`h-3 w-3 ${sortConfig.key === colKey ? 'opacity-100' : 'opacity-40'}`} />
+                        {isDraggable && (
+                          <GripVertical className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+                        )}
+                        <span className="flex-1">{col ? col.label : colKey}</span>
+                        <ArrowUpDown className={`h-3 w-3 flex-shrink-0 ${sortConfig.key === colKey ? 'opacity-100' : 'opacity-40'}`} />
                       </div>
                     </th>
                   );

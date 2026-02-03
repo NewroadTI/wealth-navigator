@@ -1,5 +1,6 @@
 docker exec -it wealthroad-api python seed_data/initial_data.py
 python3 upload_assets.py
+python3 createcsvuser.py
 docker exec -it wealthroad-api python seed_data/import_from_splits_v.py
 ssh root@178.156.215.84
 
