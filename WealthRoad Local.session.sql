@@ -1,1 +1,1 @@
-SELECT * FROM positions;
+SELECT * FROM corporate_actions;

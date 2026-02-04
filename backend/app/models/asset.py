@@ -135,8 +135,8 @@ class Trades(Base):
     ib_order_id = Column(String, nullable=True)
 
     # --- FECHAS ---
-    # "DateTime" o "TradeDate". Incluye hora si está disponible.
-    trade_date = Column(DateTime, nullable=False)
+    # "ReportDate" del CSV: Fecha sin hora
+    trade_date = Column(Date, nullable=False)
     
     # "SettleDateTarget": Cuando realmente se mueve el efectivo
     settlement_date = Column(Date, nullable=True)
@@ -172,6 +172,12 @@ class Trades(Base):
     realized_pnl = Column(Numeric, nullable=True) # "FifoPnlRealized" (Ganancia/Pérdida realizada en esta venta)
     mtm_pnl = Column(Numeric, nullable=True)      # "MtmPnl" (Marcado a mercado del día)
 
+    # --- OPCIONES / DERIVADOS ---
+    multiplier = Column(Numeric, nullable=True)   # "Multiplier" (100 para opciones)
+    strike = Column(Numeric, nullable=True)       # "Strike" (Precio de ejercicio)
+    expiry = Column(Date, nullable=True)          # "Expiry" (Fecha de vencimiento)
+    put_call = Column(String, nullable=True)      # "Put/Call" (C o P)
+
     # --- EXTRAS ---
     currency = Column(CHAR(3))                    # "CurrencyPrimary" o "IBCommissionCurrency"
     description = Column(Text)                    # "Description"
@@ -201,32 +207,41 @@ class CashJournal(Base):
     extra_details = Column(JSONB, nullable=True)
     account = relationship("Account", back_populates="cash_journal")
     asset = relationship("Asset")
-    # En tu modelo CashJournal (app/models/asset.py)
-
-    # 1. Para guardar el ID único de IBKR y evitar duplicados al correr diario
     external_transaction_id = Column(String, unique=True, index=True, nullable=True) 
-    # 3. Para agrupar transacciones relacionadas (ej. el Dividendo y su Impuesto tienen IDs cercanos o logicamente vinculados)
     action_id = Column(String, nullable=True)
 
 class FXTransaction(Base):
     __tablename__ = "fx_transactions"
     fx_id = Column(Integer, primary_key=True, index=True)
-    trade_date = Column(DateTime)
+    trade_date = Column(Date)  # Fecha sin hora del ReportDate
     
     # Cuenta de donde SALE el dinero (Source)
     account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=False)
     
-    # NUEVA: Cuenta a donde ENTRA el dinero (Target)
+    # Cuenta a donde ENTRA el dinero (Target)
     target_account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=True)
     
     source_currency = Column(CHAR(3))
     source_amount = Column(Numeric)
     target_currency = Column(CHAR(3))
     target_amount = Column(Numeric)
-    side = Column(String, nullable=True) # BUY-SELL
+    side = Column(String, nullable=True)  # BUY / SELL
     
     exchange_rate = Column(Numeric)
-    external_id = Column(String, unique=True)
+    commission = Column(Numeric, nullable=True)  # "IBCommission"
+    commission_currency = Column(CHAR(3), nullable=True)  # "IBCommissionCurrency"
+    
+    # Identificadores IBKR
+    ib_transaction_id = Column(String, index=True, nullable=True)  # "TransactionID"
+    ib_exec_id = Column(String, nullable=True)  # "IBExecID"
+    ib_order_id = Column(String, nullable=True)  # "IBOrderID"
+    
+    # Extras
+    exchange = Column(String, nullable=True)  # "Exchange" (IDEALFX, etc.)
+    transaction_type = Column(String, nullable=True)  # "TransactionType" (ExchTrade, TradeCancel)
+    notes = Column(String, nullable=True)  # "Notes/Codes"
+    
+    external_id = Column(String, unique=True, nullable=True)
 
 class PerformanceAttribution(Base):
     __tablename__ = "performance_attribution"
