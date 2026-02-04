@@ -1,14 +1,13 @@
 """
-Cash Journal Processor
-======================
-Processes STATEMENTFUNDS reports from IBKR and uploads via API.
-Handles: Dividends, Interest, Deposits, Withdrawals, Taxes, Fees, etc.
+Transfers Processor (ACATS)
+============================
+Processes TRANSFERS reports from IBKR and uploads via API.
+Handles: Asset transfers IN/OUT between accounts (ACATS)
 
 REFACTORED: Now uses APIClient instead of direct DB access.
 """
 
 import csv
-import re
 import logging
 from pathlib import Path
 from datetime import datetime, date
@@ -20,31 +19,8 @@ from app.jobs.api_client import APIClient, get_api_client
 logger = logging.getLogger(__name__)
 
 
-# Activity Code to Type Mapping
-ACTIVITY_CODE_MAP = {
-    "DIV": "DIVIDEND",
-    "DINT": "INTEREST",
-    "DEP": "DEPOSIT",
-    "WITH": "WITHDRAWAL",
-    "FRTAX": "TAX",
-    "OFEE": "FEE",
-    "ADJ": "FEE ADJ",
-    "PIL": "DIVIDEND PIL",
-}
-
-# Activity codes to ignore (handled elsewhere)
-IGNORED_ACTIVITY_CODES = {
-    "BUYSELL",  # Trades - handled by trades processor
-    "BUY",      # Trades - handled by trades processor
-    "SELL",     # Trades - handled by trades processor
-    "FXSELL",   # Forex - handled by fx processor
-    "FXBUY",    # Forex - handled by fx processor
-    "CA",       # Corporate Actions - handled by corporate actions processor
-}
-
-
-class CashJournalProcessor:
-    """Process Statement Funds CSV from IBKR for Cash Journal entries via API."""
+class TransfersProcessor:
+    """Process Transfers (ACATS) CSV from IBKR for Cash Journal entries via API."""
     
     def __init__(self, api_client: APIClient = None):
         self.api = api_client or get_api_client()
@@ -57,30 +33,28 @@ class CashJournalProcessor:
             "errors": [],
             "missing_assets": [],
             "missing_accounts": [],
+            "missing_transfer_accounts": [],  # Transfer accounts that don't exist
             "skipped_records": [],
             "failed_records": []
         }
         # Track unique missing items
         self._missing_asset_symbols = set()
         self._missing_account_codes = set()
+        self._missing_transfer_accounts = set()
         # Track processed reference codes within batch
         self._batch_reference_codes = set()
     
     def process_file(self, file_path: Path) -> dict:
         """
-        Process Statement Funds CSV file via API bulk endpoint.
+        Process Transfers CSV file via API bulk endpoint.
         
         Expected CSV columns from IBKR:
-        ClientAccountID, AccountAlias, Model, CurrencyPrimary, FXRateToBase, AssetClass, SubCategory,
-        Symbol, Description, Conid, SecurityID, SecurityIDType, CUSIP, ISIN, FIGI, ListingExchange,
-        UnderlyingConid, UnderlyingSymbol, UnderlyingSecurityID, UnderlyingListingExchange, Issuer,
-        IssuerCountryCode, Multiplier, Strike, Expiry, Put/Call, PrincipalAdjustFactor, ReportDate,
-        Date, SettleDate, ActivityCode, ActivityDescription, TradeID, RelatedTradeID, OrderID,
-        Buy/Sell, TradeQuantity, TradePrice, TradeGross, TradeCommission, TradeTax, Debit, Credit,
-        Amount, TradeCode, Balance, LevelOfDetail, TransactionID, OrigTransactionID, RelatedTransactionID,
-        ActionID, SerialNumber, DeliveryType, CommodityType, Fineness, Weight
+        ClientAccountID, AccountAlias, CurrencyPrimary, Symbol, Description, ISIN,
+        ReportDate, Date, DateTime, SettleDate, Type, Direction, TransferCompany,
+        TransferAccount, TransferAccountName, DeliveringBroker, Quantity, TransferPrice,
+        PositionAmount, PositionAmountInBase, TransactionID, etc.
         """
-        logger.info(f"Processing Cash Journal file: {file_path}")
+        logger.info(f"Processing Transfers file: {file_path}")
         
         try:
             # Pre-load caches via API
@@ -133,7 +107,7 @@ class CashJournalProcessor:
                     self._send_batch(entries_to_create)
             
             logger.info(
-                f"Cash Journal processing complete: "
+                f"Transfers processing complete: "
                 f"{self.stats['records_created']} created, "
                 f"{self.stats['records_updated']} updated (duplicates), "
                 f"{self.stats['records_skipped']} skipped (ignored), "
@@ -146,7 +120,7 @@ class CashJournalProcessor:
             }
             
         except Exception as e:
-            logger.error(f"Failed to process Cash Journal file: {e}", exc_info=True)
+            logger.error(f"Failed to process Transfers file: {e}", exc_info=True)
             return {
                 "status": "failed",
                 "error": str(e),
@@ -158,7 +132,7 @@ class CashJournalProcessor:
         if not entries:
             return
         
-        logger.info(f"Sending batch of {len(entries)} cash journal entries to API...")
+        logger.info(f"Sending batch of {len(entries)} transfer entries to API...")
         
         result = self.api.create_cash_journal_bulk(entries)
         
@@ -168,7 +142,7 @@ class CashJournalProcessor:
             logger.info(f"Batch successful: {result.get('created')} created, {result.get('skipped')} updated (duplicates)")
         elif result.get("status") == "partial":
             self.stats["records_created"] += result.get("created", 0)
-            self.stats["records_updated"] += result.get("skipped", 0)  # skipped = duplicates = updated
+            self.stats["records_updated"] += result.get("skipped", 0)
             self.stats["records_failed"] += len(result.get("errors", []))
             for err in result.get("errors", [])[:5]:
                 self.stats["errors"].append(str(err))
@@ -189,6 +163,7 @@ class CashJournalProcessor:
             "%d/%m/%Y",
             "%Y-%m-%d",
             "%d-%m-%Y",
+            "%m/%d/%Y",
             "%d/%m/%Y %H:%M:%S",
             "%Y-%m-%d %H:%M:%S",
         ]
@@ -220,29 +195,6 @@ class CashJournalProcessor:
         except (InvalidOperation, ValueError, AttributeError):
             return default
     
-    def _extract_rate_per_share(self, description: str) -> Optional[str]:
-        """
-        Extract rate per share from activity description.
-        Examples:
-        - "EAD(US94987B1052) Cash Dividend USD 0.05349 per Share (Ordinary Dividend)"
-        - "Cash Dividend EUR 1.23 per Share"
-        """
-        if not description:
-            return None
-        
-        # Pattern: currency code followed by amount followed by "per Share"
-        # Matches: USD 0.05349 per Share, EUR 1.23 per Share, etc.
-        pattern = r'(?:USD|EUR|GBP|CHF|CAD|HKD|JPY|AUD|CNH|SGD|MXN)\s+([0-9]+\.?[0-9]*)\s+per\s+[Ss]hare'
-        match = re.search(pattern, description)
-        
-        if match:
-            try:
-                return str(Decimal(match.group(1)))
-            except (InvalidOperation, ValueError):
-                pass
-        
-        return None
-    
     def _lookup_account(self, client_account_id: str, currency: str = None) -> Optional[int]:
         """Look up account_id from ClientAccountID via API cache."""
         if not client_account_id:
@@ -269,19 +221,39 @@ class CashJournalProcessor:
         
         return None
     
+    def _lookup_account_by_alias(self, account_alias: str) -> Optional[int]:
+        """Look up account_id by account_alias via API."""
+        if not account_alias or account_alias.strip() in ["", "--"]:
+            return None
+        
+        # Get all accounts and search by alias
+        # Note: This is inefficient but works with current API structure
+        # In production, you'd want an API endpoint to search by alias
+        try:
+            result = self.api._make_request("GET", "/api/v1/accounts/", params={"limit": 10000})
+            if result and isinstance(result, list):
+                for acc in result:
+                    if acc.get("account_alias") == account_alias:
+                        return acc.get("account_id")
+        except Exception as e:
+            logger.debug(f"Error looking up account by alias {account_alias}: {e}")
+        
+        return None
+    
     def _lookup_asset(self, isin: str = None, symbol: str = None) -> Optional[int]:
         """
         Look up asset_id using ISIN or symbol via API cache.
+        Priority: ISIN first, then symbol
         """
         # Try ISIN first
-        if isin:
-            asset_id = self.api.get_asset_id(isin)
+        if isin and isin.strip() and isin.strip() != "":
+            asset_id = self.api.get_asset_id_by_isin(isin.strip())
             if asset_id:
                 return asset_id
         
         # Fallback to symbol
-        if symbol:
-            asset_id = self.api.get_asset_id(symbol)
+        if symbol and symbol.strip() and symbol.strip() != "":
+            asset_id = self.api.get_asset_id_by_symbol(symbol.strip())
             if asset_id:
                 return asset_id
         
@@ -303,8 +275,8 @@ class CashJournalProcessor:
                 "description": row.get("Description", "").strip(),
                 "currency": row.get("CurrencyPrimary", "").strip(),
                 "asset_class": row.get("AssetClass", "").strip(),
-                "activity_code": row.get("ActivityCode", "").strip(),
-                "amount": row.get("Amount", "").strip(),
+                "quantity": row.get("Quantity", "").strip(),
+                "position_amount": row.get("PositionAmount", "").strip(),
                 "reason": reason
             })
     
@@ -317,21 +289,31 @@ class CashJournalProcessor:
                 "reason": "Account not found in database"
             })
     
+    def _track_missing_transfer_account(self, transfer_account: str):
+        """Track a missing transfer account for notification."""
+        if transfer_account and transfer_account not in self._missing_transfer_accounts:
+            self._missing_transfer_accounts.add(transfer_account)
+            self.stats["missing_transfer_accounts"].append({
+                "transfer_account": transfer_account,
+                "reason": "Transfer account alias not found in database"
+            })
+    
     def _process_row(self, row: Dict[str, str]) -> Optional[Dict]:
-        """Process a single row from CSV. Returns entry data dict for API or None."""
-        # Get activity code
-        activity_code = row.get("ActivityCode", "").strip().upper()
+        """Process a single row from CSV. Returns entry data dict for API or error dict."""
+        # Get direction to determine type
+        direction = row.get("Direction", "").strip().upper()
         
-        # Skip ignored activity codes
-        if activity_code in IGNORED_ACTIVITY_CODES or not activity_code:
-            return {"error": f"Ignored activity code: {activity_code or 'empty'}"}
+        # Skip if no direction
+        if not direction:
+            return {"error": "Missing Direction field"}
         
-        # Get mapped type
-        entry_type = ACTIVITY_CODE_MAP.get(activity_code)
-        if not entry_type:
-            # Unknown activity code - skip
-            logger.debug(f"Skipping unknown activity code: {activity_code}")
-            return {"error": f"Unmapped activity code: {activity_code}"}
+        # Map direction to type
+        if direction == "IN":
+            entry_type = "ACATIN"
+        elif direction == "OUT":
+            entry_type = "ACATOUT"
+        else:
+            return {"error": f"Unknown Direction: {direction}"}
         
         # Extract common fields
         client_account_id = row.get("ClientAccountID", "").strip()
@@ -351,51 +333,43 @@ class CashJournalProcessor:
         
         # Parse dates
         report_date = self._parse_date(row.get("ReportDate", ""))
-        settle_date = self._parse_date(row.get("SettleDate", ""))
         
         if not report_date:
             logger.debug("Missing report date")
             return {"error": f"Invalid or missing report date: {row.get('ReportDate', '')}"}
         
         # Parse amount
-        amount = self._safe_decimal(row.get("Amount", "0"))
+        amount = self._safe_decimal(row.get("PositionAmount", "0"))
         if amount is None:
             amount = "0"
         
-        # Common fields
-        description = row.get("ActivityDescription", "").strip()
-        trade_id = row.get("TradeID", "").strip() or None
-        action_id = row.get("ActionID", "").strip() or None
+        # Parse quantity
+        quantity = self._safe_decimal(row.get("Quantity", "0"))
         
-        # Determine asset_id and other fields based on type
-        asset_id = None
-        quantity = None
-        rate_per_share = None
+        # Get description
+        description = row.get("Description", "").strip()
         
-        if entry_type in ("DIVIDEND", "DIVIDEND PIL", "TAX"):
-            # Look up asset using ISIN/Symbol
-            isin = row.get("ISIN", "").strip()
-            symbol = row.get("Symbol", "").strip()
-            
-            asset_id = self._lookup_asset(isin=isin, symbol=symbol)
-            
-            if not asset_id:
-                # Track missing asset but DON'T skip - insert with null asset_id
-                self._track_missing_asset(row, f"Asset not found for {entry_type}")
-                logger.debug(f"Asset not found for {entry_type}: ISIN={isin}, Symbol={symbol}")
-            
-            # Extract rate per share from description
-            rate_per_share = self._extract_rate_per_share(description)
-            
-            # Calculate quantity if we have rate_per_share (only for DIVIDEND types)
-            if entry_type in ("DIVIDEND", "DIVIDEND PIL") and rate_per_share:
-                try:
-                    rate_dec = Decimal(rate_per_share)
-                    amount_dec = Decimal(amount)
-                    if rate_dec != Decimal("0"):
-                        quantity = str(amount_dec / rate_dec)
-                except Exception:
-                    quantity = None
+        # Lookup asset (can be null for transfers)
+        isin = row.get("ISIN", "").strip()
+        symbol = row.get("Symbol", "").strip()
+        
+        asset_id = self._lookup_asset(isin=isin, symbol=symbol) if (isin or symbol) else None
+        
+        if not asset_id and (isin or symbol):
+            # Track missing asset but DON'T skip - insert with null asset_id
+            self._track_missing_asset(row, f"Asset not found for transfer")
+            logger.debug(f"Asset not found for transfer: ISIN={isin}, Symbol={symbol}")
+        
+        # Lookup transfer account by alias
+        transfer_account = row.get("TransferAccount", "").strip()
+        transfer_account_id = None
+        
+        if transfer_account and transfer_account != "--":
+            transfer_account_id = self._lookup_account_by_alias(transfer_account)
+            if not transfer_account_id:
+                # Track missing transfer account for notification
+                self._track_missing_transfer_account(transfer_account)
+                logger.debug(f"Transfer account not found: {transfer_account}")
         
         # Track reference code for batch dedup
         if reference_code:
@@ -406,16 +380,15 @@ class CashJournalProcessor:
             "account_id": account_id,
             "asset_id": asset_id,
             "date": report_date,
-            "ex_date": settle_date,
             "type": entry_type,
             "amount": amount,
             "currency": currency,
             "quantity": quantity,
-            "rate_per_share": rate_per_share,
+            "rate_per_share": None,
             "description": description,
             "reference_code": reference_code,
-            "external_transaction_id": trade_id,
-            "action_id": action_id
+            "external_transaction_id": reference_code,
+            "transfer_account_id": transfer_account_id
         }
         
         return entry_data

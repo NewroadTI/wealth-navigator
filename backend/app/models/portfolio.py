@@ -52,7 +52,7 @@ class Account(Base):
     
     portfolio = relationship("Portfolio", back_populates="accounts")
     trades = relationship("Trades", back_populates="account")
-    cash_journal = relationship("CashJournal", back_populates="account")
+    cash_journal = relationship("CashJournal", foreign_keys="[CashJournal.account_id]", back_populates="account")
     return_series = relationship("AccountReturnSeries", back_populates="account")
     performance_attribution = relationship("PerformanceAttribution", back_populates="account")
     corporate_actions = relationship("CorporateAction", back_populates="account")

@@ -88,32 +88,32 @@ interface ETLJobDetails {
 // ==========================================================================
 
 const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    });
+  if (!dateString) return '-';
+  return new Date(dateString).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 };
 
 const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-        success: { variant: 'default', label: 'Success' },
-        failed: { variant: 'destructive', label: 'Failed' },
-        running: { variant: 'secondary', label: 'Running' },
-        pending: { variant: 'secondary', label: 'Pending' },
-    };
+  const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+    success: { variant: 'default', label: 'Success' },
+    failed: { variant: 'destructive', label: 'Failed' },
+    running: { variant: 'secondary', label: 'Running' },
+    pending: { variant: 'secondary', label: 'Pending' },
+  };
 
-    const { variant, label } = variants[status] || { variant: 'outline' as const, label: status };
+  const { variant, label } = variants[status] || { variant: 'outline' as const, label: status };
 
-    return (
-        <Badge variant={variant} className="text-xs">
-            {label}
-        </Badge>
-    );
+  return (
+    <Badge variant={variant} className="text-xs">
+      {label}
+    </Badge>
+  );
 };
 
 

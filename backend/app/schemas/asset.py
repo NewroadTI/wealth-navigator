@@ -183,12 +183,14 @@ class CashJournalBase(BaseModel):
     extra_details: Optional[Dict[str, Any]] = None
     external_transaction_id: Optional[str] = None
     action_id: Optional[str] = None
+    transfer_account_id: Optional[int] = None
 
 
 class CashJournalCreate(CashJournalBase):
     """Schema for creating a cash journal entry."""
     account_id: int
     asset_id: Optional[int] = None
+    transfer_account_id: Optional[int] = None
 
 
 class CashJournalRead(CashJournalBase):
@@ -197,6 +199,7 @@ class CashJournalRead(CashJournalBase):
     asset_id: Optional[int] = None
     external_transaction_id: Optional[str] = None
     action_id: Optional[str] = None
+    transfer_account_id: Optional[int] = None
 
     class Config:
         from_attributes = True

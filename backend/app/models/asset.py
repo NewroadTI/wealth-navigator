@@ -205,7 +205,10 @@ class CashJournal(Base):
     description = Column(Text)
     reference_code = Column(String, unique=True, nullable=True) # TransactionID único
     extra_details = Column(JSONB, nullable=True)
-    account = relationship("Account", back_populates="cash_journal")
+    transfer_account_id = Column(Integer, ForeignKey("accounts.account_id"), nullable=True)
+    
+    account = relationship("Account", foreign_keys=[account_id], back_populates="cash_journal")
+    transfer_account = relationship("Account", foreign_keys=[transfer_account_id])
     asset = relationship("Asset")
     external_transaction_id = Column(String, unique=True, index=True, nullable=True) 
     action_id = Column(String, nullable=True)

@@ -193,7 +193,7 @@ REPORT_DISPLAY_INFO = {
         "description": "All account transactions"
     },
     "TRANSFERS": {
-        "display_name": "Transfers",
+        "display_name": "Transfers (ACATS)",
         "description": "Asset transfers between accounts"
     }
 }
@@ -360,25 +360,37 @@ def get_etl_job(job_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/jobs/{job_id}/records")
-def get_job_records(job_id: int, db: Session = Depends(get_db)):
+def get_etl_job_records(
+    job_id: int,
+    record_type: Optional[str] = Query(None, description="Filter by 'skipped' or 'failed'"),
+    db: Session = Depends(get_db)
+):
     """
-    Get detailed records for a specific ETL job, including skipped/failed records,
-    missing assets, and missing accounts.
+    Get detailed skipped/failed records for a specific ETL job.
+    
+    Query Parameters:
+    - record_type: 'skipped' or 'failed' (optional, returns both if not specified)
+    
+    Returns:
+    - skipped_records: Array of records that were skipped with reasons
+    - failed_records: Array of records that failed processing with error messages
+    - missing_assets: Summary of assets not found in database
+    - missing_accounts: Summary of accounts not found in database
     """
     job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
     if not job:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        raise HTTPException(status_code=404, detail="Job not found")
     
-    # Parse error_details and extra_data to extract structured information
-    # Pershing jobs use extra_data, IBKR jobs use error_details
-    error_details = job.error_details or {}
     extra_data = job.extra_data or {}
     
-    # Merge both sources (extra_data takes precedence for Pershing)
-    missing_accounts = extra_data.get("missing_accounts") or error_details.get("missing_accounts", [])
-    missing_assets = extra_data.get("missing_assets") or error_details.get("missing_assets", [])
+    # Log for debugging
+    logger = logging.getLogger("ETL")
+    logger.info(f"Fetching records for job {job_id}")
+    logger.info(f"Extra data keys: {extra_data.keys()}")
+    logger.info(f"Skipped records count: {len(extra_data.get('skipped_records', []))}")
+    logger.info(f"Failed records count: {len(extra_data.get('failed_records', []))}")
     
-    return {
+    response = {
         "job_id": job.job_id,
         "job_type": job.job_type,
         "status": job.status,
@@ -388,35 +400,21 @@ def get_job_records(job_id: int, db: Session = Depends(get_db)):
         "records_created": job.records_created,
         "records_skipped": job.records_skipped,
         "records_failed": job.records_failed,
-        "filename": job.file_name,
-        "error_message": job.error_message,
-        # Extract detailed records from error_details or extra_data
-        "skipped_records": error_details.get("skipped_records", []),
-        "failed_records": error_details.get("failed_records", []),
-        "missing_assets": missing_assets,
-        "missing_accounts": missing_accounts,
+        "skipped_records": [],
+        "failed_records": [],
+        "missing_assets": extra_data.get("missing_assets", []),
+        "missing_accounts": extra_data.get("missing_accounts", [])
     }
-
-
-@router.patch("/jobs/{job_id}/mark-done")
-def mark_job_as_done(job_id: int, db: Session = Depends(get_db)):
-    """
-    Mark a job as done (reviewed by user).
-    """
-    job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
     
-    job.done = True
-    db.commit()
-    db.refresh(job)
+    # Filter based on record_type parameter
+    if record_type is None or record_type == "skipped":
+        response["skipped_records"] = extra_data.get("skipped_records", [])
     
-    return {"success": True, "job_id": job_id, "done": True}
+    if record_type is None or record_type == "failed":
+        response["failed_records"] = extra_data.get("failed_records", [])
+    
+    return response
 
-
-# ==========================================================================
-# BACKGROUND TASK RUNNER
-# ==========================================================================
 
 @router.post("/trigger", response_model=ETLTriggerResponse)
 def trigger_etl_job(
@@ -525,6 +523,14 @@ def _run_single_etl_job(job_id: int, report_type: str):
             processor = CashJournalProcessor(api_client=api_client)
             result = processor.process_file(file_path)
         
+        elif report_type == "TRANSFERS":
+            from app.jobs.processors.transfers import TransfersProcessor
+            from app.jobs.api_client import get_api_client
+            
+            api_client = get_api_client()
+            processor = TransfersProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
+        
         elif report_type == "TRADES":
             from app.jobs.processors.trades import TradesProcessor
             from app.jobs.api_client import get_api_client
@@ -551,6 +557,8 @@ def _run_single_etl_job(job_id: int, report_type: str):
                 "records_failed": stats.get("errors", 0),
                 "missing_assets": result.get("missing_assets", []),
                 "missing_accounts": result.get("missing_accounts", []),
+                "skipped_records": result.get("skipped_records", []),
+                "failed_records": result.get("failed_records", []),
             }
         
         # TODO: Add other report type processors here
@@ -596,6 +604,10 @@ def _run_single_etl_job(job_id: int, report_type: str):
             extra_data["missing_assets"] = result.get("missing_assets")
         if result.get("missing_accounts"):
             extra_data["missing_accounts"] = result.get("missing_accounts")
+        if result.get("skipped_records"):
+            extra_data["skipped_records"] = result.get("skipped_records", [])
+        if result.get("failed_records"):
+            extra_data["failed_records"] = result.get("failed_records", [])
         if extra_data:
             job.extra_data = extra_data
         else:

@@ -32,7 +32,7 @@ import {
   Layers,
   ChevronRight,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Tooltip,
   TooltipContent,
@@ -262,12 +262,15 @@ const ReportStatusCard = ({
 );
 
 const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
+  const navigate = useNavigate();
+  
   // Show missing assets link for jobs that track them
   const jobsWithMissingAssets = ['OPENPOSITIONS', 'STATEMENTFUNDS'];
   const canHaveMissingAssets = jobsWithMissingAssets.includes(log.job_type) || 
                                (log.report_type && jobsWithMissingAssets.includes(log.report_type));
   const hasMissingAssets = Boolean(log.extra_data?.missing_assets && log.extra_data.missing_assets.length > 0);
   const hasMissingAccounts = Boolean(log.extra_data?.missing_accounts && log.extra_data.missing_accounts.length > 0);
+  const hasSkippedOrFailed = (log.records_skipped || 0) > 0 || (log.records_failed || 0) > 0;
   
   // Support both 'error_message' and 'error' fields from backend
   const errorText = log.error_message || (log as any).error;
@@ -279,6 +282,15 @@ const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <p className="font-medium text-sm">{log.job_type} job id #{log.job_id}</p>
+            {hasSkippedOrFailed && (
+              <button
+                onClick={() => navigate(`/etl-job/${log.job_id}`)}
+                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
+              >
+                View details
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            )}
             {canHaveMissingAssets && hasMissingAssets && (
               <Link
                 to={`/assets?show_missing=true&job_id=${log.job_id}`}
