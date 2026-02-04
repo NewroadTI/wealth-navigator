@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Usamos la misma URL que tenías en tu main.py original
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/wealthroad")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:securepassword123@db:5432/wealthroad")
 
 # Configuración del motor de DB
 engine = create_engine(DATABASE_URL)

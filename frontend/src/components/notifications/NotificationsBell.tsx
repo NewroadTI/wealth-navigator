@@ -1,5 +1,6 @@
+// ... imports
 import { useState } from 'react';
-import { Bell, AlertTriangle, Package, Check, X, ExternalLink } from 'lucide-react';
+import { Bell, AlertTriangle, Package, Check, X, ExternalLink, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,36 +12,53 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNotifications, ETLNotification } from '@/contexts/NotificationsContext';
-import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
-function NotificationItem({ 
-  notification, 
-  onMarkRead, 
-  onDismiss 
-}: { 
+function NotificationItem({
+  notification,
+  onMarkRead,
+  onDismiss,
+  onMarkJobDone
+}: {
   notification: ETLNotification;
   onMarkRead: (id: string) => void;
   onDismiss: (id: string) => void;
+  onMarkJobDone: (jobId: number) => Promise<void>;
 }) {
+  const [isMarkingDone, setIsMarkingDone] = useState(false);
+  const { toast } = useToast();
+
+  const handleMarkDone = async () => {
+    if (!notification.data?.job_id) return;
+
+    setIsMarkingDone(true);
+    try {
+      await onMarkJobDone(notification.data.job_id);
+      toast({
+        title: 'Job marked as done',
+        description: 'This job will no longer appear in notifications',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to mark job as done',
+      });
+    } finally {
+      setIsMarkingDone(false);
+    }
+  };
   const getIcon = () => {
     switch (notification.type) {
       case 'missing_assets':
         return <Package className="h-4 w-4 text-warning" />;
       case 'error':
+      case 'persh_import_error':
         return <AlertTriangle className="h-4 w-4 text-destructive" />;
       default:
         return <Bell className="h-4 w-4 text-primary" />;
     }
   };
-
-  const getLink = () => {
-    if (notification.type === 'missing_assets') {
-      return `/assets?show_missing=true&job_id=${notification.data?.job_id}`;
-    }
-    return null;
-  };
-
-  const link = getLink();
 
   return (
     <div
@@ -69,35 +87,66 @@ function NotificationItem({
           </p>
           <div className="flex items-center gap-2 mt-2">
             <span className="text-[10px] text-muted-foreground">
-              {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
+              {(() => {
+                const now = new Date();
+                const notifTime = new Date(notification.timestamp);
+                const diffMs = now.getTime() - notifTime.getTime();
+                const diffMin = Math.floor(diffMs / (1000 * 60));
+                const diffHour = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffDay = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                if (diffMin < 1) return 'Just now';
+                if (diffMin < 60) return `${diffMin} min ago`;
+                if (diffHour < 24) return `${diffHour} hour${diffHour > 1 ? 's' : ''} ago`;
+                return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+              })()}
             </span>
-            {link && (
-              <Link to={link} onClick={() => onMarkRead(notification.id)}>
+            {/* Dynamic View Details buttons based on error type */}
+            {notification.data?.missing_assets && notification.data.missing_assets.length > 0 && (
+              <Link
+                to={`/etl-job/${notification.data?.job_id}`}
+                onClick={() => onMarkRead(notification.id)}
+              >
                 <Badge variant="outline" className="text-[10px] gap-1 cursor-pointer hover:bg-muted">
-                  View Details
+                  Asset Details ({notification.data.missing_assets.length})
                   <ExternalLink className="h-2.5 w-2.5" />
+                </Badge>
+              </Link>
+            )}
+            {notification.data?.missing_accounts && notification.data.missing_accounts.length > 0 && (
+              <Link
+                to={`/etl-job/${notification.data?.job_id}`} // Direct link to new page
+                onClick={() => onMarkRead(notification.id)}
+              >
+                <Badge
+                  variant="outline"
+                  className="text-[10px] gap-1 cursor-pointer hover:bg-muted"
+                >
+                  <Users className="h-2.5 w-2.5" />
+                  Account Details ({notification.data.missing_accounts.length})
                 </Badge>
               </Link>
             )}
           </div>
         </div>
+        {/* Simplified buttons: Check (mark done) and X (dismiss & mark done) */}
         <div className="flex flex-col gap-1">
-          {!notification.read && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => onMarkRead(notification.id)}
-              title="Mark as read"
-            >
-              <Check className="h-3 w-3" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={handleMarkDone}
+            disabled={isMarkingDone || !notification.data?.job_id}
+            title="Mark as done"
+          >
+            <Check className="h-3 w-3" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
             className="h-6 w-6 text-muted-foreground hover:text-destructive"
-            onClick={() => onDismiss(notification.id)}
+            onClick={handleMarkDone}
+            disabled={isMarkingDone || !notification.data?.job_id}
             title="Dismiss"
           >
             <X className="h-3 w-3" />
@@ -110,21 +159,22 @@ function NotificationItem({
 
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
-  const { 
-    notifications, 
-    unreadCount, 
-    markAsRead, 
-    markAllAsRead, 
+
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
     clearNotification,
-    refreshNotifications 
+    markJobAsDone
   } = useNotifications();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="relative h-8 w-8 md:h-9 md:w-9 text-muted-foreground hover:text-foreground"
         >
           <Bell className="h-4 w-4" />
@@ -135,8 +185,8 @@ export function NotificationsBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-80 p-0" 
+      <PopoverContent
+        className="w-80 p-0"
         align="end"
         sideOffset={8}
       >
@@ -162,13 +212,14 @@ export function NotificationsBell() {
             <p>No notifications</p>
           </div>
         ) : (
-          <ScrollArea className="max-h-[400px]">
+          <ScrollArea className="h-auto max-h-[400px]">
             {notifications.map(notification => (
               <NotificationItem
                 key={notification.id}
                 notification={notification}
                 onMarkRead={markAsRead}
                 onDismiss={clearNotification}
+                onMarkJobDone={markJobAsDone}
               />
             ))}
           </ScrollArea>
@@ -177,12 +228,12 @@ export function NotificationsBell() {
         {/* Footer */}
         {notifications.length > 0 && (
           <div className="px-3 py-2 border-t border-border bg-muted/30">
-            <Link 
-              to="/assets?show_missing=true" 
+            <Link
+              to="/etl/pershing"
               className="text-xs text-primary hover:underline"
               onClick={() => setOpen(false)}
             >
-              View all missing assets →
+              View dashboard →
             </Link>
           </div>
         )}
