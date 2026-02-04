@@ -31,7 +31,9 @@ class OpenPositionsProcessor:
             "records_failed": 0,
             "errors": [],
             "missing_assets": [],  # Assets that don't exist in DB
-            "missing_accounts": []  # Accounts that don't exist in DB
+            "missing_accounts": [],  # Accounts that don't exist in DB
+            "skipped_records": [],  # Full data of skipped records
+            "failed_records": []  # Full data of failed records
         }
         # Track unique missing items to avoid duplicates
         self._missing_asset_symbols = set()
@@ -66,9 +68,22 @@ class OpenPositionsProcessor:
                     self.stats["records_processed"] += 1
                     
                     try:
-                        position_data = self._process_row(row)
-                        if position_data:
-                            positions_to_create.append(position_data)
+                        # Process all rows regardless of LevelOfDetail
+                        # (DETAIL and SUMMARY rows are both valid position data)
+
+                        
+                        result = self._process_row(row)
+                        
+                        # Check if result is an error dict (skipped record)
+                        if isinstance(result, dict) and "error" in result:
+                            self.stats["records_skipped"] += 1
+                            self.stats["skipped_records"].append({
+                                "row_data": dict(row),
+                                "reason": result["error"]
+                            })
+                        elif result:
+                            # Valid position data
+                            positions_to_create.append(result)
                         
                         # Send batch every 500 records
                         if len(positions_to_create) >= 500:
@@ -281,22 +296,19 @@ class OpenPositionsProcessor:
         currency = row.get("CurrencyPrimary", "").strip() or "USD"
         
         if not client_account_id or not report_date_str:
-            self.stats["records_skipped"] += 1
             logger.debug(f"Skipping row with missing required fields")
-            return None
+            return {"error": f"Missing required fields (ClientAccountID: {bool(client_account_id)}, ReportDate: {bool(report_date_str)})"}
         
         # Use ISIN if available, otherwise use SecurityID, otherwise use Symbol
         lookup_id = isin or security_id or symbol
         
         if not lookup_id:
-            self.stats["records_skipped"] += 1
             logger.debug(f"Skipping row with no identifier (ISIN/SecurityID/Symbol)")
-            return None
+            return {"error": "Missing identifier (no ISIN/SecurityID/Symbol)"}
         
         # Lookup IDs via API cache
         account_id = self._lookup_account(client_account_id, currency)
         if not account_id:
-            self.stats["records_skipped"] += 1
             # Track missing account (only once per unique code)
             if client_account_id not in self._missing_account_codes:
                 self._missing_account_codes.add(client_account_id)
@@ -305,13 +317,12 @@ class OpenPositionsProcessor:
                     "reason": "Account not found in database"
                 })
             logger.debug(f"Account not found for ClientAccountID: {client_account_id}")
-            return None
+            return {"error": f"Account not found: {client_account_id} (currency: {currency})"}
         
         # Look up asset using flexible search: ISIN -> symbol
         asset_id = self._lookup_asset(security_id=lookup_id, symbol=symbol)
         
         if not asset_id:
-            self.stats["records_skipped"] += 1
             # Track missing asset with details (only once per unique security_id)
             unique_key = lookup_id or symbol
             if unique_key not in self._missing_asset_symbols:
@@ -336,14 +347,13 @@ class OpenPositionsProcessor:
                     "reason": f"Asset not found in database by ISIN ({lookup_id}) - needs to be created"
                 })
             logger.debug(f"Asset not found for SecurityID/ISIN: {lookup_id} (Symbol: {symbol})")
-            return None
+            return {"error": f"Asset not found: {symbol} (SecurityID: {lookup_id}, ISIN: {isin})"}
         
         # Parse date
         report_date = self._parse_date(report_date_str)
         if not report_date:
-            self.stats["records_skipped"] += 1
             logger.debug(f"Invalid report date: {report_date_str}")
-            return None
+            return {"error": f"Invalid report date: {report_date_str}"}
         
         # Build position data (all values as floats for JSON)
         quantity = self._safe_float(row.get("Quantity", "0"), 0.0)
