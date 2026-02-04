@@ -1,7 +1,9 @@
 """
 Corporate Actions Processor
 ============================
-Processes IBKR Corporate Actions CSV and imports to database directly.
+Processes IBKR Corporate Actions CSV and imports via API.
+
+REFACTORED: Now uses APIClient instead of direct DB access.
 
 CSV Format (CORPORATES.csv):
 - ClientAccountID: Account identifier (e.g., U16337121)
@@ -39,7 +41,7 @@ from app.jobs.utils import (
     get_account_code_from_currency,
     safe_get
 )
-from app.jobs.db_client import DBClient, get_db_client
+from app.jobs.api_client import APIClient, get_api_client
 
 logger = logging.getLogger("ETL.corporate_actions")
 
@@ -47,12 +49,13 @@ logger = logging.getLogger("ETL.corporate_actions")
 class CorporateActionsProcessor:
     """
     Processes IBKR Corporate Actions CSV files.
-    Uses direct database access to avoid HTTP deadlocks.
+    Uses API client for insertion.
     """
     
-    def __init__(self, db_client: DBClient = None):
-        self.db = db_client or get_db_client()
+    def __init__(self, api_client: APIClient = None):
+        self.api = api_client or get_api_client()
         self.processed_count = 0
+        self.updated_count = 0
         self.skipped_count = 0
         self.error_count = 0
         self.errors: List[Dict] = []
@@ -60,7 +63,7 @@ class CorporateActionsProcessor:
     
     def process_file(self, file_path: Path) -> Dict[str, Any]:
         """
-        Process a Corporate Actions CSV file.
+        Process a Corporate Actions CSV file via API bulk endpoint.
         
         Args:
             file_path: Path to the CSV file
@@ -92,6 +95,7 @@ class CorporateActionsProcessor:
                 "message": "No records to process (empty file)",
                 "records_processed": 0,
                 "records_created": 0,
+                "records_updated": 0,
                 "records_skipped": 0,
                 "records_failed": 0,
                 "errors": []
@@ -119,6 +123,7 @@ class CorporateActionsProcessor:
                         "message": "No DETAIL records to process",
                         "records_processed": 0,
                         "records_created": 0,
+                        "records_updated": 0,
                         "records_skipped": 0,
                         "records_failed": 0,
                         "errors": []
@@ -127,9 +132,9 @@ class CorporateActionsProcessor:
             except Exception as e:
                 logger.warning(f"Failed to filter by LevelOfDetail: {e}, processing all rows")
         
-        # Preload caches for efficiency
-        self.db.preload_accounts()
-        self.db.preload_assets()
+        # Preload caches for efficiency via API
+        self.api.preload_accounts()
+        self.api.preload_assets()
         
         # Process each row
         actions_to_create = []
@@ -151,7 +156,7 @@ class CorporateActionsProcessor:
                 })
                 self.error_count += 1
         
-        # Insert in batches
+        # Insert via API bulk endpoint
         if actions_to_create:
             self._insert_actions(actions_to_create)
         
@@ -173,9 +178,9 @@ class CorporateActionsProcessor:
         client_account_id = str(client_account_id).strip()
         currency = str(currency).strip() if currency else "USD"
         
-        # 2. Get account_id from our system
+        # 2. Get account_id from API cache
         account_code = get_account_code_from_currency(client_account_id, currency)
-        account_id = self.db.get_account_id(account_code)
+        account_id = self.api.get_account_id(account_code)
         
         if not account_id:
             logger.warning(f"Row {row_idx}: Account {account_code} not found, skipping")
@@ -221,14 +226,14 @@ class CorporateActionsProcessor:
         raw_type = str(raw_type) if raw_type and not pd.isna(raw_type) else ""
         action_type = normalize_action_type(raw_type, description)
         
-        # 6. Get symbol and look up asset
+        # 6. Get symbol and look up asset via API
         symbol = safe_get(row, "Symbol")
         if not symbol:
             symbol = extract_symbol_from_description(description)
         
         asset_id = None
         if symbol:
-            asset_id = self.db.get_asset_id(symbol)
+            asset_id = self.api.get_asset_id(symbol)
             
             # Auto-create asset if not found
             if not asset_id:
@@ -236,7 +241,7 @@ class CorporateActionsProcessor:
                 isin = clean_isin(safe_get(row, "ISIN") or safe_get(row, "SecurityID"))
                 cusip = clean_cusip(safe_get(row, "CUSIP"))
                 
-                asset_id = self.db.get_or_create_asset(
+                asset_id = self.api.get_or_create_asset(
                     symbol=symbol,
                     description=safe_get(row, "Description"),
                     isin=isin,
@@ -292,43 +297,44 @@ class CorporateActionsProcessor:
         
         return action_data
     
+    def _get_summary(self) -> Dict[str, Any]:
+        """Generate summary of processing results."""
+        return {
+            "status": "success" if self.error_count == 0 else "completed_with_errors",
+            "records_processed": self.processed_count,
+            "records_created": self.processed_count,
+            "records_updated": self.updated_count,
+            "records_skipped": self.skipped_count,
+            "records_failed": self.error_count,
+            "errors": self.errors[:10],  # Limit to first 10 errors
+            "created_assets": self.created_assets
+        }
+    
     def _insert_actions(self, actions: List[Dict]):
         """
-        Insert corporate actions directly to database.
+        Insert corporate actions via API bulk endpoint.
         """
-        logger.info(f"Inserting {len(actions)} corporate actions...")
+        logger.info(f"Sending {len(actions)} corporate actions to API...")
         
-        result = self.db.create_corporate_actions_bulk(actions)
+        result = self.api.create_corporate_actions_bulk(actions)
         
         if result.get("status") == "success":
             logger.info(f"Bulk insert successful: {result.get('created')} created")
         elif result.get("status") == "partial":
-            logger.warning(f"Partial insert: {result.get('created')} created, {result.get('skipped')} failed")
+            logger.warning(f"Partial insert: {result.get('created')} created, {result.get('skipped')} updated (duplicates)")
             self.error_count += result.get('skipped', 0)
             for err in result.get('errors', []):
                 self.errors.append(err)
         else:
-            logger.error(f"Insert failed: {result.get('errors')}")
+            error_msg = result.get("errors") or result.get("error") or "Unknown error"
+            logger.error(f"Insert failed: {error_msg}")
             self.error_count += len(actions)
-            for err in result.get('errors', []):
-                self.errors.append(err)
-    
-    def _get_summary(self) -> Dict[str, Any]:
-        """Get processing summary."""
-        return {
-            "status": "success" if self.error_count == 0 else "partial",
-            "records_processed": self.processed_count,
-            "records_created": self.processed_count - self.error_count,
-            "records_skipped": self.skipped_count,
-            "records_failed": self.error_count,
-            "created_assets": self.created_assets,
-            "errors": self.errors[:10] if self.errors else []
-        }
+            self.errors.append({"error": str(error_msg)})
 
 
 def process_corporate_actions(file_path: Path = None) -> Dict[str, Any]:
     """
-    Convenience function to process corporate actions.
+    Process CORPORATES CSV file and insert via API.
     
     Args:
         file_path: Path to CSV file (defaults to DOWNLOAD_DIR/CORPORATES.csv)

@@ -3,16 +3,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 
 from app.api import deps
-from app.models.asset import Trades, CashJournal, FXTransaction, CorporateAction
+from app.models.asset import Trades, CashJournal, FXTransaction, CorporateAction, Position
 from app.models.portfolio import Account
 from app.schemas.asset import (
-    TradeBase, TradeRead, 
+    TradeBase, TradeRead, TradeCreate,
     CashJournalBase, CashJournalRead,
-    FXTransactionBase, FXTransactionRead,
-    CorporateActionBase, CorporateActionRead
+    FXTransactionBase, FXTransactionRead, FXTransactionCreate,
+    CorporateActionBase, CorporateActionRead,
+    PositionBase, PositionRead, PositionCreate,
+    BulkTradesRequest, BulkFXTransactionsRequest, BulkPositionsRequest,
+    BulkResponse
 )
 
 router = APIRouter()
@@ -122,6 +125,148 @@ def read_cash_journal(
         
     records = query.order_by(CashJournal.date.desc()).offset(skip).limit(limit).all()
     return records
+
+
+# Import CashJournalCreate for POST endpoints
+from app.schemas.asset import CashJournalCreate
+
+
+class BulkCashJournalRequest(BaseModel):
+    """Schema for bulk cash journal creation."""
+    entries: List[CashJournalCreate]
+
+
+@router.post("/cash-journal/", response_model=CashJournalRead, status_code=201)
+def create_cash_journal_entry(
+    entry_in: CashJournalCreate,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Create a single cash journal entry.
+    """
+    # Validate account exists
+    account = db.query(Account).filter(Account.account_id == entry_in.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail=f"Account {entry_in.account_id} not found")
+    
+    # Check for duplicate by reference_code
+    if entry_in.reference_code:
+        existing = db.query(CashJournal).filter(
+            CashJournal.reference_code == entry_in.reference_code
+        ).first()
+        if existing:
+            return existing
+    
+    # Create the entry
+    try:
+        db_entry = CashJournal(
+            account_id=entry_in.account_id,
+            asset_id=entry_in.asset_id,
+            date=entry_in.date,
+            ex_date=entry_in.ex_date,
+            type=entry_in.type,
+            amount=entry_in.amount,
+            currency=entry_in.currency,
+            quantity=entry_in.quantity,
+            rate_per_share=entry_in.rate_per_share,
+            description=entry_in.description,
+            reference_code=entry_in.reference_code,
+            extra_details=entry_in.extra_details,
+            external_transaction_id=entry_in.external_transaction_id,
+            action_id=entry_in.action_id
+        )
+        
+        db.add(db_entry)
+        db.commit()
+        db.refresh(db_entry)
+        return db_entry
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating cash journal entry: {str(e)}")
+
+
+@router.post("/cash-journal/bulk", response_model=BulkResponse)
+def create_cash_journal_bulk(
+    request: BulkCashJournalRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Create multiple cash journal entries in bulk.
+    Skips duplicates (based on reference_code) and continues on errors.
+    """
+    created_count = 0
+    skipped_count = 0
+    errors = []
+    
+    # Get existing reference_codes to check for duplicates
+    existing_codes = set()
+    if any(e.reference_code for e in request.entries):
+        existing_entries = db.query(CashJournal.reference_code).filter(
+            CashJournal.reference_code.isnot(None)
+        ).all()
+        existing_codes = {e.reference_code for e in existing_entries}
+    
+    for idx, entry_in in enumerate(request.entries):
+        try:
+            # Skip if duplicate
+            if entry_in.reference_code and entry_in.reference_code in existing_codes:
+                skipped_count += 1
+                continue
+            
+            db_entry = CashJournal(
+                account_id=entry_in.account_id,
+                asset_id=entry_in.asset_id,
+                date=entry_in.date,
+                ex_date=entry_in.ex_date,
+                type=entry_in.type,
+                amount=entry_in.amount,
+                currency=entry_in.currency,
+                quantity=entry_in.quantity,
+                rate_per_share=entry_in.rate_per_share,
+                description=entry_in.description,
+                reference_code=entry_in.reference_code,
+                extra_details=entry_in.extra_details,
+                external_transaction_id=entry_in.external_transaction_id,
+                action_id=entry_in.action_id
+            )
+            
+            db.add(db_entry)
+            created_count += 1
+            
+            # Add to existing set to prevent duplicates within same batch
+            if entry_in.reference_code:
+                existing_codes.add(entry_in.reference_code)
+                
+        except Exception as e:
+            errors.append({
+                "index": idx,
+                "error": str(e),
+                "type": entry_in.type,
+                "amount": str(entry_in.amount) if entry_in.amount else None
+            })
+    
+    # Commit all at once
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return BulkResponse(
+            status="error",
+            total=len(request.entries),
+            created=0,
+            skipped=skipped_count,
+            errors=[{"error": f"Commit failed: {str(e)}"}]
+        )
+    
+    return BulkResponse(
+        status="success" if not errors else "partial",
+        total=len(request.entries),
+        created=created_count,
+        skipped=skipped_count,
+        errors=errors[:10]
+    )
+
 
 # --------------------------------------------------------------------------
 # FX TRANSACTIONS
@@ -320,4 +465,407 @@ def create_corporate_actions_bulk(
         created=created_count,
         skipped=skipped_count,
         errors=errors[:10]  # Limit errors in response
+    )
+
+
+# --------------------------------------------------------------------------
+# TRADES - BULK OPERATIONS
+# --------------------------------------------------------------------------
+
+@router.post("/trades/", response_model=TradeRead, status_code=201)
+def create_trade(
+    trade_in: TradeCreate,
+    db: Session = Depends(deps.get_db)
+):
+    """Create a single trade."""
+    # Validate account exists
+    account = db.query(Account).filter(Account.account_id == trade_in.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail=f"Account {trade_in.account_id} not found")
+    
+    # Check for duplicate by ib_transaction_id
+    if trade_in.ib_transaction_id:
+        existing = db.query(Trades).filter(
+            Trades.ib_transaction_id == trade_in.ib_transaction_id
+        ).first()
+        if existing:
+            return existing
+    
+    try:
+        db_trade = Trades(
+            account_id=trade_in.account_id,
+            asset_id=trade_in.asset_id,
+            ib_transaction_id=trade_in.ib_transaction_id,
+            ib_exec_id=trade_in.ib_exec_id,
+            ib_trade_id=trade_in.ib_trade_id,
+            ib_order_id=trade_in.ib_order_id,
+            trade_date=trade_in.trade_date,
+            settlement_date=trade_in.settlement_date,
+            report_date=trade_in.report_date,
+            transaction_type=trade_in.transaction_type,
+            side=trade_in.side,
+            exchange=trade_in.exchange,
+            quantity=trade_in.quantity,
+            price=trade_in.price,
+            gross_amount=trade_in.gross_amount,
+            net_amount=trade_in.net_amount,
+            proceeds=trade_in.proceeds,
+            commission=trade_in.commission,
+            tax=trade_in.tax,
+            cost_basis=trade_in.cost_basis,
+            realized_pnl=trade_in.realized_pnl,
+            mtm_pnl=trade_in.mtm_pnl,
+            multiplier=trade_in.multiplier,
+            strike=trade_in.strike,
+            expiry=trade_in.expiry,
+            put_call=trade_in.put_call,
+            currency=trade_in.currency,
+            description=trade_in.description,
+            notes=trade_in.notes
+        )
+        
+        db.add(db_trade)
+        db.commit()
+        db.refresh(db_trade)
+        return db_trade
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating trade: {str(e)}")
+
+
+@router.post("/trades/bulk", response_model=BulkResponse)
+def create_trades_bulk(
+    request: BulkTradesRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Create multiple trades in bulk.
+    Skips duplicates (based on ib_transaction_id) and continues on errors.
+    """
+    created_count = 0
+    skipped_count = 0
+    errors = []
+    
+    # Get existing ib_transaction_ids to check for duplicates
+    existing_ids = set()
+    if any(t.ib_transaction_id for t in request.trades):
+        existing_trades = db.query(Trades.ib_transaction_id).filter(
+            Trades.ib_transaction_id.isnot(None)
+        ).all()
+        existing_ids = {t.ib_transaction_id for t in existing_trades}
+    
+    for idx, trade_in in enumerate(request.trades):
+        try:
+            # Skip if duplicate
+            if trade_in.ib_transaction_id and trade_in.ib_transaction_id in existing_ids:
+                skipped_count += 1
+                continue
+            
+            db_trade = Trades(
+                account_id=trade_in.account_id,
+                asset_id=trade_in.asset_id,
+                ib_transaction_id=trade_in.ib_transaction_id,
+                ib_exec_id=trade_in.ib_exec_id,
+                ib_trade_id=trade_in.ib_trade_id,
+                ib_order_id=trade_in.ib_order_id,
+                trade_date=trade_in.trade_date,
+                settlement_date=trade_in.settlement_date,
+                report_date=trade_in.report_date,
+                transaction_type=trade_in.transaction_type,
+                side=trade_in.side,
+                exchange=trade_in.exchange,
+                quantity=trade_in.quantity,
+                price=trade_in.price,
+                gross_amount=trade_in.gross_amount,
+                net_amount=trade_in.net_amount,
+                proceeds=trade_in.proceeds,
+                commission=trade_in.commission,
+                tax=trade_in.tax,
+                cost_basis=trade_in.cost_basis,
+                realized_pnl=trade_in.realized_pnl,
+                mtm_pnl=trade_in.mtm_pnl,
+                multiplier=trade_in.multiplier,
+                strike=trade_in.strike,
+                expiry=trade_in.expiry,
+                put_call=trade_in.put_call,
+                currency=trade_in.currency,
+                description=trade_in.description,
+                notes=trade_in.notes
+            )
+            
+            db.add(db_trade)
+            created_count += 1
+            
+            # Add to existing set to prevent duplicates within same batch
+            if trade_in.ib_transaction_id:
+                existing_ids.add(trade_in.ib_transaction_id)
+                
+        except Exception as e:
+            errors.append({
+                "index": idx,
+                "error": str(e),
+                "ib_transaction_id": trade_in.ib_transaction_id
+            })
+    
+    # Commit all at once
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return BulkResponse(
+            status="error",
+            total=len(request.trades),
+            created=0,
+            skipped=skipped_count,
+            errors=[{"error": f"Commit failed: {str(e)}"}]
+        )
+    
+    return BulkResponse(
+        status="success" if not errors else "partial",
+        total=len(request.trades),
+        created=created_count,
+        skipped=skipped_count,
+        errors=errors[:10]
+    )
+
+
+# --------------------------------------------------------------------------
+# FX TRANSACTIONS - BULK OPERATIONS  
+# --------------------------------------------------------------------------
+
+@router.post("/fx-transactions/", response_model=FXTransactionRead, status_code=201)
+def create_fx_transaction(
+    fx_in: FXTransactionCreate,
+    db: Session = Depends(deps.get_db)
+):
+    """Create a single FX transaction."""
+    # Validate account exists
+    account = db.query(Account).filter(Account.account_id == fx_in.account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail=f"Account {fx_in.account_id} not found")
+    
+    # Check for duplicate by ib_transaction_id
+    if fx_in.ib_transaction_id:
+        existing = db.query(FXTransaction).filter(
+            FXTransaction.ib_transaction_id == fx_in.ib_transaction_id
+        ).first()
+        if existing:
+            return existing
+    
+    try:
+        db_fx = FXTransaction(
+            account_id=fx_in.account_id,
+            target_account_id=fx_in.target_account_id,
+            trade_date=fx_in.trade_date,
+            source_currency=fx_in.source_currency,
+            source_amount=fx_in.source_amount,
+            target_currency=fx_in.target_currency,
+            target_amount=fx_in.target_amount,
+            side=fx_in.side,
+            exchange_rate=fx_in.exchange_rate,
+            commission=fx_in.commission,
+            commission_currency=fx_in.commission_currency,
+            ib_transaction_id=fx_in.ib_transaction_id,
+            ib_exec_id=fx_in.ib_exec_id,
+            ib_order_id=fx_in.ib_order_id,
+            exchange=fx_in.exchange,
+            transaction_type=fx_in.transaction_type,
+            notes=fx_in.notes,
+            external_id=fx_in.external_id
+        )
+        
+        db.add(db_fx)
+        db.commit()
+        db.refresh(db_fx)
+        return db_fx
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating FX transaction: {str(e)}")
+
+
+@router.post("/fx-transactions/bulk", response_model=BulkResponse)
+def create_fx_transactions_bulk(
+    request: BulkFXTransactionsRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Create multiple FX transactions in bulk.
+    Skips duplicates (based on ib_transaction_id) and continues on errors.
+    """
+    created_count = 0
+    skipped_count = 0
+    errors = []
+    
+    # Get existing ib_transaction_ids to check for duplicates
+    existing_ids = set()
+    if any(f.ib_transaction_id for f in request.transactions):
+        existing_fxs = db.query(FXTransaction.ib_transaction_id).filter(
+            FXTransaction.ib_transaction_id.isnot(None)
+        ).all()
+        existing_ids = {f.ib_transaction_id for f in existing_fxs}
+    
+    for idx, fx_in in enumerate(request.transactions):
+        try:
+            # Skip if duplicate
+            if fx_in.ib_transaction_id and fx_in.ib_transaction_id in existing_ids:
+                skipped_count += 1
+                continue
+            
+            db_fx = FXTransaction(
+                account_id=fx_in.account_id,
+                target_account_id=fx_in.target_account_id,
+                trade_date=fx_in.trade_date,
+                source_currency=fx_in.source_currency,
+                source_amount=fx_in.source_amount,
+                target_currency=fx_in.target_currency,
+                target_amount=fx_in.target_amount,
+                side=fx_in.side,
+                exchange_rate=fx_in.exchange_rate,
+                commission=fx_in.commission,
+                commission_currency=fx_in.commission_currency,
+                ib_transaction_id=fx_in.ib_transaction_id,
+                ib_exec_id=fx_in.ib_exec_id,
+                ib_order_id=fx_in.ib_order_id,
+                exchange=fx_in.exchange,
+                transaction_type=fx_in.transaction_type,
+                notes=fx_in.notes,
+                external_id=fx_in.external_id
+            )
+            
+            db.add(db_fx)
+            created_count += 1
+            
+            # Add to existing set to prevent duplicates within same batch
+            if fx_in.ib_transaction_id:
+                existing_ids.add(fx_in.ib_transaction_id)
+                
+        except Exception as e:
+            errors.append({
+                "index": idx,
+                "error": str(e),
+                "ib_transaction_id": fx_in.ib_transaction_id
+            })
+    
+    # Commit all at once
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return BulkResponse(
+            status="error",
+            total=len(request.transactions),
+            created=0,
+            skipped=skipped_count,
+            errors=[{"error": f"Commit failed: {str(e)}"}]
+        )
+    
+    return BulkResponse(
+        status="success" if not errors else "partial",
+        total=len(request.transactions),
+        created=created_count,
+        skipped=skipped_count,
+        errors=errors[:10]
+    )
+
+
+# --------------------------------------------------------------------------
+# POSITIONS - BULK OPERATIONS
+# --------------------------------------------------------------------------
+
+@router.post("/positions/bulk", response_model=BulkResponse)
+def create_positions_bulk(
+    request: BulkPositionsRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Create or update multiple positions in bulk.
+    Updates existing positions if same account_id/asset_id/report_date exists.
+    """
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+    errors = []
+    
+    for idx, pos_in in enumerate(request.positions):
+        try:
+            # Check for existing position (same account, asset, date)
+            existing = db.query(Position).filter(
+                Position.account_id == pos_in.account_id,
+                Position.asset_id == pos_in.asset_id,
+                Position.report_date == pos_in.report_date
+            ).first()
+            
+            if existing:
+                # Update existing position
+                existing.quantity = pos_in.quantity
+                existing.mark_price = pos_in.mark_price
+                existing.position_value = pos_in.position_value
+                existing.cost_basis_money = pos_in.cost_basis_money
+                existing.cost_basis_price = pos_in.cost_basis_price
+                existing.open_price = pos_in.open_price
+                existing.fifo_pnl_unrealized = pos_in.fifo_pnl_unrealized
+                existing.percent_of_nav = pos_in.percent_of_nav
+                existing.side = pos_in.side
+                existing.level_of_detail = pos_in.level_of_detail
+                existing.open_date_time = pos_in.open_date_time
+                existing.vesting_date = pos_in.vesting_date
+                existing.accrued_interest = pos_in.accrued_interest
+                existing.fx_rate_to_base = pos_in.fx_rate_to_base
+                
+                updated_count += 1
+            else:
+                # Create new position
+                db_position = Position(
+                    account_id=pos_in.account_id,
+                    asset_id=pos_in.asset_id,
+                    report_date=pos_in.report_date,
+                    quantity=pos_in.quantity,
+                    mark_price=pos_in.mark_price,
+                    position_value=pos_in.position_value,
+                    cost_basis_money=pos_in.cost_basis_money,
+                    cost_basis_price=pos_in.cost_basis_price,
+                    open_price=pos_in.open_price,
+                    fifo_pnl_unrealized=pos_in.fifo_pnl_unrealized,
+                    percent_of_nav=pos_in.percent_of_nav,
+                    side=pos_in.side,
+                    level_of_detail=pos_in.level_of_detail,
+                    open_date_time=pos_in.open_date_time,
+                    vesting_date=pos_in.vesting_date,
+                    accrued_interest=pos_in.accrued_interest,
+                    fx_rate_to_base=pos_in.fx_rate_to_base
+                )
+                db.add(db_position)
+                created_count += 1
+                
+        except Exception as e:
+            errors.append({
+                "index": idx,
+                "error": str(e),
+                "account_id": pos_in.account_id,
+                "asset_id": pos_in.asset_id
+            })
+    
+    # Commit all at once
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return BulkResponse(
+            status="error",
+            total=len(request.positions),
+            created=0,
+            updated=0,
+            skipped=skipped_count,
+            errors=[{"error": f"Commit failed: {str(e)}"}]
+        )
+    
+    return BulkResponse(
+        status="success" if not errors else "partial",
+        total=len(request.positions),
+        created=created_count,
+        updated=updated_count,
+        skipped=skipped_count,
+        errors=errors[:10]
     )

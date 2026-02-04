@@ -27,6 +27,9 @@ from app.jobs.config import DOWNLOAD_DIR, FLEX_QUERIES
 from app.jobs.downloader import IBKRDownloader, download_ibkr_reports
 from app.jobs.api_client import get_api_client
 from app.jobs.processors.corporate_actions import CorporateActionsProcessor
+from app.jobs.processors.open_positions import OpenPositionsProcessor
+from app.jobs.processors.cash_journal import CashJournalProcessor
+from app.jobs.processors.trades import TradesProcessor
 
 
 class ETLOrchestrator:
@@ -169,21 +172,26 @@ class ETLOrchestrator:
     
     def _process_trades(self, file_path: Path) -> Dict[str, Any]:
         """Process trades CSV."""
-        # TODO: Implement trades processor
-        logger.info("Trades processor not yet implemented")
-        return {"status": "not_implemented"}
+        processor = TradesProcessor(api_client=self.api_client)
+        
+        # Read CSV and convert to list of dicts
+        import csv
+        rows = []
+        with open(file_path, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        
+        return processor.process(rows)
     
     def _process_positions(self, file_path: Path) -> Dict[str, Any]:
         """Process open positions CSV."""
-        # TODO: Implement positions processor
-        logger.info("Positions processor not yet implemented")
-        return {"status": "not_implemented"}
+        processor = OpenPositionsProcessor(api_client=self.api_client)
+        return processor.process_file(file_path)
     
     def _process_cash_journal(self, file_path: Path) -> Dict[str, Any]:
         """Process transactions (cash journal) CSV."""
-        # TODO: Implement cash journal processor
-        logger.info("Cash journal processor not yet implemented")
-        return {"status": "not_implemented"}
+        processor = CashJournalProcessor(api_client=self.api_client)
+        return processor.process_file(file_path)
     
     def _process_transfers(self, file_path: Path) -> Dict[str, Any]:
         """Process transfers CSV."""
