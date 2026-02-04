@@ -15,10 +15,13 @@ import pandas as pd
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+import logging
 
 from app.api.deps import get_db
 from app.models.portfolio import Account
 from app.models.asset import Asset, Trades, CashJournal, CorporateAction
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -247,9 +250,11 @@ async def convert_xlsx_to_csv(file: UploadFile = File(...)):
     Returns preview of first 10 rows.
     """
     if not file.filename.endswith(('.xlsx', '.xls')):
+        logger.warning(f"❌ Invalid file format uploaded: {file.filename}")
         raise HTTPException(status_code=400, detail="File must be .xlsx or .xls format")
     
     try:
+        logger.info(f"📂 Converting XLSX to CSV: {file.filename}")
         # Save uploaded file temporarily
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         temp_xlsx_path = os.path.join(UPLOAD_DIR, f"{timestamp}_{file.filename}")
@@ -285,6 +290,7 @@ async def convert_xlsx_to_csv(file: UploadFile = File(...)):
         )
         
     except Exception as e:
+        logger.error(f"❌ Error converting file {file.filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error converting file: {str(e)}")
 
 
@@ -296,6 +302,7 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
     from app.models.asset import ETLJobLog
     
     csv_path = os.path.join(CSV_OUTPUT_DIR, request.csv_filename)
+    logger.info(f"🚀 Starting transaction import for {request.csv_filename}")
     
     # 1. Create Job Log immediately
     job = ETLJobLog(
@@ -310,11 +317,10 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
     db.refresh(job)
     
     if not os.path.exists(csv_path):
-        job.status = "failed"
-        job.error_message = f"CSV file not found: {request.csv_filename}"
         job.completed_at = datetime.now()
         db.commit()
         
+        logger.error(f"❌ CSV file not found: {request.csv_filename}")
         raise HTTPException(status_code=404, detail=f"CSV file not found: {request.csv_filename}")
     
     try:
@@ -340,6 +346,7 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
     
     # Parse CSV
     rows = []
+    logger.info(f"READING CSV: {csv_path}")
     try:
         with open(csv_path, 'r', encoding='utf-8', errors='replace') as f:
             # Skip first 9 rows (metadata for daily CSVs)
@@ -386,6 +393,7 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
     # Detailed missing items for extra_data
     missing_accounts_details = {}
     missing_assets_details = {}
+    skipped_records_details = [] # List to store full row data for skipped items
     
     errors = []
     
@@ -409,6 +417,14 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
                     "count": 0
                 }
             missing_accounts_details[account_code]["count"] += len(acct_rows)
+            
+            # Add all rows to skipped_records
+            for r in acct_rows:
+                 skipped_records_details.append({
+                     "row_data": r,
+                     "reason": f"Missing Account: {account_code}",
+                     "record_type": "transaction"
+                 })
             continue
         
         account_id = account_cache[account_code]["account_id"]
@@ -448,11 +464,12 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
             isin = row.get("ISIN", "").strip()
             symbol = row.get("SYMBOL", "").strip()
             
-            if isin and isin != "-" and not asset_id:
-                warnings_dict["missing_asset"][isin] += 1
+            if not asset_id and ((isin and isin != "-") or (symbol and symbol != "-")):
                 stats["skipped_no_asset"] += 1
                 
-                key = isin
+                # Use ISIN as key if available, else Symbol
+                key = isin if (isin and isin != "-") else f"SYMBOL:{symbol}"
+                
                 if key not in missing_assets_details:
                     # Determine asset type based on symbol format
                     is_option = (
@@ -461,22 +478,28 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
                     ) if symbol else False
                     
                     missing_assets_details[key] = {
-                        "isin": isin,
-                        "symbol": symbol,
+                        "isin": isin if isin != "-" else None,
+                        "symbol": symbol if symbol != "-" else None,
                         "description": row.get("Security Description", ""),
-                        "currrency": row.get("Transaction Currency", ""),
+                        "currency": row.get("Transaction Currency", ""),
                         "asset_type": "option" if is_option else "unknown",
-                        "reason": f"Asset not found in database by ISIN ({isin}) - needs to be created",
+                        "reason": f"Asset not found in database by {'ISIN (' + isin + ')' if isin and isin != '-' else 'Symbol (' + symbol + ')'}",
                         "count": 0
                     }
                 missing_assets_details[key]["count"] += 1
+                
+                skipped_records_details.append({
+                     "row_data": row,
+                     "reason": f"Missing Asset: {key}",
+                     "record_type": "transaction"
+                 })
                 continue
             
             ref_num = row.get("Reference Number", "").strip()
             tx_date = row.get("Trade Date", row.get("Process Date", "")).strip()
             
             if ref_num:
-                composite_ref = f"{account_code}_{ref_num}_{tx_date}_{isin}"
+                composite_ref = f"{account_code}_{ref_num}_{tx_date}_{isin}_{row['_side']}"
             else:
                 composite_ref = None
             
@@ -518,7 +541,7 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
             isin = row.get("ISIN", "").strip()
             
             if ref_num:
-                composite_ref = f"{account_code}_{ref_num}_{tx_date}_{isin}"
+                composite_ref = f"{account_code}_{ref_num}_{tx_date}_{isin}_{row['_cj_type']}"
             else:
                 composite_ref = None
             
@@ -554,7 +577,7 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
             isin = row.get("ISIN", "").strip()
             
             if ref_num:
-                composite_ref = f"{account_code}_{ref_num}_{tx_date}_{isin}"
+                composite_ref = f"{account_code}_{ref_num}_{tx_date}_{isin}_{row['_action_type']}"
             else:
                 composite_ref = None
             
@@ -606,6 +629,8 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
             message="Failed to save transactions"
         )
     
+    logger.info(f"✅ Import completed. Status: {job_status}. Stats: {stats}")
+    
     # Build warnings list
     warnings = []
     for acc, count in warnings_dict["missing_account"].items():
@@ -623,7 +648,8 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
     
     # Determine status
     total_created = stats["trades"] + stats["cash_journal"] + stats["corporate_actions"]
-    total_skipped = stats["skipped_no_account"] + stats["skipped_no_asset"] + stats["duplicates"]
+    # Only count missing accounts and assets as skipped records (errors), effectively ignoring duplicates in this metric
+    total_skipped = stats["skipped_no_account"] + stats["skipped_no_asset"]
     
     if total_created == 0 and total_skipped > 0:
         job_status = "no_new_data" # Or partial
@@ -656,6 +682,10 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
     
     if extra_data:
         job.extra_data = extra_data
+    
+    # Store skipped records details in error_details as expected by frontend/etl.py
+    if skipped_records_details:
+        job.error_details = {"skipped_records": skipped_records_details}
         
     if job.started_at:
         job.execution_time_seconds = Decimal(str((job.completed_at - job.started_at).total_seconds()))

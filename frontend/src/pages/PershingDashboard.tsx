@@ -78,6 +78,99 @@ interface JobHistory {
 }
 
 // ==========================================================================
+// HELPER COMPONENTS
+// ==========================================================================
+
+const getStatusIcon = (status: string) => {
+    switch (status) {
+        case 'success':
+            return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+        case 'failed':
+            return <XCircle className="h-4 w-4 text-red-500" />;
+        case 'running':
+        case 'pending':
+            return <Clock className="h-4 w-4 text-yellow-500 animate-pulse" />;
+        default:
+            return <Clock className="h-4 w-4 text-gray-400" />;
+    }
+};
+
+const formatRelativeTime = (dateString: string | null) => {
+    if (!dateString) return 'Never';
+    return new Date(dateString).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+};
+
+const ActivityLogItem = ({ log }: { log: JobHistory }) => {
+    const hasSkippedOrFailed = (log.records_skipped || 0) > 0 || (log.records_failed || 0) > 0;
+
+    return (
+        <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
+            <div className="mt-1">{getStatusIcon(log.status)}</div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{log.job_type} job id #{log.job_id}</p>
+                        {hasSkippedOrFailed && (
+                            <a
+                                href={`/etl-job/${log.job_id}`}
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
+                            >
+                                View details
+                                <ArrowUpCircle className="h-3 w-3 rotate-45" />
+                            </a>
+                        )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                        {formatRelativeTime(log.started_at)}
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                    {log.status === 'success' && (
+                        <>
+                            <span className="text-xs text-muted-foreground">
+                                {log.records_processed} processed
+                            </span>
+                            {log.records_created > 0 && (
+                                <span className="text-xs text-green-600">
+                                    +{log.records_created} created
+                                </span>
+                            )}
+                            {log.records_skipped > 0 && (
+                                <span className="text-xs text-amber-600">
+                                    {log.records_skipped} skipped
+                                </span>
+                            )}
+                        </>
+                    )}
+                    {log.records_failed > 0 && (
+                        <span className="text-xs text-red-500">
+                            {log.records_failed} failed
+                        </span>
+                    )}
+                </div>
+                {log.error_message && (
+                    <p className="text-xs text-red-500 mt-1 font-mono bg-red-50 p-2 rounded border border-red-200" title={log.error_message}>
+                        {log.error_message.length > 100 ? `${log.error_message.substring(0, 100)}...` : log.error_message}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================================================
+// HELPER COMPONENTS
+// ==========================================================================
+
+
+
+// ==========================================================================
 // MAIN COMPONENT
 // ==========================================================================
 
@@ -92,7 +185,7 @@ const PershingDashboard = () => {
     const [csvFilename, setCsvFilename] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingStep, setProcessingStep] = useState<string>('');
-    const [recentImports, setRecentImports] = useState<ImportResult[]>([]);
+    // Removed recentImports - replaced by jobHistory from API
     const [jobHistory, setJobHistory] = useState<JobHistory[]>([]);
     const [loadingJobs, setLoadingJobs] = useState(true);
 
@@ -196,7 +289,7 @@ const PershingDashboard = () => {
             status: 'importing',
             timestamp: new Date(),
         };
-        setRecentImports(prev => [newImport, ...prev]);
+        // No longer tracking local imports - using jobHistory from API
 
         setIsProcessing(true);
         setProcessingStep('Importing transactions...');
@@ -215,19 +308,8 @@ const PershingDashboard = () => {
 
             const result = await response.json();
 
-            // Update import result
-            setRecentImports(prev => prev.map(imp =>
-                imp.id === importId
-                    ? {
-                        ...imp,
-                        status: result.status as ImportResult['status'],
-                        stats: result.stats,
-                        warnings: result.warnings,
-                        errors: result.errors,
-                        message: result.message,
-                    }
-                    : imp
-            ));
+            // Refresh job history to show the new job
+            await fetchJobs();
 
             toast({
                 title: result.status === 'success' ? "Import complete" : "Import completed with warnings",
@@ -238,16 +320,8 @@ const PershingDashboard = () => {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-            // Update as failed
-            setRecentImports(prev => prev.map(imp =>
-                imp.id === importId
-                    ? {
-                        ...imp,
-                        status: 'failed',
-                        errors: [errorMessage],
-                    }
-                    : imp
-            ));
+            // Refresh job history to show failed job (if logged)
+            await fetchJobs();
 
             // Add critical error to notifications bell
             addNotification({
@@ -441,164 +515,61 @@ const PershingDashboard = () => {
                         </Card>
                     </div>
 
-                    {/* Recent Imports Sidebar */}
-                    <div>
-                        <Card>
+                    {/* Job History Sidebar */}
+                    {/* Recent Activity Section */}
+                    {/* Replaces Job History Sidebar */}
+                    <div className="lg:col-span-1">
+                        <Card className="h-full">
                             <CardHeader>
-                                <CardTitle>Recent Imports</CardTitle>
-                                <CardDescription>History of uploaded files</CardDescription>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Activity className="h-5 w-5" />
+                                        <CardTitle>Recent Activity</CardTitle>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={fetchJobs}
+                                        disabled={loadingJobs}
+                                    >
+                                        <RefreshCw className={`h-4 w-4 ${loadingJobs ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
+                                <CardDescription>Latest Pershing import jobs</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                {recentImports.length === 0 ? (
-                                    <div className="text-sm text-muted-foreground text-center py-8">
-                                        <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                        No recent imports
-                                    </div>
-                                ) : (
-                                    <ScrollArea className="h-[400px]">
-                                        <div className="space-y-3">
-                                            {recentImports.map((imp) => (
-                                                <div
-                                                    key={imp.id}
-                                                    className="p-3 bg-muted/30 rounded-lg border"
-                                                >
-                                                    <div className="flex items-start gap-2">
-                                                        {getStatusIcon(imp.status)}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <span className="font-medium text-sm truncate">
-                                                                    {imp.filename}
-                                                                </span>
-                                                                {getStatusBadge(imp.status)}
-                                                            </div>
-
-                                                            {/* Stats */}
-                                                            {imp.stats && (
-                                                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-1">
-                                                                    {imp.stats.trades > 0 && (
-                                                                        <span className="text-green-600">+{imp.stats.trades} trades</span>
-                                                                    )}
-                                                                    {imp.stats.cash_journal > 0 && (
-                                                                        <span className="text-green-600">+{imp.stats.cash_journal} CJ</span>
-                                                                    )}
-                                                                    {imp.stats.corporate_actions > 0 && (
-                                                                        <span className="text-green-600">+{imp.stats.corporate_actions} CA</span>
-                                                                    )}
-                                                                    {imp.stats.duplicates > 0 && (
-                                                                        <span className="text-amber-600">{imp.stats.duplicates} dups</span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Warnings */}
-                                                            {imp.warnings && imp.warnings.length > 0 && (
-                                                                <div className="text-xs text-amber-600 mt-1">
-                                                                    ⚠ {imp.warnings.reduce((sum, w) => sum + w.count, 0)} warnings
-                                                                </div>
-                                                            )}
-
-                                                            {/* Errors */}
-                                                            {imp.errors && imp.errors.length > 0 && (
-                                                                <div className="text-xs text-red-500 mt-1 line-clamp-1">
-                                                                    {imp.errors[0]}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Timestamp */}
-                                                            <div className="text-[10px] text-muted-foreground mt-1">
-                                                                {imp.timestamp.toLocaleTimeString()}
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                {loadingJobs ? (
+                                    <div className="flex flex-col gap-4">
+                                        {[1, 2, 3].map(i => (
+                                            <div key={i} className="flex gap-3">
+                                                <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+                                                    <div className="h-3 w-1/2 bg-muted animate-pulse rounded" />
                                                 </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : jobHistory.length > 0 ? (
+                                    <ScrollArea className="h-[500px]">
+                                        <div className="space-y-1">
+                                            {jobHistory.map((job) => (
+                                                <ActivityLogItem key={job.job_id} log={job} />
                                             ))}
                                         </div>
                                     </ScrollArea>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                                        <Clock className="h-10 w-10 mb-3 opacity-20" />
+                                        <p>No activity recorded yet</p>
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
                     </div>
                 </div>
 
-                {/* Job History Section */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Activity className="h-5 w-5" />
-                                <CardTitle>Job History</CardTitle>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={fetchJobs}
-                                disabled={loadingJobs}
-                            >
-                                <RefreshCw className={`h-4 w-4 ${loadingJobs ? 'animate-spin' : ''}`} />
-                            </Button>
-                        </div>
-                        <CardDescription>All Pershing import jobs</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loadingJobs ? (
-                            <div className="flex justify-center py-8">
-                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : jobHistory.length === 0 ? (
-                            <div className="text-sm text-muted-foreground text-center py-8">
-                                <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                No jobs yet
-                            </div>
-                        ) : (
-                            <ScrollArea className="h-[400px]">
-                                <div className="space-y-2">
-                                    {jobHistory.map((job) => (
-                                        <div
-                                            key={job.job_id}
-                                            className="p-3 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors"
-                                        >
-                                            <div className="flex items-start gap-3">
-                                                <div className="mt-1">{getStatusIcon(job.status as ImportResult['status'])}</div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-medium text-sm">Job #{job.job_id}</span>
-                                                            {getStatusBadge(job.status as ImportResult['status'])}
-                                                        </div>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {new Date(job.started_at).toLocaleString()}
-                                                        </span>
-                                                    </div>
-                                                    {job.file_name && (
-                                                        <div className="text-xs text-muted-foreground mb-1">
-                                                            File: {job.file_name}
-                                                        </div>
-                                                    )}
-                                                    <div className="flex gap-2 text-xs mt-1">
-                                                        <span className="text-muted-foreground">
-                                                            {job.records_processed} processed
-                                                        </span>
-                                                        {job.records_created > 0 && (
-                                                            <span className="text-green-600">+{job.records_created} created</span>
-                                                        )}
-                                                        {job.records_skipped > 0 && (
-                                                            <span className="text-amber-600">{job.records_skipped} skipped</span>
-                                                        )}
-                                                    </div>
-                                                    {job.error_message && (
-                                                        <div className="text-xs text-red-500 mt-1 line-clamp-1">
-                                                            {job.error_message}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        )}
-                    </CardContent>
-                </Card>
+
             </div>
         </AppLayout>
     );

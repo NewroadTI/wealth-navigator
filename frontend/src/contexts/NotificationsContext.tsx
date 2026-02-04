@@ -86,6 +86,28 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           });
         }
 
+        // Check for missing accounts
+        if (job.extra_data?.missing_accounts && job.extra_data.missing_accounts.length > 0) {
+          const existingNotification = notifications.find(
+            n => n.data?.job_id === job.job_id && n.type === 'persh_import_error'
+          );
+
+          newNotifications.push({
+            id: `job-${job.job_id}-missing-accounts`,
+            type: 'persh_import_error',
+            title: `${job.extra_data.missing_accounts.length} Accounts Not Found`,
+            message: `ETL job "${job.job_name}" found ${job.extra_data.missing_accounts.length} transactions for unknown accounts.`,
+            timestamp: job.completed_at || job.started_at,
+            read: existingNotification?.read || false,
+            data: {
+              job_id: job.job_id,
+              job_type: job.job_type,
+              missing_accounts: job.extra_data.missing_accounts,
+              filename: job.file_name
+            },
+          });
+        }
+
         // Check for failed/partial jobs
         if ((job.status === 'failed' || job.status === 'partial') && job.error_message) {
           const existingNotification = notifications.find(
@@ -102,6 +124,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             data: {
               job_id: job.job_id,
               job_type: job.job_type,
+              missing_accounts: job.extra_data?.missing_accounts,
             },
           });
         }

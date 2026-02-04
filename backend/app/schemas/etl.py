@@ -26,7 +26,7 @@ class ETLJobLogCreate(ETLJobLogBase):
     started_at: datetime
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
-    error_details: Optional[List[Dict[str, Any]]] = None
+    error_details: Optional[Dict[str, Any]] = None
     execution_time_seconds: Optional[float] = None
 
 
@@ -36,7 +36,7 @@ class ETLJobLog(ETLJobLogBase):
     completed_at: Optional[datetime] = None
     file_size_bytes: Optional[int] = None
     error_message: Optional[str] = None
-    error_details: Optional[List[Dict[str, Any]]] = None
+    error_details: Optional[Dict[str, Any]] = None
     execution_time_seconds: Optional[float] = None
     created_assets: Optional[List[Dict[str, Any]]] = None
     extra_data: Optional[Dict[str, Any]] = None

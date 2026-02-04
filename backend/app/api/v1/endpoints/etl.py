@@ -359,6 +359,45 @@ def get_etl_job(job_id: int, db: Session = Depends(get_db)):
     return job
 
 
+@router.get("/jobs/{job_id}/records")
+def get_job_records(job_id: int, db: Session = Depends(get_db)):
+    """
+    Get detailed records for a specific ETL job, including skipped/failed records,
+    missing assets, and missing accounts.
+    """
+    job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    
+    # Parse error_details and extra_data to extract structured information
+    # Pershing jobs use extra_data, IBKR jobs use error_details
+    error_details = job.error_details or {}
+    extra_data = job.extra_data or {}
+    
+    # Merge both sources (extra_data takes precedence for Pershing)
+    missing_accounts = extra_data.get("missing_accounts") or error_details.get("missing_accounts", [])
+    missing_assets = extra_data.get("missing_assets") or error_details.get("missing_assets", [])
+    
+    return {
+        "job_id": job.job_id,
+        "job_type": job.job_type,
+        "status": job.status,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "records_processed": job.records_processed,
+        "records_created": job.records_created,
+        "records_skipped": job.records_skipped,
+        "records_failed": job.records_failed,
+        "filename": job.file_name,
+        "error_message": job.error_message,
+        # Extract detailed records from error_details or extra_data
+        "skipped_records": error_details.get("skipped_records", []),
+        "failed_records": error_details.get("failed_records", []),
+        "missing_assets": missing_assets,
+        "missing_accounts": missing_accounts,
+    }
+
+
 @router.patch("/jobs/{job_id}/mark-done")
 def mark_job_as_done(job_id: int, db: Session = Depends(get_db)):
     """
