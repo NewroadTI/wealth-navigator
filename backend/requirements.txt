@@ -11,5 +11,6 @@ pandas
 requests
 openpyxl
 apscheduler
+python-multipart
 requests
 pandas

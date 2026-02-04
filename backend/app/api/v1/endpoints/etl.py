@@ -351,13 +351,33 @@ def get_etl_jobs(
 @router.get("/jobs/{job_id}", response_model=ETLJobLog)
 def get_etl_job(job_id: int, db: Session = Depends(get_db)):
     """
-    Get details of a specific ETL job.
+    Get a specific ETL job by ID.
     """
     job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
     return job
 
+
+@router.patch("/jobs/{job_id}/mark-done")
+def mark_job_as_done(job_id: int, db: Session = Depends(get_db)):
+    """
+    Mark a job as done (reviewed by user).
+    """
+    job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    
+    job.done = True
+    db.commit()
+    db.refresh(job)
+    
+    return {"success": True, "job_id": job_id, "done": True}
+
+
+# ==========================================================================
+# BACKGROUND TASK RUNNER
+# ==========================================================================
 
 @router.post("/trigger", response_model=ETLTriggerResponse)
 def trigger_etl_job(
@@ -477,19 +497,30 @@ def _run_single_etl_job(job_id: int, report_type: str):
             }
         
         # 3. Update job log
-        job.status = result.get("status", "success")
         job.completed_at = datetime.now()
+        # Update job stats
         job.records_processed = result.get("records_processed", 0)
         job.records_created = result.get("records_created", 0)
         job.records_updated = result.get("records_updated", 0)
-        job.records_failed = result.get("records_failed", 0)
         job.records_skipped = result.get("records_skipped", 0)
+        job.records_failed = result.get("records_failed", 0)
+        job.status = result.get("status", "success")
         
-        if result.get("errors"):
-            job.error_details = result.get("errors")
+        # Auto-mark successful jobs as done, failed/partial jobs need user review
+        if job.status == "success":
+            job.done = True
+        else:
+            job.done = False
+        
+        job.file_name = result.get("file_name", job.file_name) # Keep existing if not in result
+        job.file_size_bytes = result.get("file_size_bytes", job.file_size_bytes) # Keep existing if not in result
+        job.error_message = result.get("error_message")
+        job.error_details = result.get("error_details")
         
         if result.get("created_assets"):
             job.created_assets = [{"symbol": s} for s in result.get("created_assets", [])]
+        else:
+            job.created_assets = None # Clear if not present
         
         # Store missing assets/accounts in extra_data for frontend to display
         extra_data = {}
@@ -499,11 +530,15 @@ def _run_single_etl_job(job_id: int, report_type: str):
             extra_data["missing_accounts"] = result.get("missing_accounts")
         if extra_data:
             job.extra_data = extra_data
+        else:
+            job.extra_data = None # Clear if not present
         
         if job.started_at and job.completed_at:
             job.execution_time_seconds = Decimal(str((job.completed_at - job.started_at).total_seconds()))
         
         db.commit()
+        db.refresh(job)
+        
         logger.info(f"ETL job {job_id} completed: {result}")
         
     except Exception as e:

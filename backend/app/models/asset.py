@@ -446,11 +446,14 @@ class ETLJobLog(Base):
     job_id = Column(Integer, primary_key=True, index=True)
     
     # Identificación del job
-    job_type = Column(String, nullable=False, index=True)  # CORPORATES, TRADES, POSITIONS, etc.
+    job_type = Column(String, nullable=False, index=True)  # CORPORATES, TRADES, POSITIONS, PERSHING, etc.
     job_name = Column(String, nullable=True)  # Nombre descriptivo
     
     # Estado del job
     status = Column(String, nullable=False, default="pending")  # pending, running, success, failed, partial
+    
+    # Indica si el job ha sido revisado/completado por el usuario
+    done = Column(Boolean, nullable=False, default=False, index=True)
     
     # Timestamps
     started_at = Column(DateTime, nullable=False, index=True)

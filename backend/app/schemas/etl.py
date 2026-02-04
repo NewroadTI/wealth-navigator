@@ -40,6 +40,7 @@ class ETLJobLog(ETLJobLogBase):
     execution_time_seconds: Optional[float] = None
     created_assets: Optional[List[Dict[str, Any]]] = None
     extra_data: Optional[Dict[str, Any]] = None
+    done: bool = False
 
     class Config:
         from_attributes = True

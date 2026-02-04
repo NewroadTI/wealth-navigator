@@ -524,9 +524,11 @@ const IBKRDashboard = () => {
                 <ScrollArea className="h-[400px]">
                   {data?.recent_activity && data.recent_activity.length > 0 ? (
                     <div className="divide-y">
-                      {data.recent_activity.map((log) => (
-                        <ActivityLogItem key={log.job_id} log={log} />
-                      ))}
+                      {data.recent_activity
+                        .filter(log => log.job_type !== 'PERSHING')
+                        .map((log) => (
+                          <ActivityLogItem key={log.job_id} log={log} />
+                        ))}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
