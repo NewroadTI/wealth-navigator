@@ -30,6 +30,7 @@ from app.jobs.processors.corporate_actions import CorporateActionsProcessor
 from app.jobs.processors.open_positions import OpenPositionsProcessor
 from app.jobs.processors.cash_journal import CashJournalProcessor
 from app.jobs.processors.trades import TradesProcessor
+from app.jobs.processors.transfers import TransfersProcessor
 
 
 class ETLOrchestrator:
@@ -194,10 +195,9 @@ class ETLOrchestrator:
         return processor.process_file(file_path)
     
     def _process_transfers(self, file_path: Path) -> Dict[str, Any]:
-        """Process transfers CSV."""
-        # TODO: Implement transfers processor
-        logger.info("Transfers processor not yet implemented")
-        return {"status": "not_implemented"}
+        """Process transfers (ACATS) CSV."""
+        processor = TransfersProcessor(api_client=self.api_client)
+        return processor.process_file(file_path)
     
     # ==========================================================================
     # CONVENIENCE METHODS

@@ -50,6 +50,8 @@ class TradesProcessor:
         }
         self.missing_assets: List[Dict] = []
         self.missing_accounts: List[str] = []
+        self.skipped_records: List[Dict] = []
+        self.failed_records: List[Dict] = []
         self._asset_cache: Dict[str, Optional[int]] = {}
         self._account_cache: Dict[str, Optional[int]] = {}
     
@@ -87,7 +89,15 @@ class TradesProcessor:
                 
                 if is_fx:
                     fx_data = self._process_fx_row(row, idx)
-                    if fx_data:
+                    if isinstance(fx_data, dict) and "error" in fx_data:
+                        self.stats["fx_skipped"] += 1
+                        self.skipped_records.append({
+                            "row_index": idx,
+                            "row_data": dict(row),
+                            "reason": fx_data["error"],
+                            "record_type": "FX"
+                        })
+                    elif fx_data:
                         fx_to_create.append(fx_data)
                         # Send batch if full
                         if len(fx_to_create) >= BATCH_SIZE:
@@ -95,7 +105,15 @@ class TradesProcessor:
                             fx_to_create = []
                 else:
                     trade_data = self._process_trade_row(row, idx)
-                    if trade_data:
+                    if isinstance(trade_data, dict) and "error" in trade_data:
+                        self.stats["trades_skipped"] += 1
+                        self.skipped_records.append({
+                            "row_index": idx,
+                            "row_data": dict(row),
+                            "reason": trade_data["error"],
+                            "record_type": "TRADE"
+                        })
+                    elif trade_data:
                         trades_to_create.append(trade_data)
                         # Send batch if full
                         if len(trades_to_create) >= BATCH_SIZE:
@@ -105,6 +123,11 @@ class TradesProcessor:
             except Exception as e:
                 logger.error(f"❌ Error procesando fila {idx + 2}: {e}")
                 self.stats["errors"] += 1
+                self.failed_records.append({
+                    "row_index": idx,
+                    "row_data": dict(row),
+                    "error": str(e)
+                })
         
         # Send remaining batches
         if trades_to_create:
@@ -118,6 +141,8 @@ class TradesProcessor:
             "stats": self.stats,
             "missing_assets": self.missing_assets,
             "missing_accounts": list(set(self.missing_accounts)),
+            "skipped_records": self.skipped_records[:100],  # Limit to first 100
+            "failed_records": self.failed_records[:100]  # Limit to first 100
         }
     
     def _send_trades_batch(self, trades: List[Dict]) -> None:
@@ -170,8 +195,7 @@ class TradesProcessor:
         
         if not account_id:
             self.missing_accounts.append(f"{account_code}_{currency}")
-            self.stats["trades_skipped"] += 1
-            return None
+            return {"error": f"Account not found: {account_code}_{currency}"}
         
         # 2. ib_transaction_id for duplicate checking (done by API)
         ib_transaction_id = str(row.get("TransactionID", "")).strip() or None
@@ -327,8 +351,7 @@ class TradesProcessor:
         
         if not source_account_id:
             self.missing_accounts.append(f"{account_code}_{source_currency}")
-            self.stats["fx_skipped"] += 1
-            return None
+            return {"error": f"Source account not found: {account_code}_{source_currency}"}
         
         # 7. Comisión
         commission = abs(self._parse_decimal(row.get("IBCommission")) or Decimal(0))

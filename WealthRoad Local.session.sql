@@ -1,1 +1,1 @@
-SELECT * FROM corporate_actions;
+SELECT * FROM positions ORDER BY report_date desc;

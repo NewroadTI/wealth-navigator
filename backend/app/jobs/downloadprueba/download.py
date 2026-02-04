@@ -27,7 +27,7 @@ from datetime import datetime
 # =============================================================================
 
 # IBKR Flex Query Token
-IBKR_TOKEN = os.getenv("IBKR_TOKEN", "20238265020605888696400")
+IBKR_TOKEN = os.getenv("IBKR_TOKEN", "181787535917845028470530")
 
 # Flex Query IDs - Estos generan los reportes CSV
 FLEX_QUERIES = {
@@ -36,7 +36,7 @@ FLEX_QUERIES = {
     "PRICES": "1126564",
     "STATEMENTFUNDS": "1126598",
     "TRADES": "1126535",
-    "TRANSACCIONES": "1126336",
+    "TRANSACCIONES": "1126335",
     "TRANSFERS": "1126559"
 }
 

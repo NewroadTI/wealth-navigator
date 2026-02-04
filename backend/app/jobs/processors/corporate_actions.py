@@ -60,6 +60,8 @@ class CorporateActionsProcessor:
         self.error_count = 0
         self.errors: List[Dict] = []
         self.created_assets: List[str] = []
+        self.skipped_records: List[Dict] = []
+        self.failed_records: List[Dict] = []
     
     def process_file(self, file_path: Path) -> Dict[str, Any]:
         """
@@ -142,17 +144,35 @@ class CorporateActionsProcessor:
         for idx, row in df.iterrows():
             try:
                 action_data = self._process_row(row, idx)
-                if action_data:
+                if isinstance(action_data, dict) and "error" in action_data:
+                    # Record was skipped with a reason
+                    self.skipped_count += 1
+                    self.skipped_records.append({
+                        "row_index": idx,
+                        "row_data": row.to_dict() if hasattr(row, 'to_dict') else str(row),
+                        "reason": action_data["error"]
+                    })
+                elif action_data:
                     actions_to_create.append(action_data)
                     self.processed_count += 1
                 else:
                     self.skipped_count += 1
+                    self.skipped_records.append({
+                        "row_index": idx,
+                        "row_data": row.to_dict() if hasattr(row, 'to_dict') else str(row),
+                        "reason": "Unknown error during processing"
+                    })
             except Exception as e:
                 logger.error(f"Error processing row {idx}: {e}")
                 self.errors.append({
                     "row": idx,
                     "error": str(e),
                     "data": row.to_dict() if hasattr(row, 'to_dict') else str(row)
+                })
+                self.failed_records.append({
+                    "row_index": idx,
+                    "row_data": row.to_dict() if hasattr(row, 'to_dict') else str(row),
+                    "error": str(e)
                 })
                 self.error_count += 1
         
@@ -172,7 +192,7 @@ class CorporateActionsProcessor:
         
         if not client_account_id:
             logger.warning(f"Row {row_idx}: Missing ClientAccountID, skipping")
-            return None
+            return {"error": "Missing ClientAccountID"}
         
         # Ensure client_account_id is a string
         client_account_id = str(client_account_id).strip()
@@ -184,12 +204,7 @@ class CorporateActionsProcessor:
         
         if not account_id:
             logger.warning(f"Row {row_idx}: Account {account_code} not found, skipping")
-            self.errors.append({
-                "row": row_idx,
-                "error": f"Account not found: {account_code}",
-                "client_account_id": client_account_id
-            })
-            return None
+            return {"error": f"Account not found: {account_code}"}
         
         # 3. Parse dates - try multiple columns
         report_date = parse_date(safe_get(row, "Report Date"))
@@ -204,7 +219,7 @@ class CorporateActionsProcessor:
         
         if not report_date and not execution_date:
             logger.warning(f"Row {row_idx}: No valid date found, skipping")
-            return None
+            return {"error": "No valid date found (Report Date or Date/Time required)"}
         
         # 4. Get description and parse ratio
         # Try multiple columns for description
@@ -307,7 +322,9 @@ class CorporateActionsProcessor:
             "records_skipped": self.skipped_count,
             "records_failed": self.error_count,
             "errors": self.errors[:10],  # Limit to first 10 errors
-            "created_assets": self.created_assets
+            "created_assets": self.created_assets,
+            "skipped_records": self.skipped_records[:100],  # Limit to first 100
+            "failed_records": self.failed_records[:100]  # Limit to first 100
         }
     
     def _insert_actions(self, actions: List[Dict]):
