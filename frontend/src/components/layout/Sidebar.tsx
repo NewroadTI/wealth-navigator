@@ -89,7 +89,7 @@ export function Sidebar() {
           <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-base md:text-lg font-semibold text-sidebar-foreground">WealthRoad</h1>
+          <h1 className="text-base md:text-lg font-semibold text-sidebar-foreground">NewroadAI</h1>
           <p className="text-[10px] md:text-xs text-muted-foreground">Wealth Management ERP</p>
         </div>
       </div>

@@ -181,11 +181,22 @@ class CashJournalBase(BaseModel):
     description: Optional[str] = None
     reference_code: Optional[str] = None
     extra_details: Optional[Dict[str, Any]] = None
+    external_transaction_id: Optional[str] = None
+    action_id: Optional[str] = None
+
+
+class CashJournalCreate(CashJournalBase):
+    """Schema for creating a cash journal entry."""
+    account_id: int
+    asset_id: Optional[int] = None
+
 
 class CashJournalRead(CashJournalBase):
     journal_id: int
     account_id: int
     asset_id: Optional[int] = None
+    external_transaction_id: Optional[str] = None
+    action_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -427,3 +438,66 @@ class InvestmentStrategyRead(InvestmentStrategyBase):
     strategy_id: int
     class Config:
         from_attributes = True
+
+
+# =============================================================================
+# BULK CREATE SCHEMAS (For ETL API-based insertion)
+# =============================================================================
+
+class TradeCreate(TradeBase):
+    """Schema for creating a single trade via API."""
+    account_id: int
+    asset_id: Optional[int] = None
+    
+    # IBKR identifiers
+    ib_transaction_id: Optional[str] = None
+    ib_exec_id: Optional[str] = None
+    ib_trade_id: Optional[str] = None
+    ib_order_id: Optional[str] = None
+    
+    # Options fields
+    multiplier: Optional[Decimal] = None
+    strike: Optional[Decimal] = None
+    expiry: Optional[date] = None
+    put_call: Optional[str] = None
+
+
+class BulkTradesRequest(BaseModel):
+    """Schema for bulk trades creation."""
+    trades: List[TradeCreate]
+
+
+class FXTransactionCreate(FXTransactionBase):
+    """Schema for creating a single FX transaction via API."""
+    account_id: int
+    target_account_id: Optional[int] = None
+    
+    # Additional fields for IBKR
+    commission: Optional[Decimal] = None
+    commission_currency: Optional[str] = None
+    ib_transaction_id: Optional[str] = None
+    ib_exec_id: Optional[str] = None
+    ib_order_id: Optional[str] = None
+    exchange: Optional[str] = None
+    transaction_type: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class BulkFXTransactionsRequest(BaseModel):
+    """Schema for bulk FX transactions creation."""
+    transactions: List[FXTransactionCreate]
+
+
+class BulkPositionsRequest(BaseModel):
+    """Schema for bulk positions creation/update."""
+    positions: List[PositionCreate]
+
+
+class BulkResponse(BaseModel):
+    """Standard response for bulk operations."""
+    status: str  # "success", "partial", "error"
+    total: int
+    created: int
+    updated: int = 0
+    skipped: int
+    errors: List[dict] = []

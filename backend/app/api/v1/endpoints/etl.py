@@ -181,8 +181,8 @@ REPORT_DISPLAY_INFO = {
         "description": "Historical price data"
     },
     "STATEMENTFUNDS": {
-        "display_name": "Statement Funds",
-        "description": "Account fund statements"
+        "display_name": "Cash Journal",
+        "description": "Dividends, interest, deposits, withdrawals, fees"
     },
     "TRADES": {
         "display_name": "Trades",
@@ -408,7 +408,6 @@ def _run_single_etl_job(job_id: int, report_type: str):
     """
     from app.db.session import SessionLocal
     from app.jobs.downloader import IBKRDownloader
-    from app.jobs.db_client import DBClient, reset_db_client
     from pathlib import Path
     
     db = SessionLocal()
@@ -441,31 +440,61 @@ def _run_single_etl_job(job_id: int, report_type: str):
         db.commit()
         
         # 2. Process the file based on report type
-        # Use a fresh DB client for processing (avoids HTTP deadlocks)
-        reset_db_client()
-        
         result = {"status": "success", "records_processed": 0, "records_created": 0, "records_failed": 0}
         
         if report_type == "CORPORATES":
             from app.jobs.processors.corporate_actions import CorporateActionsProcessor
-            from app.jobs.db_client import DBClient
+            from app.jobs.api_client import get_api_client
             
-            with DBClient() as db_client:
-                processor = CorporateActionsProcessor(db_client)
-                result = processor.process_file(file_path)
+            api_client = get_api_client()
+            processor = CorporateActionsProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
         
         elif report_type == "OPENPOSITIONS":
             from app.jobs.processors.open_positions import OpenPositionsProcessor
-            from app.jobs.db_client import DBClient
+            from app.jobs.api_client import get_api_client
             
-            with DBClient() as db_client:
-                processor = OpenPositionsProcessor(db_client)
-                result = processor.process_file(file_path)
+            api_client = get_api_client()
+            processor = OpenPositionsProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
+        
+        elif report_type == "STATEMENTFUNDS":
+            from app.jobs.processors.cash_journal import CashJournalProcessor
+            from app.jobs.api_client import get_api_client
+            
+            api_client = get_api_client()
+            processor = CashJournalProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
+        
+        elif report_type == "TRADES":
+            from app.jobs.processors.trades import TradesProcessor
+            from app.jobs.api_client import get_api_client
+            import csv
+            
+            # Read CSV file
+            rows = []
+            with open(file_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+            
+            # Process with APIClient
+            api_client = get_api_client()
+            processor = TradesProcessor(api_client=api_client)
+            result = processor.process(rows)
+            
+            # Map result to expected format
+            stats = result.get("stats", {})
+            result = {
+                "status": "success",
+                "records_processed": stats.get("trades_created", 0) + stats.get("fx_created", 0) + stats.get("trades_skipped", 0) + stats.get("fx_skipped", 0),
+                "records_created": stats.get("trades_created", 0) + stats.get("fx_created", 0),
+                "records_skipped": stats.get("trades_skipped", 0) + stats.get("fx_skipped", 0),
+                "records_failed": stats.get("errors", 0),
+                "missing_assets": result.get("missing_assets", []),
+                "missing_accounts": result.get("missing_accounts", []),
+            }
         
         # TODO: Add other report type processors here
-        # elif report_type == "TRADES":
-        #     processor = TradesProcessor()
-        #     result = processor.process_file(file_path)
         else:
             logger.warning(f"No processor implemented for {report_type}")
             result = {
@@ -520,7 +549,6 @@ def _run_single_etl_job(job_id: int, report_type: str):
             db.commit()
     finally:
         db.close()
-        reset_db_client()
 
 
 async def _run_etl_job_with_logging(job_id: int, report_type: str):

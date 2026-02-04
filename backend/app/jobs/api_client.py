@@ -168,8 +168,9 @@ class APIClient:
     
     def get_asset_by_symbol(self, symbol: str) -> Optional[Dict]:
         """Get an asset by symbol."""
-        if symbol in self._asset_cache:
-            return {"asset_id": self._asset_cache[symbol]}
+        cache_key = f"symbol:{symbol}"
+        if cache_key in self._asset_cache:
+            return {"asset_id": self._asset_cache[cache_key]}
         
         result = self._make_request(
             "GET",
@@ -181,13 +182,18 @@ class APIClient:
             # Find exact match
             for asset in result:
                 if asset["symbol"] == symbol:
-                    self._asset_cache[symbol] = asset["asset_id"]
+                    self._asset_cache[cache_key] = asset["asset_id"]
                     return asset
         
         return None
     
     def get_asset_id(self, symbol: str) -> Optional[int]:
         """Get asset_id from symbol."""
+        # First check the preloaded cache
+        asset_id = self.get_asset_id_by_symbol(symbol)
+        if asset_id:
+            return asset_id
+        # Fallback to API lookup
         asset = self.get_asset_by_symbol(symbol)
         return asset.get("asset_id") if asset else None
     
@@ -247,11 +253,36 @@ class APIClient:
         Create multiple corporate actions.
         Returns summary of successes and failures.
         """
-        return self._make_request(
+        result = self._make_request(
             "POST",
             "/api/v1/transactions/corporate-actions/bulk",
             data={"actions": actions}
         )
+        return result or {"status": "error", "created": 0, "skipped": 0, "errors": []}
+    
+    # ==========================================================================
+    # CASH JOURNAL
+    # ==========================================================================
+    
+    def create_cash_journal_entry(self, entry_data: Dict) -> Optional[Dict]:
+        """Create a single cash journal entry."""
+        return self._make_request(
+            "POST",
+            "/api/v1/transactions/cash-journal/",
+            data=entry_data
+        )
+    
+    def create_cash_journal_bulk(self, entries: List[Dict]) -> Dict:
+        """
+        Create multiple cash journal entries.
+        Returns summary of successes and failures.
+        """
+        result = self._make_request(
+            "POST",
+            "/api/v1/transactions/cash-journal/bulk",
+            data={"entries": entries}
+        )
+        return result or {"status": "error", "created": 0, "skipped": 0, "errors": []}
     
     # ==========================================================================
     # TRADES
@@ -267,11 +298,33 @@ class APIClient:
     
     def create_trades_bulk(self, trades: List[Dict]) -> Dict:
         """Create multiple trades."""
-        return self._make_request(
+        result = self._make_request(
             "POST",
             "/api/v1/transactions/trades/bulk",
             data={"trades": trades}
         )
+        return result or {"status": "error", "created": 0, "skipped": 0, "errors": []}
+    
+    # ==========================================================================
+    # FX TRANSACTIONS
+    # ==========================================================================
+    
+    def create_fx_transaction(self, fx_data: Dict) -> Optional[Dict]:
+        """Create a single FX transaction."""
+        return self._make_request(
+            "POST",
+            "/api/v1/transactions/fx-transactions/",
+            data=fx_data
+        )
+    
+    def create_fx_transactions_bulk(self, transactions: List[Dict]) -> Dict:
+        """Create multiple FX transactions."""
+        result = self._make_request(
+            "POST",
+            "/api/v1/transactions/fx-transactions/bulk",
+            data={"transactions": transactions}
+        )
+        return result or {"status": "error", "created": 0, "skipped": 0, "errors": []}
     
     # ==========================================================================
     # POSITIONS
@@ -287,11 +340,12 @@ class APIClient:
     
     def create_positions_bulk(self, positions: List[Dict]) -> Dict:
         """Create multiple positions."""
-        return self._make_request(
+        result = self._make_request(
             "POST",
-            "/api/v1/positions/bulk",
+            "/api/v1/transactions/positions/bulk",
             data={"positions": positions}
         )
+        return result or {"status": "error", "created": 0, "updated": 0, "skipped": 0, "errors": []}
     
     # ==========================================================================
     # PORTFOLIOS
@@ -361,7 +415,7 @@ class APIClient:
             logger.info(f"Preloaded {len(self._account_cache)} accounts into cache")
     
     def preload_assets(self):
-        """Preload all assets into cache."""
+        """Preload all assets into cache (by symbol, isin, and conid)."""
         result = self._make_request(
             "GET",
             "/api/v1/assets/",
@@ -370,8 +424,32 @@ class APIClient:
         
         if result and isinstance(result, list):
             for asset in result:
-                self._asset_cache[asset["symbol"]] = asset["asset_id"]
-            logger.info(f"Preloaded {len(self._asset_cache)} assets into cache")
+                asset_id = asset["asset_id"]
+                # Cache by symbol
+                if asset.get("symbol"):
+                    self._asset_cache[f"symbol:{asset['symbol']}"] = asset_id
+                # Cache by ISIN
+                if asset.get("isin"):
+                    self._asset_cache[f"isin:{asset['isin']}"] = asset_id
+                # Cache by conid
+                if asset.get("ib_conid"):
+                    self._asset_cache[f"conid:{asset['ib_conid']}"] = asset_id
+            logger.info(f"Preloaded {len(result)} assets into cache")
+    
+    def get_asset_id_by_symbol(self, symbol: str) -> Optional[int]:
+        """Get asset_id from symbol."""
+        cache_key = f"symbol:{symbol}"
+        return self._asset_cache.get(cache_key)
+    
+    def get_asset_id_by_isin(self, isin: str) -> Optional[int]:
+        """Get asset_id from ISIN."""
+        cache_key = f"isin:{isin}"
+        return self._asset_cache.get(cache_key)
+    
+    def get_asset_id_by_conid(self, conid: int) -> Optional[int]:
+        """Get asset_id from IB conid."""
+        cache_key = f"conid:{conid}"
+        return self._asset_cache.get(cache_key)
 
 
 # Global client instance
