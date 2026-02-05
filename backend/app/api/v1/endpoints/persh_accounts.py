@@ -422,7 +422,7 @@ def create_account_for_user(
     new_account = Account(
         portfolio_id=portfolio.portfolio_id,
         account_code=request.account_code,
-        account_alias=f"Pershing - {request.account_code}",
+        account_alias=request.account_code,
         account_type="BROKER",
         currency="USD",
         institution="PERSHING"

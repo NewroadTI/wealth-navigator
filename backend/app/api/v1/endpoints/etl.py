@@ -390,6 +390,20 @@ def get_etl_job_records(
     logger.info(f"Skipped records count: {len(extra_data.get('skipped_records', []))}")
     logger.info(f"Failed records count: {len(extra_data.get('failed_records', []))}")
     
+    
+    # Deduplicate missing assets by symbol/ISIN (frontend shows unique count)
+    seen_assets = {}
+    for asset in extra_data.get("missing_assets", []):
+        key = asset.get("isin") or asset.get("symbol") or asset.get("security_id")
+        if key and key not in seen_assets:
+            seen_assets[key] = asset
+        elif key:
+            # Update count if already exists
+            if "count" in asset:
+                seen_assets[key]["count"] = seen_assets[key].get("count", 1) + asset.get("count", 1)
+    
+    unique_missing_assets = list(seen_assets.values())
+    
     response = {
         "job_id": job.job_id,
         "job_type": job.job_type,
@@ -400,20 +414,95 @@ def get_etl_job_records(
         "records_created": job.records_created,
         "records_skipped": job.records_skipped,
         "records_failed": job.records_failed,
+        "filename": job.file_name,  # ⭐ CRITICAL: Frontend needs this for extract-names endpoint
         "skipped_records": [],
         "failed_records": [],
-        "missing_assets": extra_data.get("missing_assets", []),
+        "missing_assets": unique_missing_assets,
         "missing_accounts": extra_data.get("missing_accounts", [])
     }
     
     # Filter based on record_type parameter
     if record_type is None or record_type == "skipped":
         response["skipped_records"] = extra_data.get("skipped_records", [])
+        # Fallback for older jobs (like Pershing) that stored skipped records in error_details
+        if not response["skipped_records"] and job.error_details:
+             response["skipped_records"] = job.error_details.get("skipped_records", [])
     
     if record_type is None or record_type == "failed":
         response["failed_records"] = extra_data.get("failed_records", [])
     
     return response
+
+
+class MarkItemDoneRequest(BaseModel):
+    """Request to mark a missing account or asset as resolved."""
+    item_type: str  # "account" or "asset"
+    item_key: str   # account_code for accounts, isin/symbol for assets
+
+
+@router.post("/jobs/{job_id}/mark-done")
+def mark_item_as_done(
+    job_id: int,
+    request: MarkItemDoneRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Mark a missing account or asset as resolved (done=true).
+    Updates the job's extra_data JSON field.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+    
+    job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    extra_data = job.extra_data or {}
+    updated = False
+    
+    if request.item_type == "account":
+        missing_accounts = extra_data.get("missing_accounts", [])
+        for acc in missing_accounts:
+            if acc.get("account_code") == request.item_key:
+                acc["done"] = True
+                updated = True
+                break
+        extra_data["missing_accounts"] = missing_accounts
+        
+    elif request.item_type == "asset":
+        missing_assets = extra_data.get("missing_assets", [])
+        for asset in missing_assets:
+            # Match by isin or symbol
+            if (asset.get("isin") == request.item_key or 
+                asset.get("symbol") == request.item_key or
+                f"SYMBOL:{asset.get('symbol')}" == request.item_key):
+                asset["done"] = True
+                updated = True
+                break
+        extra_data["missing_assets"] = missing_assets
+    else:
+        raise HTTPException(status_code=400, detail="item_type must be 'account' or 'asset'")
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"{request.item_type} with key {request.item_key} not found")
+    
+    # Save back to DB - CRITICAL: Use flag_modified to force SQLAlchemy to detect JSON changes
+    job.extra_data = extra_data
+    flag_modified(job, "extra_data")  # Tell SQLAlchemy the JSON field changed
+    db.commit()
+    
+    # Check if all items are done to update job.done status
+    all_accounts_done = all(acc.get("done", False) for acc in extra_data.get("missing_accounts", []))
+    all_assets_done = all(asset.get("done", False) for asset in extra_data.get("missing_assets", []))
+    
+    if all_accounts_done and all_assets_done and (extra_data.get("missing_accounts") or extra_data.get("missing_assets")):
+        job.done = True
+        db.commit()
+    
+    return {
+        "success": True,
+        "message": f"Marked {request.item_type} {request.item_key} as done",
+        "all_resolved": all_accounts_done and all_assets_done
+    }
 
 
 @router.post("/trigger", response_model=ETLTriggerResponse)

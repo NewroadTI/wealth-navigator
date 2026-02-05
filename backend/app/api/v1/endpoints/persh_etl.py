@@ -414,7 +414,8 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
                 missing_accounts_details[account_code] = {
                     "account_code": account_code,
                     "reason": f"Account not found in database: {account_code}",
-                    "count": 0
+                    "count": 0,
+                    "done": False  # Track resolution status
                 }
             missing_accounts_details[account_code]["count"] += len(acct_rows)
             
@@ -484,7 +485,8 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
                         "currency": row.get("Transaction Currency", ""),
                         "asset_type": "option" if is_option else "unknown",
                         "reason": f"Asset not found in database by {'ISIN (' + isin + ')' if isin and isin != '-' else 'Symbol (' + symbol + ')'}",
-                        "count": 0
+                        "count": 0,
+                        "done": False  # Track resolution status
                     }
                 missing_assets_details[key]["count"] += 1
                 
@@ -680,12 +682,13 @@ async def import_transactions(request: ImportRequest, db: Session = Depends(get_
     if missing_assets_details:
         extra_data["missing_assets"] = list(missing_assets_details.values())
     
+    
+    # Store skipped records details in extra_data as expected by frontend/etl.py
+    if skipped_records_details:
+        extra_data["skipped_records"] = skipped_records_details
+    
     if extra_data:
         job.extra_data = extra_data
-    
-    # Store skipped records details in error_details as expected by frontend/etl.py
-    if skipped_records_details:
-        job.error_details = {"skipped_records": skipped_records_details}
         
     if job.started_at:
         job.execution_time_seconds = Decimal(str((job.completed_at - job.started_at).total_seconds()))

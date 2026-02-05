@@ -48,8 +48,8 @@ class TradesProcessor:
             "fx_skipped": 0,
             "errors": 0,
         }
-        self.missing_assets: List[Dict] = []
-        self.missing_accounts: List[str] = []
+        self.missing_assets: Dict[str, Dict] = {}  # keyed by symbol/isin
+        self.missing_accounts: Dict[str, Dict] = {}  # keyed by account_code
         self.skipped_records: List[Dict] = []
         self.failed_records: List[Dict] = []
         self._asset_cache: Dict[str, Optional[int]] = {}
@@ -139,8 +139,8 @@ class TradesProcessor:
         
         return {
             "stats": self.stats,
-            "missing_assets": self.missing_assets,
-            "missing_accounts": list(set(self.missing_accounts)),
+            "missing_assets": list(self.missing_assets.values()),  # Convert dict to list
+            "missing_accounts": list(self.missing_accounts.values()),  # Convert dict to list
             "skipped_records": self.skipped_records[:100],  # Limit to first 100
             "failed_records": self.failed_records[:100]  # Limit to first 100
         }
@@ -194,8 +194,16 @@ class TradesProcessor:
         account_id = self._get_account_id(account_code, currency)
         
         if not account_id:
-            self.missing_accounts.append(f"{account_code}_{currency}")
-            return {"error": f"Account not found: {account_code}_{currency}"}
+            account_key = f"{account_code}_{currency}"
+            if account_key not in self.missing_accounts:
+                self.missing_accounts[account_key] = {
+                    "account_code": account_key,
+                    "reason": f"Account not found in database: {account_key}",
+                    "count": 0,
+                    "done": False  # Track resolution status
+                }
+            self.missing_accounts[account_key]["count"] += 1
+            return {"error": f"Account not found: {account_key}"}
         
         # 2. ib_transaction_id for duplicate checking (done by API)
         ib_transaction_id = str(row.get("TransactionID", "")).strip() or None
@@ -204,12 +212,22 @@ class TradesProcessor:
         asset_id = self._find_asset_id(row)
         if not asset_id:
             # Registrar como missing pero NO saltar - guardar el trade sin asset
-            self.missing_assets.append({
-                "row": idx + 2,
-                "symbol": row.get("Symbol"),
-                "isin": row.get("ISIN"),
-                "description": row.get("Description"),
-            })
+            symbol = str(row.get("Symbol", "")).strip()
+            isin = str(row.get("ISIN", "")).strip()
+            asset_key = isin if isin else f"SYMBOL:{symbol}"
+            
+            if asset_key and asset_key not in self.missing_assets:
+                self.missing_assets[asset_key] = {
+                    "symbol": symbol,
+                    "isin": isin if isin else None,
+                    "description": str(row.get("Description", "")).strip(),
+                    "currency": str(row.get("CurrencyPrimary", "USD")).strip()[:3],
+                    "reason": f"Asset not found in database by {'ISIN (' + isin + ')' if isin else 'Symbol (' + symbol + ')'}",
+                    "count": 0,
+                    "done": False  # Track resolution status
+                }
+            if asset_key:
+                self.missing_assets[asset_key]["count"] += 1
         
         # 4. Parsear fechas - Usar ReportDate (sin hora) primero, luego TradeDate
         report_date = self._parse_date(row.get("ReportDate"))
@@ -350,8 +368,16 @@ class TradesProcessor:
         target_account_id = self._get_account_id(account_code, target_currency)
         
         if not source_account_id:
-            self.missing_accounts.append(f"{account_code}_{source_currency}")
-            return {"error": f"Source account not found: {account_code}_{source_currency}"}
+            account_key = f"{account_code}_{source_currency}"
+            if account_key not in self.missing_accounts:
+                self.missing_accounts[account_key] = {
+                    "account_code": account_key,
+                    "reason": f"Account not found in database: {account_key}",
+                    "count": 0,
+                    "done": False  # Track resolution status
+                }
+            self.missing_accounts[account_key]["count"] += 1
+            return {"error": f"Source account not found: {account_key}"}
         
         # 7. Comisión
         commission = abs(self._parse_decimal(row.get("IBCommission")) or Decimal(0))

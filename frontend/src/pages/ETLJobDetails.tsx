@@ -88,32 +88,32 @@ interface ETLJobDetails {
 // ==========================================================================
 
 const formatDateTime = (dateString: string | null) => {
-  if (!dateString) return '-';
-  return new Date(dateString).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
 };
 
 const getStatusBadge = (status: string) => {
-  const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-    success: { variant: 'default', label: 'Success' },
-    failed: { variant: 'destructive', label: 'Failed' },
-    running: { variant: 'secondary', label: 'Running' },
-    pending: { variant: 'secondary', label: 'Pending' },
-  };
+    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+        success: { variant: 'default', label: 'Success' },
+        failed: { variant: 'destructive', label: 'Failed' },
+        running: { variant: 'secondary', label: 'Running' },
+        pending: { variant: 'secondary', label: 'Pending' },
+    };
 
-  const { variant, label } = variants[status] || { variant: 'outline' as const, label: status };
+    const { variant, label } = variants[status] || { variant: 'outline' as const, label: status };
 
-  return (
-    <Badge variant={variant} className="text-xs">
-      {label}
-    </Badge>
-  );
+    return (
+        <Badge variant={variant} className="text-xs">
+            {label}
+        </Badge>
+    );
 };
 
 
@@ -198,43 +198,83 @@ const RecordDetailsCard = ({
     );
 };
 
-const MissingAssetCard = ({ asset, index, onResolve }: { asset: any; index: number; onResolve: (asset: any) => void }) => (
-    <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="pt-4 pb-3">
-            <div className="space-y-2">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <p className="font-semibold text-amber-400">{asset.symbol || 'Unknown Symbol'}</p>
-                        <p className="text-xs text-gray-300 mt-1">{asset.description || 'No description'}</p>
+const MissingAssetCard = ({
+    asset,
+    index,
+    jobId,
+    onResolve
+}: {
+    asset: any;
+    index: number;
+    jobId: number;
+    onResolve: (asset: any) => void
+}) => {
+    const [isDone, setIsDone] = useState(asset.done || false);
+    const apiBaseUrl = getApiBaseUrl();
+
+    // Sync isDone with prop when data refreshes
+    useEffect(() => {
+        setIsDone(asset.done || false);
+    }, [asset.done]);
+
+    // If already done, show completed state
+    if (isDone) {
+        return (
+            <Card className="bg-gray-800 border-green-700">
+                <CardContent className="pt-4 pb-3">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <p className="font-semibold text-green-400">{asset.symbol || 'Unknown Symbol'}</p>
+                            <p className="text-xs text-gray-300 mt-1">{asset.description || 'No description'}</p>
+                        </div>
+                        <Badge className="bg-green-600 text-white border-green-500">
+                            <Check className="h-3 w-3 mr-1" />
+                            Completed
+                        </Badge>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                        <Badge variant="outline" className="bg-gray-900 text-amber-400 border-amber-500 text-xs">{asset.currency || 'USD'}</Badge>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs bg-gray-900 text-amber-400 hover:bg-gray-700 border-gray-600"
-                            onClick={() => onResolve(asset)}
-                        >
-                            <UserPlus className="h-3 w-3 mr-1" />
-                            Resolve
-                        </Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card className="bg-gray-800 border-gray-700">
+            <CardContent className="pt-4 pb-3">
+                <div className="space-y-2">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="font-semibold text-amber-400">{asset.symbol || 'Unknown Symbol'}</p>
+                            <p className="text-xs text-gray-300 mt-1">{asset.description || 'No description'}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                            <Badge variant="outline" className="bg-gray-900 text-amber-400 border-amber-500 text-xs">{asset.currency || 'USD'}</Badge>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs bg-gray-900 text-amber-400 hover:bg-gray-700 border-gray-600"
+                                onClick={() => onResolve(asset)}
+                            >
+                                <UserPlus className="h-3 w-3 mr-1" />
+                                Resolve
+                            </Button>
+                        </div>
                     </div>
+
+                    {(asset.isin || asset.security_id) && (
+                        <div className="text-xs text-gray-400 space-y-1">
+                            {asset.isin && <p>ISIN: {asset.isin}</p>}
+                            {asset.security_id && <p>Security ID: {asset.security_id}</p>}
+                        </div>
+                    )}
+
+                    <p className="text-xs text-gray-400 pt-2 border-t border-gray-700">
+                        {asset.reason}
+                    </p>
                 </div>
-
-                {(asset.isin || asset.security_id) && (
-                    <div className="text-xs text-gray-400 space-y-1">
-                        {asset.isin && <p>ISIN: {asset.isin}</p>}
-                        {asset.security_id && <p>Security ID: {asset.security_id}</p>}
-                    </div>
-                )}
-
-                <p className="text-xs text-gray-400 pt-2 border-t border-gray-700">
-                    {asset.reason}
-                </p>
-            </div>
-        </CardContent>
-    </Card>
-);
+            </CardContent>
+        </Card>
+    );
+};
 
 // --- Account Resolution Components ---
 
@@ -261,7 +301,7 @@ function CreateInvestorForm({ initialName, accountCode, onSuccess, onCancel }: C
 
     const [formData, setFormData] = useState({
         full_name: initialName,
-        email: `${uniqueUsername}@investor.temp`,
+        email: `${uniqueUsername}@example.com`,
         username: uniqueUsername,
         phone: `+519${randomSuffix}${randomSuffix}`,
         tax_id: `TAX-${uniqueUsername.toUpperCase()}`,
@@ -317,7 +357,7 @@ function CreateInvestorForm({ initialName, accountCode, onSuccess, onCancel }: C
                 title: 'Success',
                 description: `Created investor and linked account ${accountCode}`,
             });
-            onSuccess();
+            await onSuccess(); // Wait for markAsDone to complete
 
         } catch (error) {
             toast({
@@ -382,18 +422,55 @@ function CreateInvestorForm({ initialName, accountCode, onSuccess, onCancel }: C
 const MissingAccountCard = ({
     account,
     csvFilename,
+    jobId,
     onResolved
 }: {
     account: any;
     csvFilename?: string;
+    jobId: number;
     onResolved: () => void;
 }) => {
     const [isResolving, setIsResolving] = useState(false);
     const [parsedName, setParsedName] = useState<string | null>(null);
     const [loadingName, setLoadingName] = useState(false);
     const [matchedUser, setMatchedUser] = useState<any | null>(null);
+    const [isDone, setIsDone] = useState(account.done || false);
     const apiBaseUrl = getApiBaseUrl();
     const { toast } = useToast();
+
+    // Sync isDone with prop when data refreshes
+    useEffect(() => {
+        setIsDone(account.done || false);
+    }, [account.done]);
+
+    // Mark the account as done in the backend
+    const markAsDone = async () => {
+        try {
+            const res = await fetch(`${apiBaseUrl}/api/v1/etl/jobs/${jobId}/mark-done`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    item_type: 'account',
+                    item_key: account.account_code
+                }),
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({ detail: 'Unknown error' }));
+                throw new Error(errorData.detail || `Failed to mark as done: ${res.status}`);
+            }
+
+            setIsDone(true);
+        } catch (e) {
+            console.error('Failed to mark as done:', e);
+            toast({
+                variant: 'destructive',
+                title: 'Mark as Done Failed',
+                description: e instanceof Error ? e.message : 'Could not mark account as resolved',
+            });
+            throw e; // Re-throw to prevent onResolved from being called
+        }
+    };
 
     const handleLinkExistingUser = async (userId: number) => {
         try {
@@ -415,6 +492,9 @@ const MissingAccountCard = ({
                 title: 'Success',
                 description: `Linked account ${account.account_code} to user`,
             });
+
+            // Mark as done and notify parent - ensure markAsDone completes first
+            await markAsDone();
             onResolved();
         } catch (error) {
             toast({
@@ -441,11 +521,16 @@ const MissingAccountCard = ({
                     console.log('Extract names response:', data);
                     const match = data.names?.find((n: any) => n.account_code === account.account_code);
                     console.log('Match found for', account.account_code, ':', match);
+                    console.log('Parsed name from match:', match?.parsed_name);
 
                     let currentParsedName = null;
                     if (match?.parsed_name) {
                         currentParsedName = match.parsed_name;
                         setParsedName(match.parsed_name);
+                        console.log('✅ Set parsedName to:', match.parsed_name);
+                    } else {
+                        console.warn('⚠️ No parsed_name found for account:', account.account_code);
+                        console.warn('Match object:', match);
                     }
 
                     // Now try to fuzzy match against existing users
@@ -475,6 +560,32 @@ const MissingAccountCard = ({
             }
         }
     };
+
+    // Handle successful investor creation from the form
+    const handleFormSuccess = async () => {
+        await markAsDone();
+        onResolved();
+    };
+
+    // If already done, show completed state
+    if (isDone) {
+        return (
+            <Card className="bg-gray-800 border-green-700 overflow-hidden">
+                <CardContent className="pt-4 pb-3">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <p className="font-semibold text-green-400">{account.account_code}</p>
+                            <p className="text-xs text-gray-400">{account.reason}</p>
+                        </div>
+                        <Badge className="bg-green-600 text-white border-green-500">
+                            <Check className="h-3 w-3 mr-1" />
+                            Completed
+                        </Badge>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card className="bg-gray-800 border-gray-700 overflow-hidden">
@@ -539,7 +650,7 @@ const MissingAccountCard = ({
                                 <CreateInvestorForm
                                     initialName={parsedName || account.account_code}
                                     accountCode={account.account_code}
-                                    onSuccess={onResolved}
+                                    onSuccess={handleFormSuccess}
                                     onCancel={() => setIsResolving(false)}
                                 />
                             )}
@@ -571,6 +682,7 @@ const ETLJobDetails = () => {
     const [newAssetDraft, setNewAssetDraft] = useState<AssetFormState>(defaultAssetFormState);
     const [assetActionError, setAssetActionError] = useState<string | null>(null);
     const [assetActionLoading, setAssetActionLoading] = useState(false);
+    const [currentResolvingAsset, setCurrentResolvingAsset] = useState<any | null>(null);
 
     // Catalogs State
     const [assetClasses, setAssetClasses] = useState<AssetClass[]>([]);
@@ -694,8 +806,26 @@ const ETLJobDetails = () => {
                 className: 'bg-green-600 text-white border-green-700',
             });
 
+            // Mark asset as done in job
+            if (currentResolvingAsset && data?.job_id) {
+                const itemKey = currentResolvingAsset.isin || currentResolvingAsset.symbol;
+                try {
+                    await fetch(`${apiBaseUrl}/api/v1/etl/jobs/${data.job_id}/mark-done`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            item_type: 'asset',
+                            item_key: itemKey
+                        }),
+                    });
+                } catch (e) {
+                    console.error('Failed to mark asset as done:', e);
+                }
+            }
+
             setIsNewAssetOpen(false);
-            fetchJobDetails(); // Refresh to remove the resolved asset
+            setCurrentResolvingAsset(null);
+            fetchJobDetails(); // Refresh to show as completed
 
         } catch (error: any) {
             setAssetActionError(error.message || 'Could not create the asset.');
@@ -705,6 +835,7 @@ const ETLJobDetails = () => {
     };
 
     const openAssetResolution = (asset: any) => {
+        setCurrentResolvingAsset(asset);  // Save reference for mark-done
         setNewAssetDraft({
             ...defaultAssetFormState,
             symbol: asset.symbol || '',
@@ -1013,6 +1144,7 @@ const ETLJobDetails = () => {
                                                 key={index}
                                                 asset={asset}
                                                 index={index}
+                                                jobId={data.job_id}
                                                 onResolve={openAssetResolution}
                                             />
                                         ))}
@@ -1047,6 +1179,7 @@ const ETLJobDetails = () => {
                                                 key={index}
                                                 account={account}
                                                 csvFilename={data.filename}
+                                                jobId={data.job_id}
                                                 onResolved={handleResolveSuccess}
                                             />
                                         ))}
