@@ -181,8 +181,8 @@ REPORT_DISPLAY_INFO = {
         "description": "Historical price data"
     },
     "STATEMENTFUNDS": {
-        "display_name": "Statement Funds",
-        "description": "Account fund statements"
+        "display_name": "Cash Journal",
+        "description": "Dividends, interest, deposits, withdrawals, fees"
     },
     "TRADES": {
         "display_name": "Trades",
@@ -193,7 +193,7 @@ REPORT_DISPLAY_INFO = {
         "description": "All account transactions"
     },
     "TRANSFERS": {
-        "display_name": "Transfers",
+        "display_name": "Transfers (ACATS)",
         "description": "Asset transfers between accounts"
     }
 }
@@ -351,12 +351,69 @@ def get_etl_jobs(
 @router.get("/jobs/{job_id}", response_model=ETLJobLog)
 def get_etl_job(job_id: int, db: Session = Depends(get_db)):
     """
-    Get details of a specific ETL job.
+    Get a specific ETL job by ID.
+    """
+    job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    return job
+
+
+@router.get("/jobs/{job_id}/records")
+def get_etl_job_records(
+    job_id: int,
+    record_type: Optional[str] = Query(None, description="Filter by 'skipped' or 'failed'"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed skipped/failed records for a specific ETL job.
+    
+    Query Parameters:
+    - record_type: 'skipped' or 'failed' (optional, returns both if not specified)
+    
+    Returns:
+    - skipped_records: Array of records that were skipped with reasons
+    - failed_records: Array of records that failed processing with error messages
+    - missing_assets: Summary of assets not found in database
+    - missing_accounts: Summary of accounts not found in database
     """
     job = db.query(ETLJobLogModel).filter(ETLJobLogModel.job_id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
+    
+    extra_data = job.extra_data or {}
+    
+    # Log for debugging
+    logger = logging.getLogger("ETL")
+    logger.info(f"Fetching records for job {job_id}")
+    logger.info(f"Extra data keys: {extra_data.keys()}")
+    logger.info(f"Skipped records count: {len(extra_data.get('skipped_records', []))}")
+    logger.info(f"Failed records count: {len(extra_data.get('failed_records', []))}")
+    
+    response = {
+        "job_id": job.job_id,
+        "job_type": job.job_type,
+        "status": job.status,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "records_processed": job.records_processed,
+        "records_created": job.records_created,
+        "records_skipped": job.records_skipped,
+        "records_failed": job.records_failed,
+        "skipped_records": [],
+        "failed_records": [],
+        "missing_assets": extra_data.get("missing_assets", []),
+        "missing_accounts": extra_data.get("missing_accounts", [])
+    }
+    
+    # Filter based on record_type parameter
+    if record_type is None or record_type == "skipped":
+        response["skipped_records"] = extra_data.get("skipped_records", [])
+    
+    if record_type is None or record_type == "failed":
+        response["failed_records"] = extra_data.get("failed_records", [])
+    
+    return response
 
 
 @router.post("/trigger", response_model=ETLTriggerResponse)
@@ -408,7 +465,6 @@ def _run_single_etl_job(job_id: int, report_type: str):
     """
     from app.db.session import SessionLocal
     from app.jobs.downloader import IBKRDownloader
-    from app.jobs.db_client import DBClient, reset_db_client
     from pathlib import Path
     
     db = SessionLocal()
@@ -441,31 +497,71 @@ def _run_single_etl_job(job_id: int, report_type: str):
         db.commit()
         
         # 2. Process the file based on report type
-        # Use a fresh DB client for processing (avoids HTTP deadlocks)
-        reset_db_client()
-        
         result = {"status": "success", "records_processed": 0, "records_created": 0, "records_failed": 0}
         
         if report_type == "CORPORATES":
             from app.jobs.processors.corporate_actions import CorporateActionsProcessor
-            from app.jobs.db_client import DBClient
+            from app.jobs.api_client import get_api_client
             
-            with DBClient() as db_client:
-                processor = CorporateActionsProcessor(db_client)
-                result = processor.process_file(file_path)
+            api_client = get_api_client()
+            processor = CorporateActionsProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
         
         elif report_type == "OPENPOSITIONS":
             from app.jobs.processors.open_positions import OpenPositionsProcessor
-            from app.jobs.db_client import DBClient
+            from app.jobs.api_client import get_api_client
             
-            with DBClient() as db_client:
-                processor = OpenPositionsProcessor(db_client)
-                result = processor.process_file(file_path)
+            api_client = get_api_client()
+            processor = OpenPositionsProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
+        
+        elif report_type == "STATEMENTFUNDS":
+            from app.jobs.processors.cash_journal import CashJournalProcessor
+            from app.jobs.api_client import get_api_client
+            
+            api_client = get_api_client()
+            processor = CashJournalProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
+        
+        elif report_type == "TRANSFERS":
+            from app.jobs.processors.transfers import TransfersProcessor
+            from app.jobs.api_client import get_api_client
+            
+            api_client = get_api_client()
+            processor = TransfersProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
+        
+        elif report_type == "TRADES":
+            from app.jobs.processors.trades import TradesProcessor
+            from app.jobs.api_client import get_api_client
+            import csv
+            
+            # Read CSV file
+            rows = []
+            with open(file_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+            
+            # Process with APIClient
+            api_client = get_api_client()
+            processor = TradesProcessor(api_client=api_client)
+            result = processor.process(rows)
+            
+            # Map result to expected format
+            stats = result.get("stats", {})
+            result = {
+                "status": "success",
+                "records_processed": stats.get("trades_created", 0) + stats.get("fx_created", 0) + stats.get("trades_skipped", 0) + stats.get("fx_skipped", 0),
+                "records_created": stats.get("trades_created", 0) + stats.get("fx_created", 0),
+                "records_skipped": stats.get("trades_skipped", 0) + stats.get("fx_skipped", 0),
+                "records_failed": stats.get("errors", 0),
+                "missing_assets": result.get("missing_assets", []),
+                "missing_accounts": result.get("missing_accounts", []),
+                "skipped_records": result.get("skipped_records", []),
+                "failed_records": result.get("failed_records", []),
+            }
         
         # TODO: Add other report type processors here
-        # elif report_type == "TRADES":
-        #     processor = TradesProcessor()
-        #     result = processor.process_file(file_path)
         else:
             logger.warning(f"No processor implemented for {report_type}")
             result = {
@@ -477,19 +573,30 @@ def _run_single_etl_job(job_id: int, report_type: str):
             }
         
         # 3. Update job log
-        job.status = result.get("status", "success")
         job.completed_at = datetime.now()
+        # Update job stats
         job.records_processed = result.get("records_processed", 0)
         job.records_created = result.get("records_created", 0)
         job.records_updated = result.get("records_updated", 0)
-        job.records_failed = result.get("records_failed", 0)
         job.records_skipped = result.get("records_skipped", 0)
+        job.records_failed = result.get("records_failed", 0)
+        job.status = result.get("status", "success")
         
-        if result.get("errors"):
-            job.error_details = result.get("errors")
+        # Auto-mark successful jobs as done, failed/partial jobs need user review
+        if job.status == "success":
+            job.done = True
+        else:
+            job.done = False
+        
+        job.file_name = result.get("file_name", job.file_name) # Keep existing if not in result
+        job.file_size_bytes = result.get("file_size_bytes", job.file_size_bytes) # Keep existing if not in result
+        job.error_message = result.get("error_message")
+        job.error_details = result.get("error_details")
         
         if result.get("created_assets"):
             job.created_assets = [{"symbol": s} for s in result.get("created_assets", [])]
+        else:
+            job.created_assets = None # Clear if not present
         
         # Store missing assets/accounts in extra_data for frontend to display
         extra_data = {}
@@ -497,13 +604,21 @@ def _run_single_etl_job(job_id: int, report_type: str):
             extra_data["missing_assets"] = result.get("missing_assets")
         if result.get("missing_accounts"):
             extra_data["missing_accounts"] = result.get("missing_accounts")
+        if result.get("skipped_records"):
+            extra_data["skipped_records"] = result.get("skipped_records", [])
+        if result.get("failed_records"):
+            extra_data["failed_records"] = result.get("failed_records", [])
         if extra_data:
             job.extra_data = extra_data
+        else:
+            job.extra_data = None # Clear if not present
         
         if job.started_at and job.completed_at:
             job.execution_time_seconds = Decimal(str((job.completed_at - job.started_at).total_seconds()))
         
         db.commit()
+        db.refresh(job)
+        
         logger.info(f"ETL job {job_id} completed: {result}")
         
     except Exception as e:
@@ -520,7 +635,6 @@ def _run_single_etl_job(job_id: int, report_type: str):
             db.commit()
     finally:
         db.close()
-        reset_db_client()
 
 
 async def _run_etl_job_with_logging(job_id: int, report_type: str):

@@ -1,9 +1,10 @@
 """
 Schemas para el sistema de ETL monitoring.
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
+import json
 
 
 # ==========================================================================
@@ -26,7 +27,7 @@ class ETLJobLogCreate(ETLJobLogBase):
     started_at: datetime
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
-    error_details: Optional[List[Dict[str, Any]]] = None
+    error_details: Optional[Dict[str, Any]] = None
     execution_time_seconds: Optional[float] = None
 
 
@@ -36,10 +37,59 @@ class ETLJobLog(ETLJobLogBase):
     completed_at: Optional[datetime] = None
     file_size_bytes: Optional[int] = None
     error_message: Optional[str] = None
-    error_details: Optional[List[Dict[str, Any]]] = None
+    error_details: Optional[Dict[str, Any]] = None
     execution_time_seconds: Optional[float] = None
     created_assets: Optional[List[Dict[str, Any]]] = None
     extra_data: Optional[Dict[str, Any]] = None
+    done: bool = False
+
+    @field_validator('error_details', mode='before')
+    @classmethod
+    def parse_error_details(cls, v):
+        """Parse error_details if it's a JSON string."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                # Ensure it's a list
+                return parsed if isinstance(parsed, list) else None
+            except (json.JSONDecodeError, ValueError):
+                # If JSON is malformed/truncated, return empty list instead of failing
+                return []
+        return v
+
+    @field_validator('extra_data', mode='before')
+    @classmethod
+    def parse_extra_data(cls, v):
+        """Parse extra_data if it's a JSON string."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                # Ensure it's a dict
+                return parsed if isinstance(parsed, dict) else None
+            except (json.JSONDecodeError, ValueError):
+                # If JSON is malformed/truncated, return empty dict
+                return {}
+        return v
+    
+    @field_validator('created_assets', mode='before')
+    @classmethod
+    def parse_created_assets(cls, v):
+        """Parse created_assets if it's a JSON string."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                # Ensure it's a list
+                return parsed if isinstance(parsed, list) else None
+            except (json.JSONDecodeError, ValueError):
+                # If JSON is malformed/truncated, return empty list
+                return []
+        return v
 
     class Config:
         from_attributes = True

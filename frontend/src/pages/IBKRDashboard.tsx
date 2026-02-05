@@ -32,7 +32,7 @@ import {
   Layers,
   ChevronRight,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Tooltip,
   TooltipContent,
@@ -79,6 +79,7 @@ interface ETLActivityLog {
   report_type?: string;
   extra_data?: {
     missing_assets?: Array<{ symbol: string }>;
+    missing_accounts?: Array<{ account_code: string; reason: string }>;
   };
 }
 
@@ -261,8 +262,18 @@ const ReportStatusCard = ({
 );
 
 const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
-  const isOpenPositions = log.job_type === 'OPENPOSITIONS' || log.report_type === 'OPENPOSITIONS';
+  const navigate = useNavigate();
+  
+  // Show missing assets link for jobs that track them
+  const jobsWithMissingAssets = ['OPENPOSITIONS', 'STATEMENTFUNDS'];
+  const canHaveMissingAssets = jobsWithMissingAssets.includes(log.job_type) || 
+                               (log.report_type && jobsWithMissingAssets.includes(log.report_type));
   const hasMissingAssets = Boolean(log.extra_data?.missing_assets && log.extra_data.missing_assets.length > 0);
+  const hasMissingAccounts = Boolean(log.extra_data?.missing_accounts && log.extra_data.missing_accounts.length > 0);
+  const hasSkippedOrFailed = (log.records_skipped || 0) > 0 || (log.records_failed || 0) > 0;
+  
+  // Support both 'error_message' and 'error' fields from backend
+  const errorText = log.error_message || (log as any).error;
 
   return (
     <div className="flex items-start gap-3 py-3">
@@ -271,7 +282,16 @@ const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <p className="font-medium text-sm">{log.job_type} job id #{log.job_id}</p>
-            {isOpenPositions && hasMissingAssets && (
+            {hasSkippedOrFailed && (
+              <button
+                onClick={() => navigate(`/etl-job/${log.job_id}`)}
+                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
+              >
+                View details
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            )}
+            {canHaveMissingAssets && hasMissingAssets && (
               <Link
                 to={`/assets?show_missing=true&job_id=${log.job_id}`}
                 className="inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 underline-offset-2 hover:underline"
@@ -279,6 +299,11 @@ const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
                 View missing assets
                 <ChevronRight className="h-3 w-3" />
               </Link>
+            )}
+            {hasMissingAccounts && (
+              <span className="text-xs text-amber-600" title={`Missing accounts: ${log.extra_data?.missing_accounts?.map(a => a.account_code).join(', ')}`}>
+                ({log.extra_data?.missing_accounts?.length} missing accounts)
+              </span>
             )}
           </div>
           <span className="text-xs text-muted-foreground">
@@ -314,9 +339,9 @@ const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
             </span>
           )}
         </div>
-        {log.error_message && (
-          <p className="text-xs text-red-500 mt-1 line-clamp-1">
-            {log.error_message}
+        {errorText && (
+          <p className="text-xs text-red-500 mt-1 font-mono bg-red-50 p-2 rounded border border-red-200" title={errorText}>
+            {errorText.length > 100 ? `${errorText.substring(0, 100)}...` : errorText}
           </p>
         )}
       </div>
@@ -524,9 +549,11 @@ const IBKRDashboard = () => {
                 <ScrollArea className="h-[400px]">
                   {data?.recent_activity && data.recent_activity.length > 0 ? (
                     <div className="divide-y">
-                      {data.recent_activity.map((log) => (
-                        <ActivityLogItem key={log.job_id} log={log} />
-                      ))}
+                      {data.recent_activity
+                        .filter(log => log.job_type !== 'PERSHING')
+                        .map((log) => (
+                          <ActivityLogItem key={log.job_id} log={log} />
+                        ))}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">

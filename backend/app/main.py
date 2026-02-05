@@ -11,7 +11,7 @@ from app.api.deps import engine
 from app.models import user, portfolio, asset 
 
 app = FastAPI(
-    title="WealthRoad API",
+    title="NewroadAI API",
     description="Backend ERP de Gestión Patrimonial",
     version="1.0.0",
     docs_url="/docs",

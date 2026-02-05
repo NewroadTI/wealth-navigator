@@ -17,7 +17,7 @@ export interface MissingAsset {
 
 export interface ETLNotification {
   id: string;
-  type: 'missing_assets' | 'error' | 'warning' | 'info';
+  type: 'missing_assets' | 'error' | 'warning' | 'info' | 'persh_import_error';
   title: string;
   message: string;
   timestamp: string;
@@ -27,6 +27,7 @@ export interface ETLNotification {
     job_type?: string;
     missing_assets?: MissingAsset[];
     missing_accounts?: Array<{ account_code: string; reason: string }>;
+    filename?: string;  // For Pershing imports
   };
 }
 
@@ -39,6 +40,8 @@ interface NotificationsContextType {
   markAllAsRead: () => void;
   clearNotification: (id: string) => void;
   refreshNotifications: () => Promise<void>;
+  addNotification: (notification: Omit<ETLNotification, 'id' | 'timestamp' | 'read'>) => void;
+  markJobAsDone: (jobId: number) => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
@@ -50,20 +53,23 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const fetchETLNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch latest ETL jobs that might have missing assets
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/etl/jobs?limit=10`);
+      // Fetch latest ETL jobs that are NOT done (filter by done=false)
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/etl/jobs?limit=50`);
       if (!response.ok) return;
-      
+
       const jobs = await response.json();
       const newNotifications: ETLNotification[] = [];
-      
+
       for (const job of jobs) {
+        // Skip jobs that are already marked as done
+        if (job.done) continue;
+
         // Check for missing assets
         if (job.extra_data?.missing_assets && job.extra_data.missing_assets.length > 0) {
           const existingNotification = notifications.find(
             n => n.data?.job_id === job.job_id && n.type === 'missing_assets'
           );
-          
+
           newNotifications.push({
             id: `job-${job.job_id}-missing-assets`,
             type: 'missing_assets',
@@ -79,33 +85,56 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             },
           });
         }
-        
-        // Check for failed jobs
-        if (job.status === 'failed' && job.error_message) {
+
+        // Check for missing accounts
+        if (job.extra_data?.missing_accounts && job.extra_data.missing_accounts.length > 0) {
+          const existingNotification = notifications.find(
+            n => n.data?.job_id === job.job_id && n.type === 'persh_import_error'
+          );
+
+          newNotifications.push({
+            id: `job-${job.job_id}-missing-accounts`,
+            type: 'persh_import_error',
+            title: `${job.extra_data.missing_accounts.length} Accounts Not Found`,
+            message: `ETL job "${job.job_name}" found ${job.extra_data.missing_accounts.length} transactions for unknown accounts.`,
+            timestamp: job.completed_at || job.started_at,
+            read: existingNotification?.read || false,
+            data: {
+              job_id: job.job_id,
+              job_type: job.job_type,
+              missing_accounts: job.extra_data.missing_accounts,
+              filename: job.file_name
+            },
+          });
+        }
+
+        // Check for failed/partial jobs
+        if ((job.status === 'failed' || job.status === 'partial') && job.error_message) {
           const existingNotification = notifications.find(
             n => n.data?.job_id === job.job_id && n.type === 'error'
           );
-          
+
           newNotifications.push({
             id: `job-${job.job_id}-error`,
             type: 'error',
-            title: `ETL Job Failed`,
+            title: job.status === 'partial' ? `ETL Job Completed with Warnings` : `ETL Job Failed`,
             message: job.error_message,
             timestamp: job.completed_at || job.started_at,
             read: existingNotification?.read || false,
             data: {
               job_id: job.job_id,
               job_type: job.job_type,
+              missing_accounts: job.extra_data?.missing_accounts,
             },
           });
         }
       }
-      
+
       // Sort by timestamp descending
-      newNotifications.sort((a, b) => 
+      newNotifications.sort((a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
-      
+
       setNotifications(newNotifications);
     } catch (error) {
       console.error('Failed to fetch ETL notifications:', error);
@@ -117,14 +146,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // Initial fetch
   useEffect(() => {
     fetchETLNotifications();
-    
+
     // Poll every 30 seconds
     const interval = setInterval(fetchETLNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const markAsRead = useCallback((id: string) => {
-    setNotifications(prev => 
+    setNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, read: true } : n)
     );
   }, []);
@@ -140,6 +169,33 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const refreshNotifications = useCallback(async () => {
     await fetchETLNotifications();
   }, [fetchETLNotifications]);
+
+  // Add a new notification (for Pershing imports and other manual additions)
+  const addNotification = useCallback((notification: Omit<ETLNotification, 'id' | 'timestamp' | 'read'>) => {
+    const newNotification: ETLNotification = {
+      ...notification,
+      id: `manual-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+  }, []);
+
+  const markJobAsDone = useCallback(async (jobId: number) => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/etl/jobs/${jobId}/mark-done`, {
+        method: 'PATCH',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to mark job as done');
+      }
+      // Remove notifications associated with this job
+      setNotifications(prev => prev.filter(n => n.data?.job_id !== jobId));
+    } catch (error) {
+      console.error('Failed to mark job as done:', error);
+      throw error;
+    }
+  }, []);
 
   // Aggregate all missing assets from recent notifications
   const missingAssets = notifications
@@ -159,6 +215,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         markAllAsRead,
         clearNotification,
         refreshNotifications,
+        addNotification,
+        markJobAsDone,
       }}
     >
       {children}

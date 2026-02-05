@@ -22,6 +22,7 @@ import CRM from "./pages/CRM";
 import StructuredNotes from "./pages/StructuredNotes";
 import IBKRDashboard from "./pages/IBKRDashboard";
 import PershingDashboard from "./pages/PershingDashboard";
+import ETLJobDetails from "./pages/ETLJobDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,10 +51,12 @@ const App = () => (
               <Route path="/basic-data" element={<BasicData />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/crm" element={<CRM />} />
-              
+
               {/* Rutas ETL específicas (basadas en los imports disponibles) */}
               <Route path="/etl/ibkr" element={<IBKRDashboard />} />
               <Route path="/etl/pershing" element={<PershingDashboard />} />
+              <Route path="/etl-job/:jobId" element={<ETLJobDetails />} />
+
               
               <Route path="*" element={<NotFound />} />
             </Routes>

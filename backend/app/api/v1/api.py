@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import utils, users, auth, catalogs, assets, roles, transactions, portfolios, accounts, positions, analytics, etl
+from app.api.v1.endpoints import utils, users, auth, catalogs, assets, roles, transactions, portfolios, accounts, positions, analytics, etl, persh_etl, persh_accounts
 
 api_router = APIRouter()
 
@@ -16,6 +16,9 @@ api_router.include_router(accounts.router, prefix="/accounts", tags=["accounts"]
 api_router.include_router(positions.router, prefix="/positions", tags=["Positions"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics & Reports"])
 api_router.include_router(etl.router, prefix="/etl", tags=["ETL & Data Import"])
+api_router.include_router(persh_etl.router, prefix="/persh-etl", tags=["Pershing ETL"])
+api_router.include_router(persh_accounts.router, prefix="/persh-accounts", tags=["Pershing Account Resolution"])
 # Estas aparecerán apenas crees los archivos correspondientes
 # api_router.include_router(portfolios.router, prefix="/portfolios", tags=["Portfolios"])
 # api_router.include_router(transactions.router, prefix="/transactions", tags=["Transacciones & ETL"])
+

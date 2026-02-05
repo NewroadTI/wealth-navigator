@@ -45,27 +45,27 @@ interface ColumnDef {
   getValue: (data: AnyTransaction) => string | number | null | undefined;
 }
 
-// All available columns organized by data
+// All available columns organized by data (synced with database models)
 const ALL_COLUMNS: ColumnDef[] = [
   // Common columns
   {
     key: 'table_type', label: 'Type', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
-      if ('transaction_id' in d && 'side' in d) return `trade/${(d as Trade).side.toLowerCase()}`;
+      if ('transaction_id' in d && 'side' in d) return `trade/${(d as Trade).side?.toLowerCase() || 'unknown'}`;
       if ('journal_id' in d) return `cj:${(d as CashJournal).type.toLowerCase()}`;
       if ('fx_id' in d) return 'fx/fxtrade';
-      if ('action_id' in d) return `ca:${(d as CorporateAction).action_type.toLowerCase()}`;
+      if ('action_id' in d) return `ca:${(d as CorporateAction).action_type?.toLowerCase() || 'unknown'}`;
       return '';
     }
   },
   { key: 'portfolio', label: 'Portfolio', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: () => '' },
   {
-    key: 'account_id', label: 'Account ID', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+    key: 'account_id', label: 'Account', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
       if ('account_id' in d) return (d as any).account_id || '';
       return '';
     }
   },
   {
-    key: 'asset_id', label: 'Asset ID', tables: ['Trade', 'CashJournal', 'CorporateAction'], getValue: (d) => {
+    key: 'asset_id', label: 'Asset', tables: ['Trade', 'CashJournal', 'CorporateAction'], getValue: (d) => {
       if ('asset_id' in d) return (d as any).asset_id || '';
       return '';
     }
@@ -102,7 +102,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   },
   // Description
   {
-    key: 'description', label: 'Description', tables: ['Trade', 'CashJournal', 'FX', 'CorporateAction'], getValue: (d) => {
+    key: 'description', label: 'Description', tables: ['Trade', 'CashJournal', 'CorporateAction'], getValue: (d) => {
       if ('description' in d) return (d as any).description || '';
       return '';
     }
@@ -126,19 +126,44 @@ const ALL_COLUMNS: ColumnDef[] = [
   },
 
   // Trade-specific columns
+  { key: 'ib_transaction_id', label: 'IB Trans ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_transaction_id || '' },
+  { key: 'ib_exec_id', label: 'IB Exec ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_exec_id || '' },
+  { key: 'ib_trade_id', label: 'IB Trade ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_trade_id || '' },
+  { key: 'ib_order_id', label: 'IB Order ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_order_id || '' },
   { key: 'settlement_date', label: 'Settlement Date', tables: ['Trade'], getValue: (d) => (d as Trade).settlement_date || '' },
-  { key: 'report_date', label: 'Report Date', tables: ['Trade'], getValue: (d) => (d as Trade).report_date || '' },
+  { key: 'report_date', label: 'Report Date', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
+    if ('transaction_id' in d) return (d as Trade).report_date || '';
+    if ('action_id' in d) return (d as CorporateAction).report_date || '';
+    return '';
+  }},
+  { key: 'transaction_type', label: 'Transaction Type', tables: ['Trade'], getValue: (d) => (d as Trade).transaction_type || '' },
+  { key: 'exchange', label: 'Exchange', tables: ['Trade'], getValue: (d) => (d as Trade).exchange || '' },
   { key: 'price', label: 'Price', tables: ['Trade'], getValue: (d) => (d as Trade).price || '' },
   { key: 'gross_amount', label: 'Gross Amount', tables: ['Trade'], getValue: (d) => (d as Trade).gross_amount || '' },
   { key: 'net_amount', label: 'Net Amount', tables: ['Trade'], getValue: (d) => (d as Trade).net_amount || '' },
+  { key: 'proceeds', label: 'Proceeds', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
+    if ('transaction_id' in d) return (d as Trade).proceeds || '';
+    if ('action_id' in d) return (d as CorporateAction).proceeds || '';
+    return '';
+  }},
   { key: 'commission', label: 'Commission', tables: ['Trade'], getValue: (d) => (d as Trade).commission || '' },
   { key: 'tax', label: 'Tax', tables: ['Trade'], getValue: (d) => (d as Trade).tax || '' },
-  { key: 'ib_exec_id', label: 'IB Exec ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_exec_id || '' },
+  { key: 'cost_basis', label: 'Cost Basis', tables: ['Trade'], getValue: (d) => (d as Trade).cost_basis || '' },
+  { key: 'realized_pnl', label: 'Realized P&L', tables: ['Trade'], getValue: (d) => (d as Trade).realized_pnl || '' },
+  { key: 'mtm_pnl', label: 'MTM P&L', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
+    if ('transaction_id' in d) return (d as Trade).mtm_pnl || '';
+    if ('action_id' in d) return (d as CorporateAction).mtm_pnl || '';
+    return '';
+  }},
+  { key: 'notes', label: 'Notes', tables: ['Trade'], getValue: (d) => (d as Trade).notes || '' },
 
   // Cash Journal-specific columns
   { key: 'ex_date', label: 'Ex Date', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).ex_date || '' },
   { key: 'cash_type', label: 'Cash Type', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).type || '' },
   { key: 'rate_per_share', label: 'Rate Per Share', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).rate_per_share || '' },
+  { key: 'reference_code', label: 'Reference Code', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).reference_code || '' },
+  { key: 'external_transaction_id', label: 'External Trans ID', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).external_transaction_id || '' },
+  { key: 'action_id_cj', label: 'Action ID', tables: ['CashJournal'], getValue: (d) => (d as CashJournal).action_id || '' },
 
   // FX-specific columns
   { key: 'source_currency', label: 'Source Currency', tables: ['FX'], getValue: (d) => (d as FxTransaction).source_currency || '' },
@@ -146,15 +171,23 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'target_currency', label: 'Target Currency', tables: ['FX'], getValue: (d) => (d as FxTransaction).target_currency || '' },
   { key: 'target_amount', label: 'Target Amount', tables: ['FX'], getValue: (d) => (d as FxTransaction).target_amount || '' },
   { key: 'exchange_rate', label: 'Exchange Rate', tables: ['FX'], getValue: (d) => (d as FxTransaction).exchange_rate || '' },
-  { key: 'target_account_id', label: 'Target Account ID', tables: ['FX'], getValue: (d) => (d as FxTransaction).target_account_id || '' },
+  { key: 'target_account_id', label: 'Target Account', tables: ['FX'], getValue: (d) => (d as FxTransaction).target_account_id || '' },
   { key: 'external_id', label: 'External ID', tables: ['FX'], getValue: (d) => (d as FxTransaction).external_id || '' },
 
   // Corporate Action-specific columns
+  { key: 'ib_action_id', label: 'IB Action ID', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).ib_action_id || '' },
+  { key: 'ca_transaction_id', label: 'Transaction ID', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).transaction_id || '' },
   { key: 'action_type', label: 'Action Type', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).action_type || '' },
+  { key: 'execution_date', label: 'Execution Date', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).execution_date || '' },
   { key: 'ratio_old', label: 'Ratio Old', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).ratio_old || '' },
   { key: 'ratio_new', label: 'Ratio New', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).ratio_new || '' },
   { key: 'symbol', label: 'Symbol', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).symbol || '' },
   { key: 'isin', label: 'ISIN', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).isin || '' },
+  { key: 'cusip', label: 'CUSIP', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).cusip || '' },
+  { key: 'security_id', label: 'Security ID', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).security_id || '' },
+  { key: 'security_id_type', label: 'Security ID Type', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).security_id_type || '' },
+  { key: 'ca_value', label: 'Value', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).value || '' },
+  { key: 'fifo_pnl_realized', label: 'FIFO P&L Realized', tables: ['CorporateAction'], getValue: (d) => (d as CorporateAction).fifo_pnl_realized || '' },
 ];
 
 // Default visible columns (exported for use in ColumnConfigurator)
@@ -192,6 +225,8 @@ const Transactions = () => {
   // Filters
   const [selectedTypes, setSelectedTypes] = useState<string[]>(transactionTypeFilters);
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all');
+  const [portfolioSearchInput, setPortfolioSearchInput] = useState('');
+  const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<string>('');
   const [assetSearchInput, setAssetSearchInput] = useState('');
   const [assetDropdownOpen, setAssetDropdownOpen] = useState(false);
@@ -517,6 +552,16 @@ const Transactions = () => {
     );
   }, [availableAssets, assetSearchInput]);
 
+  // Filter portfolios based on search input
+  const filteredPortfolios = useMemo(() => {
+    if (!portfolioSearchInput) return portfoliosSimple;
+    const searchLower = portfolioSearchInput.toLowerCase();
+    return portfoliosSimple.filter((p) =>
+      p.name.toLowerCase().includes(searchLower) ||
+      (p.interface_code && p.interface_code.toLowerCase().includes(searchLower))
+    );
+  }, [portfoliosSimple, portfolioSearchInput]);
+
   // Get column value for a transaction with optimized lookups
   const getColumnValue = (transaction: TransactionDisplay, columnKey: string): string => {
     const data = transaction.data;
@@ -772,18 +817,72 @@ const Transactions = () => {
 
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
-          {/* Portfolio Filter */}
-          <Select value={selectedPortfolio} onValueChange={(v) => { setSelectedPortfolio(v); setCurrentPage(1); }}>
-            <SelectTrigger className="w-full sm:w-48 md:w-56 bg-muted/50 border-border text-xs md:text-sm h-8 md:h-9">
-              <SelectValue placeholder="Portfolio" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Portfolios</SelectItem>
-              {portfoliosSimple.map((p) => (
-                <SelectItem key={p.portfolio_id} value={String(p.portfolio_id)}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Portfolio Filter - Searchable */}
+          <Popover open={portfolioDropdownOpen} onOpenChange={setPortfolioDropdownOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full sm:w-48 md:w-56 bg-muted/50 border-border text-xs md:text-sm h-8 md:h-9 justify-between">
+                <span className="truncate">
+                  {selectedPortfolio === 'all'
+                    ? 'All Portfolios'
+                    : portfoliosSimple.find(p => String(p.portfolio_id) === selectedPortfolio)?.name || 'Portfolio'}
+                </span>
+                <Filter className="h-3.5 w-3.5 ml-2 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="start">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs mb-2 block">Search Portfolio</Label>
+                  <Input
+                    type="text"
+                    placeholder="Type portfolio name..."
+                    value={portfolioSearchInput}
+                    onChange={(e) => setPortfolioSearchInput(e.target.value)}
+                    className="h-8 text-xs bg-muted/50 border-border"
+                  />
+                </div>
+                <div>
+                  <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded p-2">
+                    <button
+                      onClick={() => {
+                        setSelectedPortfolio('all');
+                        setPortfolioSearchInput('');
+                        setPortfolioDropdownOpen(false);
+                        setCurrentPage(1);
+                      }}
+                      className={cn(
+                        "w-full text-left px-2 py-1.5 text-xs rounded transition-colors",
+                        selectedPortfolio === 'all' ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/10'
+                      )}
+                    >
+                      All Portfolios
+                    </button>
+                    {filteredPortfolios.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-2">No portfolios found</p>
+                    ) : (
+                      filteredPortfolios.map((p) => (
+                        <button
+                          key={p.portfolio_id}
+                          onClick={() => {
+                            setSelectedPortfolio(String(p.portfolio_id));
+                            setPortfolioSearchInput('');
+                            setPortfolioDropdownOpen(false);
+                            setCurrentPage(1);
+                          }}
+                          className={cn(
+                            "w-full text-left px-2 py-1.5 text-xs rounded transition-colors",
+                            selectedPortfolio === String(p.portfolio_id) ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/10'
+                          )}
+                        >
+                          {p.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* Asset Class Filter */}
           <Select
