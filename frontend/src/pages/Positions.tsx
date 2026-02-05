@@ -8,11 +8,55 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/config';
 
 const ITEMS_PER_PAGE = 15;
 // getApiBaseUrl() returns the API URL with runtime protocol detection
+
+// Sortable header component
+const SortableHeader = ({ 
+  column, 
+  label, 
+  sortColumn, 
+  sortDirection, 
+  onSort, 
+  align = 'left' 
+}: { 
+  column: string; 
+  label: string; 
+  sortColumn: string | null; 
+  sortDirection: 'asc' | 'desc'; 
+  onSort: (column: string) => void; 
+  align?: 'left' | 'right' | 'center';
+}) => {
+  const isActive = sortColumn === column;
+  const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
+  
+  return (
+    <th 
+      className={cn(
+        alignClass, 
+        "cursor-pointer hover:bg-muted/50 transition-colors select-none",
+        isActive && "bg-muted/30"
+      )}
+      onClick={() => onSort(column)}
+    >
+      <div className={cn("flex items-center gap-1", align === 'right' && "justify-end", align === 'center' && "justify-center")}>
+        <span>{label}</span>
+        {isActive ? (
+          sortDirection === 'asc' ? (
+            <ArrowUp className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
+        )}
+      </div>
+    </th>
+  );
+};
 
 interface AggregatedAsset {
   asset_id: number;
@@ -22,6 +66,7 @@ interface AggregatedAsset {
   avg_cost_price: number;
   current_mark_price: number;
   total_market_value: number;
+  total_cost_basis_money: number;
   total_pnl_unrealized: number;
   day_change_pct: number;
   // Distribución de rendimiento
@@ -38,12 +83,15 @@ interface AggregatedAsset {
     user_name: string | null;
     quantity: number | null;
     avg_cost_price: number | null;
+    cost_basis_money: number | null;
     market_price: number | null;
     market_value: number | null;
     unrealized_pnl: number | null;
     day_change_pct: number | null;
+    fx_rate_to_base: number | null;
   }>;
   account_ids: number[];
+  fx_rate_to_base: number;
 }
 
 interface TopMover {
@@ -75,6 +123,8 @@ const Positions = () => {
   const [tableSearchQuery, setTableSearchQuery] = useState('');
   const [selectedAssetInTable, setSelectedAssetInTable] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Data State
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
@@ -123,7 +173,26 @@ const Positions = () => {
         const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/positions-report?${params}`);
         if (!response.ok) throw new Error('Failed to load positions');
         const data = await response.json();
-        setPositions(data);
+        
+        // Apply fx_rate_to_base transformation to all monetary values
+        const transformedData = data.map((asset: AggregatedAsset) => ({
+          ...asset,
+          avg_cost_price: asset.avg_cost_price * (asset.fx_rate_to_base || 1),
+          total_cost_basis_money: asset.total_cost_basis_money * (asset.fx_rate_to_base || 1),
+          current_mark_price: asset.current_mark_price * (asset.fx_rate_to_base || 1),
+          total_market_value: asset.total_market_value * (asset.fx_rate_to_base || 1),
+          total_pnl_unrealized: asset.total_pnl_unrealized * (asset.fx_rate_to_base || 1),
+          institutions: asset.institutions.map(inst => ({
+            ...inst,
+            avg_cost_price: (inst.avg_cost_price ?? 0) * (inst.fx_rate_to_base ?? 1),
+            cost_basis_money: (inst.cost_basis_money ?? 0) * (inst.fx_rate_to_base ?? 1),
+            market_price: (inst.market_price ?? 0) * (inst.fx_rate_to_base ?? 1),
+            market_value: (inst.market_value ?? 0) * (inst.fx_rate_to_base ?? 1),
+            unrealized_pnl: (inst.unrealized_pnl ?? 0) * (inst.fx_rate_to_base ?? 1),
+          }))
+        }));
+        
+        setPositions(transformedData);
       } catch (err) {
         console.error('Error loading positions:', err);
         setError('Failed to load positions');
@@ -170,6 +239,18 @@ const Positions = () => {
     );
   }, [filterOptions?.assets, assetSearchQuery]);
 
+  // Handle column sorting
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to descending
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
   // Filter positions by table search (NOT by selected asset - selection only expands)
   const filteredPositions = useMemo(() => {
     let result = [...positions];
@@ -187,11 +268,72 @@ const Positions = () => {
       );
     }
 
-    // Ordenar por número de accounts (mayor a menor)
-    result.sort((a, b) => b.institutions.length - a.institutions.length);
+    // Apply sorting
+    if (sortColumn) {
+      result.sort((a, b) => {
+        let aVal: any;
+        let bVal: any;
+
+        switch (sortColumn) {
+          case 'symbol':
+            aVal = a.asset_symbol;
+            bVal = b.asset_symbol;
+            break;
+          case 'quantity':
+            aVal = a.total_quantity;
+            bVal = b.total_quantity;
+            break;
+          case 'avg_cost':
+            aVal = a.avg_cost_price;
+            bVal = b.avg_cost_price;
+            break;
+          case 'cost_basis':
+            aVal = a.total_cost_basis_money;
+            bVal = b.total_cost_basis_money;
+            break;
+          case 'market_price':
+            aVal = a.current_mark_price;
+            bVal = b.current_mark_price;
+            break;
+          case 'market_value':
+            aVal = a.total_market_value;
+            bVal = b.total_market_value;
+            break;
+          case 'pnl':
+            aVal = a.total_pnl_unrealized;
+            bVal = b.total_pnl_unrealized;
+            break;
+          case 'day_change':
+            aVal = a.day_change_pct || 0;
+            bVal = b.day_change_pct || 0;
+            break;
+          case 'accounts':
+            aVal = a.institutions.length;
+            bVal = b.institutions.length;
+            break;
+          default:
+            return 0;
+        }
+
+        // Handle string comparison
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          return sortDirection === 'asc' 
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        }
+
+        // Handle numeric comparison
+        const aNum = Number(aVal) || 0;
+        const bNum = Number(bVal) || 0;
+        return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+      });
+    } else {
+      // Default sort: by number of accounts (mayor a menor)
+      result.sort((a, b) => b.institutions.length - a.institutions.length);
+    }
 
     return result;
-  }, [positions, tableSearchQuery]);
+  }, [positions, tableSearchQuery, sortColumn, sortDirection]);
 
   // Paginate
   const totalPages = Math.ceil(filteredPositions.length / ITEMS_PER_PAGE);
@@ -506,15 +648,16 @@ const Positions = () => {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Asset</th>
-                  <th className="text-right">Qty</th>
-                  <th className="text-right">Avg Price</th>
-                  <th className="text-right">Market Price</th>
-                  <th className="text-right">Market Value</th>
-                  <th className="text-right">Unrealized P&L</th>
+                  <SortableHeader column="symbol" label="Asset" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                  <SortableHeader column="quantity" label="Qty" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="avg_cost" label="Avg Price" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="cost_basis" label="Cost Basis" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="market_price" label="Market Price" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="market_value" label="Market Value" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="pnl" label="Unrealized P&L" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
                   <th className="text-center">Distribution</th>
-                  <th className="text-right">Day Chg %</th>
-                  <th className="text-right">Accounts</th>
+                  <SortableHeader column="day_change" label="Day Chg %" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="accounts" label="Accounts" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
                 </tr>
               </thead>
               <tbody>
@@ -538,6 +681,7 @@ const Positions = () => {
                         </td>
                         <td className="text-right mono">{formatNumber(asset.total_quantity)}</td>
                         <td className="text-right mono">{formatCurrency(asset.avg_cost_price)}</td>
+                        <td className="text-right mono">{formatCurrency(asset.total_cost_basis_money)}</td>
                         <td className="text-right mono">{formatCurrency(asset.current_mark_price)}</td>
                         <td className="text-right mono font-medium">{formatCurrency(asset.total_market_value)}</td>
                         <td className="text-right">
@@ -580,7 +724,7 @@ const Positions = () => {
                       {/* Expanded Account Details */}
                       {isSelected && (
                         <tr key={`expand-${asset.asset_id}`} className="bg-muted/30">
-                          <td colSpan={9} className="p-0">
+                          <td colSpan={10} className="p-0">
                             <div className="p-4 border-t border-border">
                               {/* Resumen de distribución */}
                               <div className="mb-4 p-3 bg-card rounded-lg border border-border">
@@ -629,6 +773,7 @@ const Positions = () => {
                                       <th className="text-left py-2 px-3 font-medium text-muted-foreground">Account</th>
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Qty</th>
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Avg Price</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Cost Basis</th>
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Mkt Price</th>
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Mkt Value</th>
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unrealized P&L</th>
@@ -651,6 +796,7 @@ const Positions = () => {
                                           <td className="py-2 px-3 font-medium text-foreground">{displayName}</td>
                                           <td className="text-right py-2 px-3 mono">{formatNumber(inst.quantity ?? 0)}</td>
                                           <td className="text-right py-2 px-3 mono">{formatCurrency(inst.avg_cost_price ?? 0)}</td>
+                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.cost_basis_money ?? 0)}</td>
                                           <td className="text-right py-2 px-3 mono text-muted-foreground">
                                             {inst.market_price ? formatCurrency(inst.market_price) : '—'}
                                           </td>

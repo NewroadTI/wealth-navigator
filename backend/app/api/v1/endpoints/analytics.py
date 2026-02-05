@@ -93,7 +93,8 @@ def get_positions_aggregated_report(
                 "pnl": 0.0,
                 "account_holders": {},  # Dict para guardar account_id -> datos completos
                 "accounts": [],
-                "mark_prices": []  # Lista de mkt_prices para calcular promedio
+                "mark_prices": [],  # Lista de mkt_prices para calcular promedio
+                "fx_rates": []  # Lista de fx_rates para calcular promedio
             }
         
         # Sumatorias agregadas
@@ -103,12 +104,14 @@ def get_positions_aggregated_report(
         market_value = float(pos.position_value or 0)
         pnl = float(pos.fifo_pnl_unrealized or 0)
         mark_price = float(pos.mark_price or 0)
+        fx_rate = float(pos.fx_rate_to_base or 1.0)
         
         data["qty"] += qty
         data["market_value"] += market_value
         data["cost_money"] += cost_money
         data["pnl"] += pnl
         data["mark_prices"].append(mark_price)
+        data["fx_rates"].append(fx_rate)
         
         # Guardar CADA CUENTA única con todos sus datos
         account_id = pos.account_id
@@ -137,6 +140,7 @@ def get_positions_aggregated_report(
                 "market_price": mark_price,  # Para futura implementación
                 "market_value": market_value,
                 "unrealized_pnl": pnl,
+                "fx_rate_to_base": fx_rate,
             }
         else:
             # Acumular si hay múltiples posiciones del mismo asset en la misma cuenta
@@ -163,6 +167,9 @@ def get_positions_aggregated_report(
         
         # Calcular promedio de mkt_price de hoy (en caso de múltiples custodios)
         price_today = sum(data["mark_prices"]) / len(data["mark_prices"]) if data["mark_prices"] else 0
+        
+        # Calcular promedio de fx_rate_to_base
+        avg_fx_rate = sum(data["fx_rates"]) / len(data["fx_rates"]) if data["fx_rates"] else 1.0
         
         # Calcular Day Change % (agregado)
         price_yesterday = float(prev_prices_map.get(aid, 0))
@@ -205,10 +212,12 @@ def get_positions_aggregated_report(
                 user_name=holder_data["user_name"],
                 quantity=holder_data["quantity"],
                 avg_cost_price=holder_data["avg_cost_price"],
+                cost_basis_money=holder_data["cost_money"],
                 market_price=holder_data["market_price"],
                 market_value=holder_data["market_value"],
                 unrealized_pnl=holder_data["unrealized_pnl"],
-                day_change_pct=acct_day_change
+                day_change_pct=acct_day_change,
+                fx_rate_to_base=holder_data["fx_rate_to_base"]
             ))
         
         # Calcular estadísticas de distribución
@@ -224,6 +233,7 @@ def get_positions_aggregated_report(
             
             total_quantity=data["qty"],
             avg_cost_price=avg_price,
+            total_cost_basis_money=data["cost_money"],
             current_mark_price=price_today,
             total_market_value=data["market_value"],
             
@@ -239,7 +249,8 @@ def get_positions_aggregated_report(
             median_pnl_pct=median_pnl_pct,
             
             institutions=institutions_list,
-            account_ids=data["accounts"]
+            account_ids=data["accounts"],
+            fx_rate_to_base=avg_fx_rate
         )
         results.append(item)
         

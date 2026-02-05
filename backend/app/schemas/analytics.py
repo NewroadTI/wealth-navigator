@@ -23,10 +23,12 @@ class InstitutionInfo(BaseModel):
     # Datos específicos de esta cuenta para el asset
     quantity: Optional[float] = None
     avg_cost_price: Optional[float] = None
+    cost_basis_money: Optional[float] = None
     market_price: Optional[float] = None  # Para futura implementación con API IBKR
     market_value: Optional[float] = None
     unrealized_pnl: Optional[float] = None
     day_change_pct: Optional[float] = None  # Calculado vs día anterior
+    fx_rate_to_base: Optional[float] = 1.0  # Tasa de cambio a moneda base
 
 # --- SCHEMA PARA TABLA AGREGADA ---
 class PositionAggregated(BaseModel):
@@ -37,6 +39,7 @@ class PositionAggregated(BaseModel):
     # Datos Agregados
     total_quantity: float
     avg_cost_price: float      # Cost Basis promedio ponderado
+    total_cost_basis_money: float  # Suma total del cost basis
     current_mark_price: float
     total_market_value: float
     
@@ -55,6 +58,7 @@ class PositionAggregated(BaseModel):
     # Desglose
     institutions: List[InstitutionInfo]    # Lista de instituciones con info de usuario
     account_ids: List[int]     # IDs de cuentas involucradas
+    fx_rate_to_base: Optional[float] = 1.0  # Tasa de cambio promedio a moneda base
 
     class Config:
         from_attributes = True

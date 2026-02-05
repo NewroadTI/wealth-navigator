@@ -3,7 +3,7 @@ python3 upload_assets.py
 python3 createcsvuser.py
 docker exec -it wealthroad-api python seed_data/import_from_splits_v.py
 ssh root@178.156.215.84
-
+docker compose -f docker-compose.prod.yml exec db psql -U admin -d wealthroad -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
 
 # 1. Via API - Solo corporate actions (con archivo existente)
 curl -X POST "http://localhost:8000/api/v1/etl/corporate-actions"
