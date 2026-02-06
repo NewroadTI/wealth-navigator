@@ -72,6 +72,19 @@ def run_migration():
             """
             connection.execute(text(sql_fk_industry))
             
+            # 4. MIGRACIÓN: ASSETS -> INVIU_CODE (NUEVO)
+            logger.info("4. Verificando columna 'assets.inviu_code'...")
+            
+            sql_add_inviu = """
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='inviu_code') THEN 
+                    ALTER TABLE assets ADD COLUMN inviu_code VARCHAR;
+                END IF; 
+            END $$;
+            """
+            connection.execute(text(sql_add_inviu))
+            
             connection.commit()
             logger.info("✅ Esquema actualizado correctamente.")
             

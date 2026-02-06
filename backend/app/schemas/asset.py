@@ -78,6 +78,8 @@ class AssetBase(BaseModel):
     # JSONB field para baskets
     structured_note_details: Optional[Dict[str, Any]] = None
     
+    inviu_code: Optional[str] = None
+    
     is_active: Optional[bool] = True
 
 # --- CREATE ---
@@ -118,6 +120,7 @@ class AssetUpdate(BaseModel):
     protection_level: Optional[Decimal] = None
     payment_frequency: Optional[str] = None
     structured_note_details: Optional[Dict[str, Any]] = None
+    inviu_code: Optional[str] = None
     is_active: Optional[bool] = None
 
 # --- READ ---

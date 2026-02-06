@@ -77,6 +77,25 @@ interface JobHistory {
     done: boolean;
 }
 
+// Types for Positions mode
+type PositionFileType = 'inviu' | 'equities' | 'mutual' | 'fixed';
+
+interface PositionFile {
+    id: string;
+    originalName: string;
+    csvPath: string;
+    type: PositionFileType | null;
+    status: 'loading' | 'matched' | 'rejected';
+    errorMessage?: string;
+}
+
+const REQUIRED_POSITION_FILES: { type: PositionFileType; label: string; description: string }[] = [
+    { type: 'inviu', label: 'Inviu Tenencias', description: 'Client holdings data' },
+    { type: 'equities', label: 'Equities', description: 'Equity positions' },
+    { type: 'mutual', label: 'Mutual Funds', description: 'Mutual fund positions' },
+    { type: 'fixed', label: 'Fixed Income', description: 'Fixed income securities' },
+];
+
 // ==========================================================================
 // HELPER COMPONENTS
 // ==========================================================================
@@ -188,6 +207,10 @@ const PershingDashboard = () => {
     // Removed recentImports - replaced by jobHistory from API
     const [jobHistory, setJobHistory] = useState<JobHistory[]>([]);
     const [loadingJobs, setLoadingJobs] = useState(true);
+
+    // Positions mode state
+    const [uploadMode, setUploadMode] = useState<'transactions' | 'positions'>('transactions');
+    const [positionFiles, setPositionFiles] = useState<PositionFile[]>([]);
 
     // ========================================================================
     // HANDLERS
@@ -360,6 +383,235 @@ const PershingDashboard = () => {
         }
     };
 
+    // ========================================================================
+    // POSITIONS MODE HANDLERS
+    // ========================================================================
+
+    const handlePositionFileDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const files = Array.from(e.dataTransfer.files);
+            for (const droppedFile of files) {
+                if (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls')) {
+                    await processPositionFile(droppedFile);
+                } else {
+                    toast({
+                        variant: "destructive",
+                        title: "Invalid file type",
+                        description: `${droppedFile.name} must be .xlsx or .xls`,
+                    });
+                }
+            }
+        }
+    };
+
+    const handlePositionFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const files = Array.from(e.target.files);
+            for (const selectedFile of files) {
+                await processPositionFile(selectedFile);
+            }
+        }
+        // Reset input
+        e.target.value = '';
+    };
+
+    const processPositionFile = async (selectedFile: File) => {
+        // Check max files limit - only count matched and loading files, not rejected
+        const activeFilesCount = positionFiles.filter(f => f.status !== 'rejected').length;
+        if (activeFilesCount >= 4) {
+            toast({
+                variant: "destructive",
+                title: "Maximum files reached",
+                description: "You can only upload up to 4 valid files",
+            });
+            return;
+        }
+
+        const fileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Add file in loading state
+        setPositionFiles(prev => [...prev, {
+            id: fileId,
+            originalName: selectedFile.name,
+            csvPath: '',
+            type: null,
+            status: 'loading'
+        }]);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            const response = await fetch(`${apiBaseUrl}/api/v1/positions-etl/convert-xlsx`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to convert file');
+            }
+
+            const result = await response.json();
+            const detectedType = result.detected_type as PositionFileType | null;
+
+            // Check if this type is already matched
+            if (detectedType) {
+                const existingOfType = positionFiles.find(f => f.type === detectedType && f.status === 'matched');
+                if (existingOfType) {
+                    // Remove the old file from server
+                    await removePositionCsv(existingOfType.csvPath);
+                    // Update to replace it
+                    setPositionFiles(prev => prev.filter(f => f.id !== existingOfType.id));
+                }
+            }
+
+            // Update file state
+            setPositionFiles(prev => prev.map(f =>
+                f.id === fileId
+                    ? {
+                        ...f,
+                        csvPath: result.csv_path,
+                        type: detectedType,
+                        status: detectedType ? 'matched' : 'rejected',
+                        errorMessage: detectedType ? undefined : 'File format not recognized'
+                    }
+                    : f
+            ));
+
+            if (detectedType) {
+                const label = REQUIRED_POSITION_FILES.find(r => r.type === detectedType)?.label || detectedType;
+                toast({
+                    title: "File matched",
+                    description: `${selectedFile.name} detected as ${label}`,
+                });
+            } else {
+                toast({
+                    variant: "destructive",
+                    title: "Format not recognized",
+                    description: `${selectedFile.name} does not match any required format`,
+                });
+            }
+
+        } catch (error) {
+            setPositionFiles(prev => prev.map(f =>
+                f.id === fileId
+                    ? {
+                        ...f,
+                        status: 'rejected',
+                        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+                    }
+                    : f
+            ));
+
+            toast({
+                variant: "destructive",
+                title: "Conversion failed",
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    };
+
+    const removePositionCsv = async (csvPath: string) => {
+        if (!csvPath) return;
+        try {
+            await fetch(`${apiBaseUrl}/api/v1/positions-etl/remove-csv`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ csv_path: csvPath }),
+            });
+        } catch (error) {
+            console.error('Error removing CSV:', error);
+        }
+    };
+
+    const handleRemovePositionFile = async (fileId: string) => {
+        const fileToRemove = positionFiles.find(f => f.id === fileId);
+        if (fileToRemove?.csvPath) {
+            await removePositionCsv(fileToRemove.csvPath);
+        }
+        setPositionFiles(prev => prev.filter(f => f.id !== fileId));
+    };
+
+    const handlePositionsUpload = async () => {
+        const inviu = getMatchedFileForType('inviu');
+        const equities = getMatchedFileForType('equities');
+        const mutual = getMatchedFileForType('mutual');
+        const fixed = getMatchedFileForType('fixed');
+
+        if (!inviu || !equities || !mutual || !fixed) {
+            toast({
+                variant: "destructive",
+                title: "Missing files",
+                description: "Please upload all 4 required position files.",
+            });
+            return;
+        }
+
+        setIsProcessing(true);
+        setProcessingStep('Importing positions...');
+
+        try {
+            const response = await fetch(`${apiBaseUrl}/api/v1/positions-etl/import-positions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    inviu_csv_path: inviu.csvPath,
+                    equities_csv_path: equities.csvPath,
+                    mutual_csv_path: mutual.csvPath,
+                    fixed_csv_path: fixed.csvPath
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Import failed');
+            }
+
+            const result = await response.json();
+
+            // Refresh job history to show new job
+            await fetchJobs();
+
+            toast({
+                title: result.status === 'success' ? "Import complete" : "Import completed with issues",
+                description: `Created: ${result.records_created}, Skipped: ${result.records_skipped}`,
+                variant: result.status === 'failed' ? 'destructive' : 'default'
+            });
+
+            // Clear files on success
+            setPositionFiles([]);
+
+            // Show notification
+            addNotification({
+                type: result.status === 'success' ? 'info' : result.status === 'partial' ? 'warning' : 'error',
+                title: 'Positions Import',
+                message: result.message
+            });
+
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Import failed",
+                description: error instanceof Error ? error.message : 'Unknown error',
+            });
+        } finally {
+            setIsProcessing(false);
+            setProcessingStep('');
+        }
+    };
+
+    const getMatchedFileForType = (type: PositionFileType): PositionFile | undefined => {
+        return positionFiles.find(f => f.type === type && f.status === 'matched');
+    };
+
+    const allPositionsMatched = REQUIRED_POSITION_FILES.every(
+        req => getMatchedFileForType(req.type)
+    );
+
     // Auto-fetch jobs on mount
     useEffect(() => {
         fetchJobs();
@@ -413,104 +665,276 @@ const PershingDashboard = () => {
                     <div className="md:col-span-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Upload className="h-5 w-5" />
-                                    Data Import
-                                </CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Upload className="h-5 w-5" />
+                                        Data Import {uploadMode === 'positions' && '(Positions)'}
+                                    </CardTitle>
+                                    {/* Mode Toggle */}
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className={uploadMode === 'transactions' ? 'font-medium' : 'text-muted-foreground'}>
+                                            Transactions
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${uploadMode === 'positions' ? 'bg-primary' : 'bg-muted'
+                                                }`}
+                                            onClick={() => {
+                                                setUploadMode(prev => prev === 'transactions' ? 'positions' : 'transactions');
+                                                // Clear state when switching modes
+                                                handleClear();
+                                                setPositionFiles([]);
+                                            }}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${uploadMode === 'positions' ? 'translate-x-6' : 'translate-x-1'
+                                                    }`}
+                                            />
+                                        </button>
+                                        <span className={uploadMode === 'positions' ? 'font-medium' : 'text-muted-foreground'}>
+                                            Positions
+                                        </span>
+                                    </div>
+                                </div>
                                 <CardDescription>
-                                    Upload Pershing transaction files (.xlsx) to import into the system.
+                                    {uploadMode === 'transactions'
+                                        ? 'Upload Pershing transaction files (.xlsx) to import into the system.'
+                                        : 'Upload position files: Inviu, Equities, Mutual Funds, and Fixed Income.'
+                                    }
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {/* Drop Zone */}
-                                {!file && (
-                                    <div
-                                        className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                                            }`}
-                                        onDragOver={handleDragOver}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={handleDrop}
-                                    >
-                                        <div className="flex flex-col items-center justify-center gap-4">
-                                            <div className="p-4 bg-muted rounded-full">
-                                                <FileSpreadsheet className="h-8 w-8 text-muted-foreground" />
+                                {/* ==================== TRANSACTIONS MODE ==================== */}
+                                {uploadMode === 'transactions' && (
+                                    <>
+                                        {/* Drop Zone */}
+                                        {!file && (
+                                            <div
+                                                className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                                    }`}
+                                                onDragOver={handleDragOver}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={handleDrop}
+                                            >
+                                                <div className="flex flex-col items-center justify-center gap-4">
+                                                    <div className="p-4 bg-muted rounded-full">
+                                                        <FileSpreadsheet className="h-8 w-8 text-muted-foreground" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-lg font-medium">
+                                                            Drag and drop your XLSX file here
+                                                        </h3>
+                                                        <p className="text-sm text-muted-foreground mt-1">
+                                                            Or click to browse from your computer
+                                                        </p>
+                                                    </div>
+                                                    <div className="relative">
+                                                        <Button variant="outline">Browse Files</Button>
+                                                        <input
+                                                            type="file"
+                                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                                            accept=".xlsx,.xls"
+                                                            onChange={handleFileChange}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
+                                        )}
+
+                                        {/* Processing Indicator */}
+                                        {isProcessing && (
+                                            <div className="flex items-center justify-center gap-3 py-4">
+                                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                                <span className="text-sm text-muted-foreground">{processingStep}</span>
+                                            </div>
+                                        )}
+
+                                        {/* File Preview */}
+                                        {file && !isProcessing && previewData.length > 0 && (
+                                            <div className="space-y-4">
+                                                {/* Action Buttons */}
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                                                        <span className="font-medium">{file.name}</span>
+                                                        <Badge variant="outline">{previewData.length} rows</Badge>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={handleClear}
+                                                            disabled={isProcessing}
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-1" />
+                                                            Remove
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={handleUpload}
+                                                            disabled={isProcessing}
+                                                        >
+                                                            <ArrowUpCircle className="h-4 w-4 mr-1" />
+                                                            Upload
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Excel Preview */}
+                                                <ExcelPreview data={previewData} maxRows={10} />
+                                            </div>
+                                        )}
+
+                                        {/* Info Box */}
+                                        <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-md flex gap-3 text-sm text-blue-700 dark:text-blue-300">
+                                            <AlertCircle className="h-5 w-5 flex-shrink-0" />
                                             <div>
-                                                <h3 className="text-lg font-medium">
-                                                    Drag and drop your XLSX file here
-                                                </h3>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Or click to browse from your computer
+                                                <p className="font-medium">Supported Format</p>
+                                                <p className="mt-1 opacity-90">
+                                                    Daily Pershing transaction exports (.xlsx). The file will be converted to CSV
+                                                    and processed automatically.
                                                 </p>
                                             </div>
-                                            <div className="relative">
-                                                <Button variant="outline">Browse Files</Button>
-                                                <input
-                                                    type="file"
-                                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                                    accept=".xlsx,.xls"
-                                                    onChange={handleFileChange}
-                                                />
-                                            </div>
                                         </div>
-                                    </div>
+                                    </>
                                 )}
 
-                                {/* Processing Indicator */}
-                                {isProcessing && (
-                                    <div className="flex items-center justify-center gap-3 py-4">
-                                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                                        <span className="text-sm text-muted-foreground">{processingStep}</span>
-                                    </div>
-                                )}
-
-                                {/* File Preview */}
-                                {file && !isProcessing && previewData.length > 0 && (
-                                    <div className="space-y-4">
-                                        {/* Action Buttons */}
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <FileSpreadsheet className="h-5 w-5 text-green-600" />
-                                                <span className="font-medium">{file.name}</span>
-                                                <Badge variant="outline">{previewData.length} rows</Badge>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={handleClear}
-                                                    disabled={isProcessing}
-                                                >
-                                                    <Trash2 className="h-4 w-4 mr-1" />
-                                                    Remove
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    onClick={handleUpload}
-                                                    disabled={isProcessing}
-                                                >
-                                                    <ArrowUpCircle className="h-4 w-4 mr-1" />
-                                                    Upload
-                                                </Button>
+                                {/* ==================== POSITIONS MODE ==================== */}
+                                {uploadMode === 'positions' && (
+                                    <>
+                                        {/* Drop Zone for Multiple Files */}
+                                        <div
+                                            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                                }`}
+                                            onDragOver={handleDragOver}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={handlePositionFileDrop}
+                                        >
+                                            <div className="flex flex-col items-center justify-center gap-3">
+                                                <div className="p-3 bg-muted rounded-full">
+                                                    <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-base font-medium">
+                                                        Drop position files here
+                                                    </h3>
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        Upload up to 4 files (Inviu, Equities, Mutual Funds, Fixed Income)
+                                                    </p>
+                                                </div>
+                                                <div className="relative">
+                                                    <Button variant="outline" size="sm">Browse Files</Button>
+                                                    <input
+                                                        type="file"
+                                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                                        accept=".xlsx,.xls"
+                                                        multiple
+                                                        onChange={handlePositionFileChange}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Excel Preview */}
-                                        <ExcelPreview data={previewData} maxRows={10} />
-                                    </div>
-                                )}
+                                        {/* Required Files Checklist */}
+                                        <div className="border rounded-lg p-4">
+                                            <h4 className="font-medium mb-3">Required Files</h4>
+                                            <div className="space-y-2">
+                                                {REQUIRED_POSITION_FILES.map(req => {
+                                                    const matchedFile = getMatchedFileForType(req.type);
+                                                    const loadingFile = positionFiles.find(f => f.status === 'loading');
 
-                                {/* Info Box */}
-                                <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-md flex gap-3 text-sm text-blue-700 dark:text-blue-300">
-                                    <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                                    <div>
-                                        <p className="font-medium">Supported Format</p>
-                                        <p className="mt-1 opacity-90">
-                                            Daily Pershing transaction exports (.xlsx). The file will be converted to CSV
-                                            and processed automatically.
-                                        </p>
-                                    </div>
-                                </div>
+                                                    return (
+                                                        <div
+                                                            key={req.type}
+                                                            className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${matchedFile
+                                                                ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                                                                : 'bg-muted/30 border-border'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                {matchedFile ? (
+                                                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                                ) : loadingFile ? (
+                                                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                                                ) : (
+                                                                    <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+                                                                )}
+                                                                <div>
+                                                                    <p className={`font-medium text-sm ${matchedFile ? 'text-gray-900 dark:text-gray-100' : ''}`}>
+                                                                        {req.label}
+                                                                    </p>
+                                                                    {matchedFile ? (
+                                                                        <p className="text-xs text-gray-600 dark:text-gray-300">{matchedFile.originalName}</p>
+                                                                    ) : (
+                                                                        <p className="text-xs text-muted-foreground">{req.description}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {matchedFile && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => handleRemovePositionFile(matchedFile.id)}
+                                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Rejected files */}
+                                        {positionFiles.filter(f => f.status === 'rejected').length > 0 && (
+                                            <div className="border border-red-200 dark:border-red-800 rounded-lg p-3 bg-red-50 dark:bg-red-950/20">
+                                                <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                                    Rejected Files
+                                                </p>
+                                                {positionFiles.filter(f => f.status === 'rejected').map(f => (
+                                                    <div key={f.id} className="flex items-center justify-between py-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <XCircle className="h-4 w-4 text-red-500" />
+                                                            <span className="text-sm">{f.originalName}</span>
+                                                            <span className="text-xs text-red-500">{f.errorMessage}</span>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleRemovePositionFile(f.id)}
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Upload Button */}
+                                        <div className="flex justify-end">
+                                            <Button
+                                                onClick={handlePositionsUpload}
+                                                disabled={!allPositionsMatched}
+                                            >
+                                                <ArrowUpCircle className="h-4 w-4 mr-2" />
+                                                Upload Positions
+                                            </Button>
+                                        </div>
+
+                                        {/* Info Box */}
+                                        <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-md flex gap-3 text-sm text-blue-700 dark:text-blue-300">
+                                            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                                            <div>
+                                                <p className="font-medium">Required Files</p>
+                                                <p className="mt-1 opacity-90">
+                                                    Upload all 4 position files: Inviu Tenencias, Equities, Mutual Funds, and Fixed Income.
+                                                    Files will be auto-detected based on their content.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
