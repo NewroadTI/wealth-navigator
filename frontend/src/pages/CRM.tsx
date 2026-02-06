@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -149,6 +150,7 @@ const CRM = () => {
 
   return (
     <AppLayout title="CRM" subtitle="Manage client relationships and communications">
+      <DevelopmentBanner feature="Módulo CRM" className="mb-4 md:mb-6" />
       <Tabs defaultValue="contacts" className="space-y-4 md:space-y-6">
         <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="contacts" className="text-xs md:text-sm data-[state=active]:bg-card">

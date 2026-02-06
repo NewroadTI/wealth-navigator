@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
+import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { getApiBaseUrl } from '@/lib/config';
@@ -1008,6 +1009,7 @@ const PortfolioAccounts = () => {
                 {/* Allocation Tab (Mocked) */}
                 <TabsContent value="allocation" className="space-y-4">
                     <div className="bg-card border border-border rounded-xl p-6">
+                        <DevelopmentBanner feature="Distribución de Activos" className="mb-4" />
                         <h3 className="text-base font-semibold text-foreground mb-4">Asset Allocation</h3>
                         <div className="text-center py-12 text-muted-foreground">
                             <PieChart className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -1019,6 +1021,7 @@ const PortfolioAccounts = () => {
                 {/* Cash Tab (Mocked) */}
                 <TabsContent value="cash" className="space-y-4">
                     <div className="bg-card border border-border rounded-xl p-6">
+                        <DevelopmentBanner feature="Resumen de Efectivo" className="mb-4" />
                         <h3 className="text-base font-semibold text-foreground mb-4">Cash Summary</h3>
                         <div className="text-center py-12 text-muted-foreground">
                             <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />

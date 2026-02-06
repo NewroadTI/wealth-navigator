@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
+import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { getApiBaseUrl } from '@/lib/config';
@@ -694,6 +695,7 @@ const PortfolioDetail = () => {
 
   return (
     <AppLayout title={portfolio.name} subtitle={`Portfolio ${portfolio.interface_code}`}>
+      <DevelopmentBanner feature="Análisis de Performance del Portfolio" className="mb-4 md:mb-6" />
       {/* Header Section */}
       <div className="bg-card border border-border rounded-xl p-4 md:p-6 mb-4 md:mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
