@@ -20,6 +20,8 @@ class InstitutionInfo(BaseModel):
     institution: str
     account_id: int
     user_name: Optional[str] = None  # Ej: "roberto_sr" (4 letras nombre-3 letras apellido)
+    user_first_name: Optional[str] = None  # Nombre completo
+    user_last_name: Optional[str] = None   # Apellido completo
     # Datos específicos de esta cuenta para el asset
     quantity: Optional[float] = None
     avg_cost_price: Optional[float] = None
@@ -29,6 +31,7 @@ class InstitutionInfo(BaseModel):
     unrealized_pnl: Optional[float] = None
     day_change_pct: Optional[float] = None  # Calculado vs día anterior
     fx_rate_to_base: Optional[float] = 1.0  # Tasa de cambio a moneda base
+    currency: Optional[str] = "USD"  # Moneda de la posición
 
 # --- SCHEMA PARA TABLA AGREGADA ---
 class PositionAggregated(BaseModel):
@@ -59,6 +62,7 @@ class PositionAggregated(BaseModel):
     institutions: List[InstitutionInfo]    # Lista de instituciones con info de usuario
     account_ids: List[int]     # IDs de cuentas involucradas
     fx_rate_to_base: Optional[float] = 1.0  # Tasa de cambio promedio a moneda base
+    currency: Optional[str] = "USD"  # Moneda predominante o de referencia
 
     class Config:
         from_attributes = True

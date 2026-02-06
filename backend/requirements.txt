@@ -14,3 +14,4 @@ apscheduler
 python-multipart
 requests
 pandas
+ib_async

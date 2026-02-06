@@ -1,13 +1,14 @@
 from typing import List, Optional
 from datetime import date
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 
 from app.api import deps
 from app.models.asset import Position
 from app.models.asset import Asset, AssetClass
 from app.models.portfolio import Account, Portfolio
+from app.models.user import User
 from app.schemas.analytics import PositionAggregated, MoversResponse, TopMover
 
 router = APIRouter()
@@ -35,6 +36,9 @@ def get_positions_aggregated_report(
     
     # 1. Query Base para HOY (Filtrado)
     query = db.query(Position).join(Asset).join(Account).join(Portfolio)
+    query = query.options(
+        joinedload(Position.account).joinedload(Account.portfolio).joinedload(Portfolio.owner)
+    )
     
     query = query.filter(Position.report_date == report_date)
     
@@ -94,7 +98,8 @@ def get_positions_aggregated_report(
                 "account_holders": {},  # Dict para guardar account_id -> datos completos
                 "accounts": [],
                 "mark_prices": [],  # Lista de mkt_prices para calcular promedio
-                "fx_rates": []  # Lista de fx_rates para calcular promedio
+                "fx_rates": [],  # Lista de fx_rates para calcular promedio
+                "currencies": []  # Lista de currencies
             }
         
         # Sumatorias agregadas
@@ -105,6 +110,7 @@ def get_positions_aggregated_report(
         pnl = float(pos.fifo_pnl_unrealized or 0)
         mark_price = float(pos.mark_price or 0)
         fx_rate = float(pos.fx_rate_to_base or 1.0)
+        currency = pos.currency or "USD"
         
         data["qty"] += qty
         data["market_value"] += market_value
@@ -112,6 +118,7 @@ def get_positions_aggregated_report(
         data["pnl"] += pnl
         data["mark_prices"].append(mark_price)
         data["fx_rates"].append(fx_rate)
+        data["currencies"].append(currency)
         
         # Guardar CADA CUENTA única con todos sus datos
         account_id = pos.account_id
@@ -120,6 +127,8 @@ def get_positions_aggregated_report(
             # Obtener el usuario del portfolio propietario
             portfolio = db.query(Portfolio).filter(Portfolio.portfolio_id == pos.account.portfolio_id).first()
             user_name = None
+            user_first_name = None
+            user_last_name = None
             if portfolio and portfolio.owner:
                 full_name = portfolio.owner.full_name or ""
                 parts = full_name.split()
@@ -127,6 +136,8 @@ def get_positions_aggregated_report(
                     first_name = parts[0][:4].lower()  # 4 letras primer nombre
                     last_name = parts[-1][:3].lower()  # 3 letras último apellido
                     user_name = f"{first_name}_{last_name}"
+                    user_first_name = parts[0]  # Nombre completo
+                    user_last_name = parts[-1]  # Apellido completo
             
             # Calcular avg_cost_price para esta cuenta
             acct_avg_price = cost_money / qty if qty != 0 else 0
@@ -134,6 +145,8 @@ def get_positions_aggregated_report(
             data["account_holders"][account_id] = {
                 "institution": institution,
                 "user_name": user_name,
+                "user_first_name": user_first_name,
+                "user_last_name": user_last_name,
                 "quantity": qty,
                 "cost_money": cost_money,
                 "avg_cost_price": acct_avg_price,
@@ -141,6 +154,7 @@ def get_positions_aggregated_report(
                 "market_value": market_value,
                 "unrealized_pnl": pnl,
                 "fx_rate_to_base": fx_rate,
+                "currency": currency,
             }
         else:
             # Acumular si hay múltiples posiciones del mismo asset en la misma cuenta
@@ -210,6 +224,8 @@ def get_positions_aggregated_report(
                 institution=holder_data["institution"],
                 account_id=account_id,
                 user_name=holder_data["user_name"],
+                user_first_name=holder_data["user_first_name"],
+                user_last_name=holder_data["user_last_name"],
                 quantity=holder_data["quantity"],
                 avg_cost_price=holder_data["avg_cost_price"],
                 cost_basis_money=holder_data["cost_money"],
@@ -217,13 +233,19 @@ def get_positions_aggregated_report(
                 market_value=holder_data["market_value"],
                 unrealized_pnl=holder_data["unrealized_pnl"],
                 day_change_pct=acct_day_change,
-                fx_rate_to_base=holder_data["fx_rate_to_base"]
+                fx_rate_to_base=holder_data["fx_rate_to_base"],
+                currency=holder_data["currency"]
             ))
         
         # Calcular estadísticas de distribución
         best_pnl_pct = max(pnl_percentages) if pnl_percentages else None
         worst_pnl_pct = min(pnl_percentages) if pnl_percentages else None
         median_pnl_pct = statistics.median(pnl_percentages) if pnl_percentages else None
+        
+        # Determinar moneda predominante (la más común)
+        from collections import Counter
+        currency_counts = Counter(data["currencies"])
+        predominant_currency = currency_counts.most_common(1)[0][0] if currency_counts else "USD"
             
         # Crear objeto de respuesta
         item = PositionAggregated(
@@ -250,7 +272,8 @@ def get_positions_aggregated_report(
             
             institutions=institutions_list,
             account_ids=data["accounts"],
-            fx_rate_to_base=avg_fx_rate
+            fx_rate_to_base=avg_fx_rate,
+            currency=predominant_currency
         )
         results.append(item)
         

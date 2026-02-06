@@ -81,6 +81,8 @@ interface AggregatedAsset {
     institution: string;
     account_id: number;
     user_name: string | null;
+    user_first_name: string | null;
+    user_last_name: string | null;
     quantity: number | null;
     avg_cost_price: number | null;
     cost_basis_money: number | null;
@@ -89,9 +91,11 @@ interface AggregatedAsset {
     unrealized_pnl: number | null;
     day_change_pct: number | null;
     fx_rate_to_base: number | null;
+    currency: string | null;
   }>;
   account_ids: number[];
   fx_rate_to_base: number;
+  currency: string;
 }
 
 interface TopMover {
@@ -113,6 +117,21 @@ interface FilterOptions {
 }
 
 const Positions = () => {
+  // Helper function to format currency with dual display if not USD
+  const formatCurrencyWithCode = (valueOriginal: number, valueUSD: number, currency: string = 'USD') => {
+    const formatValue = (val: number) => val.toFixed(2);
+    
+    if (currency === 'USD' || !currency) {
+      return `${formatValue(valueUSD)} USD`;
+    }
+    // Show: original value in local currency - converted value in USD
+    return (
+      <span className="whitespace-nowrap">
+        {formatValue(valueOriginal)} {currency} - {formatValue(valueUSD)} USD
+      </span>
+    );
+  };
+
   // Filters State
   const [reportDate, setReportDate] = useState<string>('');
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('');
@@ -175,15 +194,30 @@ const Positions = () => {
         const data = await response.json();
         
         // Apply fx_rate_to_base transformation to all monetary values
-        const transformedData = data.map((asset: AggregatedAsset) => ({
+        // Keep both original and converted values for display
+        const transformedData = data.map((asset: any) => ({
           ...asset,
+          // Store original values with _original suffix
+          avg_cost_price_original: asset.avg_cost_price,
+          total_cost_basis_money_original: asset.total_cost_basis_money,
+          current_mark_price_original: asset.current_mark_price,
+          total_market_value_original: asset.total_market_value,
+          total_pnl_unrealized_original: asset.total_pnl_unrealized,
+          // Convert to USD
           avg_cost_price: asset.avg_cost_price * (asset.fx_rate_to_base || 1),
           total_cost_basis_money: asset.total_cost_basis_money * (asset.fx_rate_to_base || 1),
           current_mark_price: asset.current_mark_price * (asset.fx_rate_to_base || 1),
           total_market_value: asset.total_market_value * (asset.fx_rate_to_base || 1),
           total_pnl_unrealized: asset.total_pnl_unrealized * (asset.fx_rate_to_base || 1),
-          institutions: asset.institutions.map(inst => ({
+          institutions: asset.institutions.map((inst: any) => ({
             ...inst,
+            // Store original values
+            avg_cost_price_original: inst.avg_cost_price ?? 0,
+            cost_basis_money_original: inst.cost_basis_money ?? 0,
+            market_price_original: inst.market_price ?? 0,
+            market_value_original: inst.market_value ?? 0,
+            unrealized_pnl_original: inst.unrealized_pnl ?? 0,
+            // Convert to USD
             avg_cost_price: (inst.avg_cost_price ?? 0) * (inst.fx_rate_to_base ?? 1),
             cost_basis_money: (inst.cost_basis_money ?? 0) * (inst.fx_rate_to_base ?? 1),
             market_price: (inst.market_price ?? 0) * (inst.fx_rate_to_base ?? 1),
@@ -260,9 +294,9 @@ const Positions = () => {
       result = result.filter(p =>
         p.asset_symbol.toLowerCase().includes(query) ||
         p.institutions.some(inst => {
-          const displayName = inst.user_name 
-            ? `${inst.institution.toLowerCase()}-${inst.user_name}`
-            : inst.institution.toLowerCase();
+          const displayName = inst.user_first_name && inst.user_last_name
+            ? `${inst.institution}-${inst.user_first_name} ${inst.user_last_name}`
+            : inst.institution;
           return displayName.toLowerCase().includes(query);
         })
       );
@@ -650,11 +684,11 @@ const Positions = () => {
                 <tr>
                   <SortableHeader column="symbol" label="Asset" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                   <SortableHeader column="quantity" label="Qty" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="avg_cost" label="Avg Price" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="cost_basis" label="Cost Basis" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="market_price" label="Market Price" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="market_value" label="Market Value" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="pnl" label="Unrealized P&L" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="avg_cost" label="Avg Price (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="cost_basis" label="Cost Basis (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="market_price" label="Market Price (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="market_value" label="Market Value (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="pnl" label="Unrealized P&L (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
                   <th className="text-center">Distribution</th>
                   <SortableHeader column="day_change" label="Day Chg %" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
                   <SortableHeader column="accounts" label="Accounts" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
@@ -680,10 +714,10 @@ const Positions = () => {
                           </div>
                         </td>
                         <td className="text-right mono">{formatNumber(asset.total_quantity)}</td>
-                        <td className="text-right mono">{formatCurrency(asset.avg_cost_price)}</td>
-                        <td className="text-right mono">{formatCurrency(asset.total_cost_basis_money)}</td>
-                        <td className="text-right mono">{formatCurrency(asset.current_mark_price)}</td>
-                        <td className="text-right mono font-medium">{formatCurrency(asset.total_market_value)}</td>
+                        <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.avg_cost_price_original, asset.avg_cost_price, asset.currency)}</td>
+                        <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.total_cost_basis_money_original, asset.total_cost_basis_money, asset.currency)}</td>
+                        <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.current_mark_price_original, asset.current_mark_price, asset.currency)}</td>
+                        <td className="text-right mono font-medium text-xs">{formatCurrencyWithCode(asset.total_market_value_original, asset.total_market_value, asset.currency)}</td>
                         <td className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {isPositivePL ? (
@@ -691,8 +725,8 @@ const Positions = () => {
                             ) : (
                               <ArrowDownRight className="h-3.5 w-3.5 text-loss" />
                             )}
-                            <p className={cn('text-sm font-medium mono', getChangeColor(asset.total_pnl_unrealized))}>
-                              {isPositivePL ? '+' : ''}{formatCurrency(asset.total_pnl_unrealized)}
+                            <p className={cn('text-xs font-medium mono', getChangeColor(asset.total_pnl_unrealized))}>
+                              {isPositivePL ? '+' : ''}{formatCurrencyWithCode(asset.total_pnl_unrealized_original, asset.total_pnl_unrealized, asset.currency)}
                             </p>
                           </div>
                         </td>
@@ -782,9 +816,9 @@ const Positions = () => {
                                   </thead>
                                   <tbody>
                                     {asset.institutions.map((inst) => {
-                                      const displayName = inst.user_name 
-                                        ? `${inst.institution.toLowerCase()}-${inst.user_name}`
-                                        : inst.institution.toLowerCase();
+                                      const displayName = inst.user_first_name && inst.user_last_name
+                                        ? `${inst.institution}-${inst.user_first_name} ${inst.user_last_name}`
+                                        : inst.institution;
                                       const instPnlPositive = (inst.unrealized_pnl ?? 0) >= 0;
                                       const instDayPositive = (inst.day_change_pct ?? 0) >= 0;
                                       
@@ -795,15 +829,15 @@ const Positions = () => {
                                         >
                                           <td className="py-2 px-3 font-medium text-foreground">{displayName}</td>
                                           <td className="text-right py-2 px-3 mono">{formatNumber(inst.quantity ?? 0)}</td>
-                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.avg_cost_price ?? 0)}</td>
-                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.cost_basis_money ?? 0)}</td>
-                                          <td className="text-right py-2 px-3 mono text-muted-foreground">
-                                            {inst.market_price ? formatCurrency(inst.market_price) : '—'}
+                                          <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.avg_cost_price_original, inst.avg_cost_price, inst.currency ?? 'USD')}</td>
+                                          <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.cost_basis_money_original, inst.cost_basis_money, inst.currency ?? 'USD')}</td>
+                                          <td className="text-right py-2 px-3 mono text-muted-foreground text-xs">
+                                            {inst.market_price ? formatCurrencyWithCode(inst.market_price_original, inst.market_price, inst.currency ?? 'USD') : '—'}
                                           </td>
-                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.market_value ?? 0)}</td>
+                                          <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.market_value_original, inst.market_value, inst.currency ?? 'USD')}</td>
                                           <td className="text-right py-2 px-3">
-                                            <span className={cn('mono', getChangeColor(inst.unrealized_pnl ?? 0))}>
-                                              {instPnlPositive ? '+' : ''}{formatCurrency(inst.unrealized_pnl ?? 0)}
+                                            <span className={cn('mono text-xs', getChangeColor(inst.unrealized_pnl ?? 0))}>
+                                              {instPnlPositive ? '+' : ''}{formatCurrencyWithCode(inst.unrealized_pnl_original, inst.unrealized_pnl, inst.currency ?? 'USD')}
                                             </span>
                                           </td>
                                           <td className="text-right py-2 px-3">
