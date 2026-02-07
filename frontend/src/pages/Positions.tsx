@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, useEffect } from 'react';
+import { Fragment, useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { formatCurrency, formatNumber, formatPercent, getChangeColor, formatDate } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Radio, Wifi, WifiOff } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/config';
 
 const ITEMS_PER_PAGE = 15;
@@ -116,6 +116,23 @@ interface FilterOptions {
   available_dates: string[];
 }
 
+// Live price data from IBKR
+interface LivePriceItem {
+  asset_id: number;
+  symbol: string | null;
+  isin: string | null;
+  live_price: number;
+  previous_close: number | null;
+  day_change_pct: number | null;
+  bid: number | null;
+  ask: number | null;
+  last: number | null;
+  timestamp: string | null;
+  currency: string;
+}
+
+const LIVE_DATA_INTERVAL = 20000; // 20 seconds
+
 const Positions = () => {
   // Helper function to format currency with dual display if not USD
   const formatCurrencyWithCode = (valueOriginal: number, valueUSD: number, currency: string = 'USD') => {
@@ -151,6 +168,14 @@ const Positions = () => {
   const [movers, setMovers] = useState<{ gainers: TopMover[]; losers: TopMover[] }>({ gainers: [], losers: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Live Data State
+  const [liveDataEnabled, setLiveDataEnabled] = useState(false);
+  const [liveDataConnected, setLiveDataConnected] = useState(false);
+  const [liveDataLoading, setLiveDataLoading] = useState(false);
+  const [livePrices, setLivePrices] = useState<Map<number, LivePriceItem>>(new Map());
+  const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
+  const liveDataIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load filter options on mount
   useEffect(() => {
@@ -376,6 +401,108 @@ const Positions = () => {
     return filteredPositions.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredPositions, currentPage]);
 
+  // ==================== LIVE DATA LOGIC ====================
+  
+  // Fetch live prices for current page positions
+  const fetchLivePrices = useCallback(async () => {
+    if (!liveDataEnabled || paginatedPositions.length === 0) return;
+
+    setLiveDataLoading(true);
+    try {
+      // Get asset IDs from current page only
+      const assetIds = paginatedPositions.map(p => p.asset_id);
+
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/live-prices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_ids: assetIds }),
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch live prices');
+      const data = await response.json();
+
+      setLiveDataConnected(data.connected);
+
+      if (data.success && data.prices) {
+        const pricesMap = new Map<number, LivePriceItem>();
+        data.prices.forEach((price: LivePriceItem) => {
+          pricesMap.set(price.asset_id, price);
+        });
+        setLivePrices(pricesMap);
+        setLastLiveUpdate(new Date());
+
+        // Also fetch live movers based on current page assets
+        fetchLiveMovers(assetIds);
+      }
+    } catch (err) {
+      console.error('Error fetching live prices:', err);
+      setLiveDataConnected(false);
+    } finally {
+      setLiveDataLoading(false);
+    }
+  }, [liveDataEnabled, paginatedPositions]);
+
+  // Fetch live movers for current page
+  const fetchLiveMovers = async (assetIds: number[]) => {
+    try {
+      const params = new URLSearchParams({
+        limit: '5',
+      });
+      assetIds.forEach(id => params.append('asset_ids', id.toString()));
+
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/live-movers?${params}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setMovers(data);
+    } catch (err) {
+      console.error('Error fetching live movers:', err);
+    }
+  };
+
+  // Toggle live data on/off
+  const toggleLiveData = useCallback(() => {
+    if (liveDataEnabled) {
+      // Turn off
+      setLiveDataEnabled(false);
+      setLiveDataConnected(false);
+      setLivePrices(new Map());
+      if (liveDataIntervalRef.current) {
+        clearInterval(liveDataIntervalRef.current);
+        liveDataIntervalRef.current = null;
+      }
+    } else {
+      // Turn on
+      setLiveDataEnabled(true);
+    }
+  }, [liveDataEnabled]);
+
+  // Setup polling interval when live data is enabled
+  useEffect(() => {
+    if (liveDataEnabled) {
+      // Fetch immediately
+      fetchLivePrices();
+
+      // Then fetch every 20 seconds
+      liveDataIntervalRef.current = setInterval(fetchLivePrices, LIVE_DATA_INTERVAL);
+
+      return () => {
+        if (liveDataIntervalRef.current) {
+          clearInterval(liveDataIntervalRef.current);
+          liveDataIntervalRef.current = null;
+        }
+      };
+    }
+  }, [liveDataEnabled, fetchLivePrices]);
+
+  // Refetch live prices when page changes or filters change
+  useEffect(() => {
+    if (liveDataEnabled && paginatedPositions.length > 0) {
+      fetchLivePrices();
+    }
+  }, [currentPage, liveDataEnabled, paginatedPositions.length]);
+
+  // ==================== END LIVE DATA LOGIC ====================
+
   const buildFilterString = () => {
     const params = new URLSearchParams();
     if (selectedPortfolio) params.set('portfolio', selectedPortfolio);
@@ -447,6 +574,55 @@ const Positions = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Live Data Toggle Button */}
+          <Button
+            variant={liveDataEnabled ? "default" : "outline"}
+            size="sm"
+            onClick={toggleLiveData}
+            className={cn(
+              "gap-2 transition-all",
+              liveDataEnabled && "bg-green-600 hover:bg-green-700 text-white",
+              liveDataEnabled && liveDataLoading && "animate-pulse"
+            )}
+          >
+            {liveDataEnabled ? (
+              liveDataConnected ? (
+                <Wifi className="h-4 w-4" />
+              ) : (
+                <WifiOff className="h-4 w-4" />
+              )
+            ) : (
+              <Radio className="h-4 w-4" />
+            )}
+            {liveDataEnabled ? (
+              <>
+                Live Data
+                {liveDataConnected && lastLiveUpdate && (
+                  <span className="text-[10px] opacity-75">
+                    {lastLiveUpdate.toLocaleTimeString()}
+                  </span>
+                )}
+              </>
+            ) : (
+              "Live Data"
+            )}
+          </Button>
+
+          {/* Live Data Status Badge */}
+          {liveDataEnabled && (
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-xs",
+                liveDataConnected 
+                  ? "bg-green-500/10 text-green-500 border-green-500/30" 
+                  : "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
+              )}
+            >
+              {liveDataConnected ? "Connected" : "Connecting..."}
+            </Badge>
+          )}
 
           {/* Portfolio Filter */}
           <div className="relative flex items-center gap-1">
@@ -582,7 +758,10 @@ const Positions = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-gain" />
-              Top Gainers Today
+              Top Gainers {liveDataEnabled ? "(Live)" : "Today"}
+              {liveDataEnabled && liveDataConnected && (
+                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -613,7 +792,10 @@ const Positions = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-loss" />
-              Top Losers Today
+              Top Losers {liveDataEnabled ? "(Live)" : "Today"}
+              {liveDataEnabled && liveDataConnected && (
+                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -698,7 +880,16 @@ const Positions = () => {
                 {paginatedPositions.length > 0 ? paginatedPositions.map((asset) => {
                   const isSelected = selectedAssetInTable === asset.asset_id;
                   const isPositivePL = asset.total_pnl_unrealized >= 0;
-                  const isPositiveDay = asset.day_change_pct >= 0;
+                  
+                  // Get live price data if available
+                  const livePrice = livePrices.get(asset.asset_id);
+                  const displayPrice = liveDataEnabled && livePrice 
+                    ? livePrice.live_price 
+                    : asset.current_mark_price;
+                  const displayDayChange = liveDataEnabled && livePrice && livePrice.day_change_pct !== null
+                    ? livePrice.day_change_pct
+                    : asset.day_change_pct;
+                  const isPositiveDay = (displayDayChange || 0) >= 0;
 
                   return (
                     <Fragment key={asset.asset_id}>
@@ -716,7 +907,19 @@ const Positions = () => {
                         <td className="text-right mono">{formatNumber(asset.total_quantity)}</td>
                         <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.avg_cost_price_original, asset.avg_cost_price, asset.currency)}</td>
                         <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.total_cost_basis_money_original, asset.total_cost_basis_money, asset.currency)}</td>
-                        <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.current_mark_price_original, asset.current_mark_price, asset.currency)}</td>
+                        <td className="text-right mono text-xs">
+                          <div className="flex items-center justify-end gap-1">
+                            {liveDataEnabled && livePrice && (
+                              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live price" />
+                            )}
+                            <span className={cn(liveDataEnabled && livePrice && "text-green-500 font-medium")}>
+                              {liveDataEnabled && livePrice 
+                                ? `${displayPrice.toFixed(2)} USD`
+                                : formatCurrencyWithCode(asset.current_mark_price_original, asset.current_mark_price, asset.currency)
+                              }
+                            </span>
+                          </div>
+                        </td>
                         <td className="text-right mono font-medium text-xs">{formatCurrencyWithCode(asset.total_market_value_original, asset.total_market_value, asset.currency)}</td>
                         <td className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -745,9 +948,18 @@ const Positions = () => {
                           </div>
                         </td>
                         <td className="text-right">
-                          <span className={cn('text-sm mono', getChangeColor(asset.day_change_pct))}>
-                            {isPositiveDay ? '+' : ''}{formatPercent(asset.day_change_pct)}
-                          </span>
+                          <div className="flex items-center justify-end gap-1">
+                            {liveDataEnabled && livePrice && (
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                            )}
+                            <span className={cn(
+                              'text-sm mono', 
+                              getChangeColor(displayDayChange || 0),
+                              liveDataEnabled && livePrice && "font-semibold"
+                            )}>
+                              {isPositiveDay ? '+' : ''}{formatPercent(displayDayChange || 0)}
+                            </span>
+                          </div>
                         </td>
                         <td className="text-right">
                           <Badge variant="secondary" className="text-xs">

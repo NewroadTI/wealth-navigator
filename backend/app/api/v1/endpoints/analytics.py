@@ -9,7 +9,10 @@ from app.models.asset import Position
 from app.models.asset import Asset, AssetClass
 from app.models.portfolio import Account, Portfolio
 from app.models.user import User
-from app.schemas.analytics import PositionAggregated, MoversResponse, TopMover
+from app.schemas.analytics import (
+    PositionAggregated, MoversResponse, TopMover,
+    LivePriceRequest, LivePriceResponse, LivePriceItem
+)
 
 router = APIRouter()
 
@@ -415,4 +418,281 @@ def get_filter_options(
             } for a in assets
         ],
         "available_dates": [d.report_date.isoformat() for d in available_dates if d.report_date]
+    }
+
+
+# =============================================================================
+# LIVE DATA ENDPOINTS - Real-time prices from IB Gateway
+# =============================================================================
+
+@router.post("/live-prices", response_model=LivePriceResponse)
+def get_live_prices(
+    request: LivePriceRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Fetch live market prices from IB Gateway for the specified assets.
+    
+    This endpoint:
+    1. Receives a list of asset_ids from the frontend (current page positions)
+    2. Looks up the ISIN and symbol for each asset
+    3. Fetches live prices from IB Gateway
+    4. Returns updated prices mapped by asset_id
+    
+    Priority for matching:
+    1. ISIN from IBKR API -> ISIN from positions
+    2. Symbol from IBKR API -> Symbol from positions
+    """
+    from app.services.ibkr_live_data import get_ibkr_service
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    if not request.asset_ids:
+        return LivePriceResponse(
+            prices=[],
+            success=True,
+            connected=False,
+            message="No assets requested"
+        )
+    
+    # 1. Get asset info (symbol, isin) for the requested asset_ids
+    assets = db.query(
+        Asset.asset_id,
+        Asset.symbol,
+        Asset.isin,
+        Asset.description
+    ).filter(Asset.asset_id.in_(request.asset_ids)).all()
+    
+    if not assets:
+        return LivePriceResponse(
+            prices=[],
+            success=False,
+            connected=False,
+            message="No assets found for the given IDs"
+        )
+    
+    # Build lookup structures
+    asset_by_id = {a.asset_id: a for a in assets}
+    isin_to_asset_id = {}
+    symbol_to_asset_id = {}
+    
+    asset_identifiers = []
+    
+    for asset in assets:
+        identifier = {"asset_id": asset.asset_id}
+        
+        if asset.symbol:
+            identifier["symbol"] = asset.symbol
+            symbol_to_asset_id[asset.symbol.upper()] = asset.asset_id
+            
+        if asset.isin:
+            identifier["isin"] = asset.isin
+            isin_to_asset_id[asset.isin.upper()] = asset.asset_id
+            
+        asset_identifiers.append(identifier)
+    
+    # 2. Get previous day prices for day change calculation
+    # Use the latest available report date
+    latest_date = db.query(func.max(Position.report_date)).scalar()
+    prev_date = get_previous_date(db, latest_date) if latest_date else None
+    
+    prev_prices_map = {}
+    if prev_date:
+        prev_positions = db.query(
+            Position.asset_id,
+            Position.mark_price
+        ).filter(
+            Position.report_date == prev_date,
+            Position.asset_id.in_(request.asset_ids)
+        ).all()
+        
+        # Average if multiple positions per asset
+        from collections import defaultdict
+        temp_prices = defaultdict(list)
+        for p in prev_positions:
+            temp_prices[p.asset_id].append(float(p.mark_price or 0))
+        
+        for aid, prices in temp_prices.items():
+            prev_prices_map[aid] = sum(prices) / len(prices) if prices else 0
+    
+    # 3. Connect to IB Gateway and fetch live prices
+    ibkr_service = get_ibkr_service()
+    
+    try:
+        live_prices = ibkr_service.get_live_prices_batch(asset_identifiers)
+    except Exception as e:
+        logger.error(f"Error fetching live prices: {e}")
+        return LivePriceResponse(
+            prices=[],
+            success=False,
+            connected=False,
+            message=f"Failed to connect to IB Gateway: {str(e)}"
+        )
+    
+    if not live_prices:
+        return LivePriceResponse(
+            prices=[],
+            success=True,
+            connected=ibkr_service.is_connected(),
+            message="No live prices available"
+        )
+    
+    # 4. Map live prices back to asset_ids
+    result_prices = []
+    
+    for asset in assets:
+        # Try to find live price by symbol first (more reliable)
+        live_price = None
+        
+        if asset.symbol and asset.symbol.upper() in live_prices:
+            live_price = live_prices[asset.symbol.upper()]
+        elif asset.symbol and asset.symbol in live_prices:
+            live_price = live_prices[asset.symbol]
+        elif asset.isin and asset.isin.upper() in live_prices:
+            live_price = live_prices[asset.isin.upper()]
+        elif asset.isin and asset.isin in live_prices:
+            live_price = live_prices[asset.isin]
+        
+        if live_price:
+            # Calculate day change vs previous close
+            prev_price = prev_prices_map.get(asset.asset_id, 0)
+            day_change_pct = 0.0
+            
+            if prev_price > 0:
+                day_change_pct = ((live_price.price - prev_price) / prev_price) * 100
+            
+            result_prices.append(LivePriceItem(
+                asset_id=asset.asset_id,
+                symbol=asset.symbol,
+                isin=asset.isin,
+                live_price=live_price.price,
+                previous_close=prev_price if prev_price > 0 else None,
+                day_change_pct=day_change_pct,
+                bid=live_price.bid,
+                ask=live_price.ask,
+                last=live_price.last,
+                timestamp=live_price.timestamp.isoformat() if live_price.timestamp else None,
+                currency=live_price.currency
+            ))
+    
+    return LivePriceResponse(
+        prices=result_prices,
+        success=True,
+        connected=True,
+        message=f"Fetched {len(result_prices)} live prices"
+    )
+
+
+@router.get("/live-movers", response_model=MoversResponse)
+def get_live_movers(
+    db: Session = Depends(deps.get_db),
+    asset_ids: List[int] = Query(..., description="List of asset IDs to compare"),
+    limit: int = 5
+):
+    """
+    Calculate top movers from current page positions vs previous day.
+    Only uses database records (no live data).
+    Only considers the assets specified in asset_ids (current page).
+    """
+    if not asset_ids:
+        return MoversResponse(gainers=[], losers=[])
+    
+    # Get asset info
+    assets = db.query(
+        Asset.asset_id,
+        Asset.symbol,
+        Asset.description
+    ).filter(Asset.asset_id.in_(asset_ids)).all()
+    
+    if not assets:
+        return MoversResponse(gainers=[], losers=[])
+    
+    # Get latest date
+    latest_date = db.query(func.max(Position.report_date)).scalar()
+    if not latest_date:
+        return MoversResponse(gainers=[], losers=[])
+    
+    # Get previous day
+    prev_date = get_previous_date(db, latest_date)
+    if not prev_date:
+        return MoversResponse(gainers=[], losers=[])
+    
+    # Get current prices (latest date)
+    current_positions = db.query(
+        Position.asset_id,
+        Position.mark_price
+    ).filter(
+        Position.report_date == latest_date,
+        Position.asset_id.in_(asset_ids)
+    ).all()
+    
+    from collections import defaultdict
+    current_prices_temp = defaultdict(list)
+    for p in current_positions:
+        current_prices_temp[p.asset_id].append(float(p.mark_price or 0))
+    
+    current_prices_map = {}
+    for aid, prices in current_prices_temp.items():
+        current_prices_map[aid] = sum(prices) / len(prices) if prices else 0
+    
+    # Get previous day prices
+    prev_positions = db.query(
+        Position.asset_id,
+        Position.mark_price
+    ).filter(
+        Position.report_date == prev_date,
+        Position.asset_id.in_(asset_ids)
+    ).all()
+    
+    prev_prices_temp = defaultdict(list)
+    for p in prev_positions:
+        prev_prices_temp[p.asset_id].append(float(p.mark_price or 0))
+    
+    prev_prices_map = {}
+    for aid, prices in prev_prices_temp.items():
+        prev_prices_map[aid] = sum(prices) / len(prices) if prices else 0
+    
+    # Calculate movers
+    movers = []
+    
+    for asset in assets:
+        current_price = current_prices_map.get(asset.asset_id, 0)
+        prev_price = prev_prices_map.get(asset.asset_id, 0)
+        
+        if current_price > 0 and prev_price > 0:
+            pct_change = ((current_price - prev_price) / prev_price) * 100
+            
+            movers.append(TopMover(
+                asset_id=asset.asset_id,
+                asset_symbol=asset.symbol,
+                asset_name=asset.description,
+                current_price=current_price,
+                previous_price=prev_price,
+                change_pct=pct_change,
+                direction="UP" if pct_change >= 0 else "DOWN"
+            ))
+    
+    # Sort and return top gainers/losers
+    gainers = sorted(movers, key=lambda x: x.change_pct, reverse=True)[:limit]
+    losers = sorted(movers, key=lambda x: x.change_pct)[:limit]
+    
+    return MoversResponse(gainers=gainers, losers=losers)
+
+
+@router.get("/live-status")
+def get_live_data_status():
+    """
+    Check the connection status to IB Gateway.
+    """
+    from app.services.ibkr_live_data import get_ibkr_service
+    
+    service = get_ibkr_service()
+    connected = service.is_connected()
+    
+    return {
+        "connected": connected,
+        "gateway_host": service.gateway_host,
+        "gateway_port": service.gateway_port,
+        "message": "Connected to IB Gateway" if connected else "Not connected to IB Gateway"
     }

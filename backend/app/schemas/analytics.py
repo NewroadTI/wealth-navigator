@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
 
 # --- SCHEMA PARA TOP MOVERS (Tarjetas) ---
 class TopMover(BaseModel):
@@ -66,3 +67,35 @@ class PositionAggregated(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# =============================================================================
+# LIVE DATA SCHEMAS - Real-time prices from IB Gateway
+# =============================================================================
+
+class LivePriceRequest(BaseModel):
+    """Request to fetch live prices for specific assets."""
+    asset_ids: List[int]  # Asset IDs to fetch prices for
+
+
+class LivePriceItem(BaseModel):
+    """Live price data for a single asset."""
+    asset_id: int
+    symbol: Optional[str] = None
+    isin: Optional[str] = None
+    live_price: float
+    previous_close: Optional[float] = None
+    day_change_pct: Optional[float] = None
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    last: Optional[float] = None
+    timestamp: Optional[str] = None
+    currency: str = "USD"
+
+
+class LivePriceResponse(BaseModel):
+    """Response containing live prices for requested assets."""
+    prices: List[LivePriceItem]
+    success: bool
+    connected: bool
+    message: Optional[str] = None
