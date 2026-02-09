@@ -52,14 +52,24 @@ class MissingAccountInput(BaseModel):
     parsed_name: Optional[str] = None
 
 
+class MatchCandidate(BaseModel):
+    """A potential user match for an account."""
+    user_id: int
+    full_name: str
+    email: Optional[str] = None
+    confidence: int  # 0-100
+
+
 class MatchResult(BaseModel):
     account_code: str
     parsed_name: str
-    match_found: bool
+    candidates: List[MatchCandidate]  # Top candidates above threshold
+    # Legacy fields for backward compatibility
+    match_found: bool = False
     matched_user_id: Optional[int] = None
     matched_user_name: Optional[str] = None
     matched_user_email: Optional[str] = None
-    confidence: int  # 0-100
+    confidence: int = 0
 
 
 class MatchUsersRequest(BaseModel):
@@ -127,41 +137,87 @@ def parse_name_from_full_name(full_name: str) -> str:
 
 def fuzzy_match_names(name1: str, name2: str) -> int:
     """
-    Simple fuzzy matching between two names.
+    Improved fuzzy matching between two names.
     Returns a score 0-100.
+    
+    Improvements:
+    - Normalizes accented characters (é → e, ñ → n)
+    - Handles word order differences
+    - Handles abbreviations (J matches Jose)
     """
     if not name1 or not name2:
         return 0
     
-    # Normalize both names
-    n1 = name1.upper().strip()
-    n2 = name2.upper().strip()
+    try:
+        from unidecode import unidecode
+        # Normalize accents: Muñoz → Munoz
+        n1 = unidecode(name1).upper().strip()
+        n2 = unidecode(name2).upper().strip()
+    except ImportError:
+        # Fallback if unidecode not available
+        n1 = name1.upper().strip()
+        n2 = name2.upper().strip()
     
-    # Exact match
+    # Exact match after normalization
     if n1 == n2:
         return 100
     
     # Check if one is contained in the other
     if n1 in n2 or n2 in n1:
-        return 90
+        return 95
     
-    # Split into words and compare
-    words1 = set(n1.split())
-    words2 = set(n2.split())
+    # Split into words
+    words1 = [w for w in n1.split() if len(w) > 0]
+    words2 = [w for w in n2.split() if len(w) > 0]
     
     if not words1 or not words2:
         return 0
     
-    # Jaccard similarity on words
-    intersection = len(words1 & words2)
-    union = len(words1 | words2)
+    # Count matched words with flexible matching
+    matched_words = 0
+    total_words = max(len(words1), len(words2))
     
-    if union == 0:
+    words2_matched = set()
+    
+    for w1 in words1:
+        best_match_score = 0
+        best_match_idx = -1
+        
+        for idx, w2 in enumerate(words2):
+            if idx in words2_matched:
+                continue
+                
+            # Exact word match
+            if w1 == w2:
+                if best_match_score < 100:
+                    best_match_score = 100
+                    best_match_idx = idx
+            # One is abbreviation of the other (J matches JOSE)
+            elif len(w1) == 1 and w2.startswith(w1):
+                if best_match_score < 80:
+                    best_match_score = 80
+                    best_match_idx = idx
+            elif len(w2) == 1 and w1.startswith(w2):
+                if best_match_score < 80:
+                    best_match_score = 80
+                    best_match_idx = idx
+            # One word starts with the other (partial match)
+            elif w1.startswith(w2) or w2.startswith(w1):
+                if best_match_score < 70:
+                    best_match_score = 70
+                    best_match_idx = idx
+        
+        if best_match_idx >= 0:
+            words2_matched.add(best_match_idx)
+            matched_words += (best_match_score / 100)
+    
+    # Calculate score based on matched words
+    if total_words == 0:
         return 0
     
-    score = int((intersection / union) * 100)
+    score = int((matched_words / total_words) * 100)
     
-    return score
+    return min(score, 100)
 
 
 # ===========================================================================
@@ -330,32 +386,55 @@ def match_missing_accounts_to_users(
     
     results: List[MatchResult] = []
     
+    # Configuration: top 3 candidates above 75% confidence
+    MAX_CANDIDATES = 3
+    MIN_CONFIDENCE = 75
+    
     for missing in request.missing_accounts:
-        best_match = None
-        best_score = 0
-        
         parsed_name = missing.parsed_name or ""
         
+        # Score all investors
+        scored_investors = []
         for investor in investors:
             if not investor.full_name:
                 continue
             
             score = fuzzy_match_names(parsed_name, investor.full_name)
             
-            if score > best_score:
-                best_score = score
-                best_match = investor
+            if score >= MIN_CONFIDENCE:
+                scored_investors.append({
+                    'investor': investor,
+                    'score': score
+                })
         
-        # Threshold for a valid match: 80%
-        is_match = best_score >= 80
+        # Sort by score descending and take top N
+        scored_investors.sort(key=lambda x: x['score'], reverse=True)
+        top_candidates = scored_investors[:MAX_CANDIDATES]
+        
+        # Build candidate list
+        candidates = [
+            MatchCandidate(
+                user_id=item['investor'].user_id,
+                full_name=item['investor'].full_name,
+                email=item['investor'].email,
+                confidence=item['score']
+            )
+            for item in top_candidates
+        ]
+        
+        # Legacy compatibility: use best match if available
+        best_match = top_candidates[0]['investor'] if top_candidates else None
+        best_score = top_candidates[0]['score'] if top_candidates else 0
+        is_match = len(candidates) > 0
         
         results.append(MatchResult(
             account_code=missing.account_code,
             parsed_name=parsed_name,
+            candidates=candidates,
             match_found=is_match,
-            matched_user_id=best_match.user_id if is_match and best_match else None,
-            matched_user_name=best_match.full_name if is_match and best_match else None,
-            matched_user_email=best_match.email if is_match and best_match else None,
+            matched_user_id=best_match.user_id if best_match else None,
+            matched_user_name=best_match.full_name if best_match else None,
+            matched_user_email=best_match.email if best_match else None,
             confidence=best_score
         ))
     

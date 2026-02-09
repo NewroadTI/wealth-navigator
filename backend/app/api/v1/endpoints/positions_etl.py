@@ -378,21 +378,7 @@ def resolve_asset_with_learning(
     return None, "not_found", False
 
 
-def resolve_account(db: Session, cuenta: str, account_cache: Dict[str, int]) -> Optional[int]:
-    """Resolve account_id from Cuenta (interface_code)."""
-    if not cuenta:
-        return None
-    
-    cuenta_clean = str(cuenta).strip()
-    if cuenta_clean in account_cache:
-        return account_cache[cuenta_clean]
-    
-    account = db.query(Account).filter(Account.interface_code == cuenta_clean).first()
-    if account:
-        account_cache[cuenta_clean] = account.account_id
-        return account.account_id
-    
-    return None
+
 
 
 @router.post("/import-positions", response_model=ImportPositionsResponse)
@@ -529,8 +515,12 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
         # STEP 4: Combine and process positions
         # =================================================================
         
+
         # Build caches
         account_cache = {}
+        # We also want to map Portfolio Interface Code -> List of Accounts (for fallback)
+        portfolio_map = {} 
+        
         asset_cache = {}
         
         # Pre-populate asset cache
@@ -548,8 +538,23 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
         # Pre-populate account cache
         all_accounts = db.query(Account).all()
         for acc in all_accounts:
-            if acc.interface_code:
-                account_cache[acc.interface_code] = acc.account_id
+            # Direct match by account_code (Primary)
+            if acc.account_code:
+                account_cache[acc.account_code] = acc
+            # Match by alias (Secondary)
+            if acc.account_alias:
+                account_cache[acc.account_alias] = acc
+                
+            # Organize by Portfolio for fallback
+            if acc.portfolio_id:
+                if acc.portfolio_id not in portfolio_map:
+                    portfolio_map[acc.portfolio_id] = []
+                portfolio_map[acc.portfolio_id].append(acc)
+
+        # Pre-populate Portfolio Interface Codes
+        from app.models.portfolio import Portfolio
+        all_portfolios = db.query(Portfolio).all()
+        portfolio_interface_map = {p.interface_code: p.portfolio_id for p in all_portfolios if p.interface_code}
         
         # Stats
         records_created = 0
@@ -571,6 +576,7 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
             # Extract data
             instrumento = str(row.get('Instrumento', '')).strip()
             cuenta = str(row.get('Cuenta', '')).strip()
+            cliente_nombre = str(row.get('Cliente', '')).strip() # Name from Inviu CSV
             cantidad = parse_decimal(row.get('Cantidad'))
             moneda = str(row.get('Moneda', 'USD'))[:3] if row.get('Moneda') else 'USD'
             monto_total = parse_decimal(row.get('Monto total'))
@@ -580,6 +586,7 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
             isin = str(row.get('ISIN', '')) if pd.notna(row.get('ISIN')) else None
             cusip = str(row.get('CUSIP', '')) if pd.notna(row.get('CUSIP')) else None
             symbol = str(row.get('Symbol', '')) if pd.notna(row.get('Symbol')) else None
+            security_desc = str(row.get('Security Description', '')) if pd.notna(row.get('Security Description')) else None
             market_value = parse_decimal(row.get('Market Value'))
             last_price = parse_decimal(row.get('Last $'))
             
@@ -587,22 +594,55 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
             row_data = {
                 'instrumento_inviu': instrumento,
                 'cuenta': cuenta,
+                'cliente': cliente_nombre,
                 'cantidad': str(cantidad) if cantidad else None,
                 'monto_total': str(monto_total) if monto_total else None,
                 'moneda': moneda,
                 'isin': isin,
                 'cusip': cusip,
                 'symbol': symbol,
+                'security_description': security_desc,
                 'match_type': match_type
             }
             
             # Resolve account
-            account_id = resolve_account(db, cuenta, account_cache)
+            account_id = None
+            
+            # 1. Try Direct Account Match
+            if cuenta in account_cache:
+                account_id = account_cache[cuenta].account_id
+            
+            # 2. Try Portfolio Match (if not found in accounts)
+            if not account_id and cuenta in portfolio_interface_map:
+                p_id = portfolio_interface_map[cuenta]
+                potential_accounts = portfolio_map.get(p_id, [])
+                
+                # Try to match by currency
+                for acc in potential_accounts:
+                    if acc.currency == moneda:
+                        account_id = acc.account_id
+                        break
+                
+                # Fallback: Just take the first account if no currency match (or USD default)
+                if not account_id and potential_accounts:
+                    # Preference for USD if available in list
+                    usd_acc = next((a for a in potential_accounts if a.currency == 'USD'), None)
+                    if usd_acc:
+                        account_id = usd_acc.account_id
+                    else:
+                        account_id = potential_accounts[0].account_id
+
             if not account_id:
                 records_skipped += 1
                 if cuenta not in missing_accounts:
+                    # Parse Name from "LASTNAME, FIRSTNAME INITIAL" format if possible to be cleaner
+                    # But for now just pass the whole string, frontend can handle or we just show as is.
+                    # Actually, the user wants "generar" format logic which usually implies specific structure.
+                    # Let's save the raw name as 'parsed_name' to be used by frontend directly.
+                    
                     missing_accounts[cuenta] = {
-                        'cuenta': cuenta,
+                        'account_code': cuenta, # RENAMED from 'cuenta' to 'account_code' for frontend contract
+                        'parsed_name': cliente_nombre, # NEW: Extracted name
                         'count': 0,
                         'reason': f"Account not found: {cuenta}",
                         'done': False
@@ -611,6 +651,7 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
                 skipped_records.append({
                     'row_data': row_data,
                     'reason': f"Missing Account: {cuenta}",
+                    'client_name': cliente_nombre, # Explicit field for UI
                     'record_type': 'position'
                 })
                 continue
@@ -636,6 +677,7 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
                         'isin': isin,
                         'cusip': cusip,
                         'symbol': symbol,
+                        'description': security_desc,
                         'reason': f"Asset not found",
                         'count': 0,
                         'done': False
@@ -644,6 +686,7 @@ async def import_positions(request: ImportPositionsRequest, db: Session = Depend
                 skipped_records.append({
                     'row_data': row_data,
                     'reason': f"Missing Asset: {key}",
+                    'asset_description': security_desc or f"Unknown Asset ({key})",
                     'record_type': 'position'
                 })
                 continue

@@ -263,15 +263,15 @@ const ReportStatusCard = ({
 
 const ActivityLogItem = ({ log }: { log: ETLActivityLog }) => {
   const navigate = useNavigate();
-  
+
   // Show missing assets link for jobs that track them
   const jobsWithMissingAssets = ['OPENPOSITIONS', 'STATEMENTFUNDS'];
-  const canHaveMissingAssets = jobsWithMissingAssets.includes(log.job_type) || 
-                               (log.report_type && jobsWithMissingAssets.includes(log.report_type));
+  const canHaveMissingAssets = jobsWithMissingAssets.includes(log.job_type) ||
+    (log.report_type && jobsWithMissingAssets.includes(log.report_type));
   const hasMissingAssets = Boolean(log.extra_data?.missing_assets && log.extra_data.missing_assets.length > 0);
   const hasMissingAccounts = Boolean(log.extra_data?.missing_accounts && log.extra_data.missing_accounts.length > 0);
   const hasSkippedOrFailed = (log.records_skipped || 0) > 0 || (log.records_failed || 0) > 0;
-  
+
   // Support both 'error_message' and 'error' fields from backend
   const errorText = log.error_message || (log as any).error;
 
@@ -373,6 +373,14 @@ const IBKRDashboard = () => {
       }
 
       const dashboardData = await response.json();
+
+      // Filter out PERSHING jobs for IBKR dashboard
+      if (dashboardData.recent_activity) {
+        dashboardData.recent_activity = dashboardData.recent_activity.filter(
+          (job: any) => !job.job_type.includes('PERSHING')
+        );
+      }
+
       setData(dashboardData);
     } catch (error) {
       console.error('Error fetching ETL dashboard:', error);

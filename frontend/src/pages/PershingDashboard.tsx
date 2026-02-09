@@ -373,8 +373,10 @@ const PershingDashboard = () => {
                 throw new Error('Failed to fetch jobs');
             }
             const jobs: JobHistory[] = await response.json();
-            // Filter only PERSHING jobs
-            const pershingJobs = jobs.filter(job => job.job_type === 'PERSHING');
+            // Filter only PERSHING jobs (Transactions and Positions)
+            const pershingJobs = jobs.filter(job =>
+                job.job_type === 'PERSHING' || job.job_type === 'PERSHING_POSITIONS'
+            );
             setJobHistory(pershingJobs);
         } catch (error) {
             console.error('Error fetching jobs:', error);
