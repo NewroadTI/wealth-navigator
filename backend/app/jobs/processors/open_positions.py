@@ -391,7 +391,8 @@ class OpenPositionsProcessor:
             "open_date_time": open_date_time,
             "vesting_date": vesting_date,
             "accrued_interest": accrued_interest,
-            "fx_rate_to_base": fx_rate
+            "fx_rate_to_base": fx_rate,
+            "currency": currency
         }
         
         return position_data
