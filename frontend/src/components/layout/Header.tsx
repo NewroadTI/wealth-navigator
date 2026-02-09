@@ -1,8 +1,18 @@
-import { Bell, Search, RefreshCw, ChevronLeft } from 'lucide-react';
+import { Bell, Search, RefreshCw, ChevronLeft, User, LogOut } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 interface HeaderProps {
   title: string;
@@ -12,6 +22,7 @@ interface HeaderProps {
 export function Header({ title, subtitle }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const path = location.pathname;
   const isPortfolioPerformance = /^\/portfolios\/[^/]+\/performance$/.test(path);
   const isPortfolioAccount = /^\/portfolios\/[^/]+\/accounts\/[^/]+$/.test(path);
@@ -22,6 +33,14 @@ export function Header({ title, subtitle }: HeaderProps) {
     : isPortfolioAccount
       ? path.replace(/\/accounts\/[^/]+$/, '')
       : '/portfolios';
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Sesión cerrada', {
+      description: 'Has cerrado sesión correctamente.',
+    });
+    navigate('/login');
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center justify-between border-b border-border bg-background/95 backdrop-blur px-3 md:px-6 pl-14 md:pl-6">
@@ -70,6 +89,33 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         {/* Notifications */}
         <NotificationsBell />
+
+        {/* User Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9">
+              <User className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{user?.full_name || 'Usuario'}</p>
+                <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <User className="mr-2 h-4 w-4" />
+              <span>Perfil</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Cerrar Sesión</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

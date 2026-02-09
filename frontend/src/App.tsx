@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { NavigationHistoryProvider } from "@/contexts/NavigationHistoryContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Index from "./pages/Index";
 import Portfolios from "./pages/Portfolios";
 import PortfolioDetail from "./pages/PortfolioDetail";
@@ -30,39 +34,46 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <NotificationsProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <NavigationHistoryProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/portfolios" element={<Portfolios />} />
-              <Route path="/portfolios/:id" element={<PortfolioDetail />} />
-              <Route path="/portfolios/:portfolioId/accounts/:accountId" element={<PortfolioAccounts />} />
-              <Route path="/portfolios/:id/performance" element={<PortfolioPerformance />} />
-              <Route path="/transactions" element={<Transactions />} />
-              <Route path="/structured-notes" element={<StructuredNotes />} />
-              <Route path="/positions" element={<Positions />} />
-              <Route path="/assets" element={<Assets />} />
-              <Route path="/advisors" element={<Advisors />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/basic-data" element={<BasicData />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/crm" element={<CRM />} />
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <AuthProvider>
+          <NotificationsProvider>
+            <Toaster />
+            <Sonner />
+            <NavigationHistoryProvider>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
-              {/* Rutas ETL específicas (basadas en los imports disponibles) */}
-              <Route path="/etl/ibkr" element={<IBKRDashboard />} />
-              <Route path="/etl/pershing" element={<PershingDashboard />} />
-              <Route path="/etl-job/:jobId" element={<ETLJobDetails />} />
+                {/* Protected Routes */}
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/portfolios" element={<ProtectedRoute><Portfolios /></ProtectedRoute>} />
+                <Route path="/portfolios/:id" element={<ProtectedRoute><PortfolioDetail /></ProtectedRoute>} />
+                <Route path="/portfolios/:portfolioId/accounts/:accountId" element={<ProtectedRoute><PortfolioAccounts /></ProtectedRoute>} />
+                <Route path="/portfolios/:id/performance" element={<ProtectedRoute><PortfolioPerformance /></ProtectedRoute>} />
+                <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+                <Route path="/structured-notes" element={<ProtectedRoute><StructuredNotes /></ProtectedRoute>} />
+                <Route path="/positions" element={<ProtectedRoute><Positions /></ProtectedRoute>} />
+                <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
+                <Route path="/advisors" element={<ProtectedRoute><Advisors /></ProtectedRoute>} />
+                <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/basic-data" element={<ProtectedRoute><BasicData /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+                <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
 
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </NavigationHistoryProvider>
-        </BrowserRouter>
-      </NotificationsProvider>
+                {/* ETL Routes */}
+                <Route path="/etl/ibkr" element={<ProtectedRoute><IBKRDashboard /></ProtectedRoute>} />
+                <Route path="/etl/pershing" element={<ProtectedRoute><PershingDashboard /></ProtectedRoute>} />
+                <Route path="/etl-job/:jobId" element={<ProtectedRoute><ETLJobDetails /></ProtectedRoute>} />
+
+                {/* 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </NavigationHistoryProvider>
+          </NotificationsProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );

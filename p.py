@@ -10,7 +10,7 @@ import time
 # 1. Configuración
 ib = IB()
 # Asegúrate de que TWS o Gateway esté abierto en el puerto 7497 (o 4002 para Gateway)
-ib.connect('127.0.0.1', 4001, clientId=1)
+ib.connect('127.0.0.1', 4001, clientId=12)
 
 # 2. Lista de 200 símbolos (S&P 500 y Tech)
 simbolos = [

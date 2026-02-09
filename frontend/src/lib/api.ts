@@ -94,7 +94,29 @@ export const assetsApi = {
   },
 };
 
-// User interface
+// Role interface
+export interface Role {
+  role_id: number;
+  name: string;
+  description: string | null;
+}
+
+// User Read interface (for responses)
+export interface UserRead {
+  user_id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  tax_id: string | null;
+  entity_type: string;
+  is_active: boolean;
+  created_at: string;
+  role_id: number | null;
+  role?: Role | null;
+}
+
+// User interface (legacy, keeping for backward compatibility)
 export interface User {
   user_id: number;
   username: string;
@@ -301,6 +323,68 @@ export const accountsApi = {
     const response = await fetch(`${getBaseUrl()}/api/v1/accounts/${query ? `?${query}` : ''}`);
     if (!response.ok) {
       throw new Error('Failed to fetch accounts');
+    }
+    return response.json();
+  },
+};
+
+// Authentication API
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user: UserRead;
+}
+
+export const authApi = {
+  async login(username: string, password: string): Promise<LoginResponse> {
+    const response = await fetch(`${getBaseUrl()}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Login failed');
+    }
+    return response.json();
+  },
+
+  async register(userData: any): Promise<UserRead> {
+    const response = await fetch(`${getBaseUrl()}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Registration failed');
+    }
+    return response.json();
+  },
+
+  async getCurrentUser(): Promise<UserRead> {
+    const response = await fetch(`${getBaseUrl()}/api/v1/auth/me`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to get current user');
+    }
+    return response.json();
+  },
+};
+
+// Roles API
+export const rolesApi = {
+  async getRoles(): Promise<Role[]> {
+    const response = await fetch(`${getBaseUrl()}/api/v1/roles/`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch roles');
     }
     return response.json();
   },
