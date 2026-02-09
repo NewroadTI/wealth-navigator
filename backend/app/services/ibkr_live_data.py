@@ -28,10 +28,15 @@ class IBKRLiveDataService:
     """
     Servicio robusto para IBKR.
     Maneja la conexión síncrona y la creación de Event Loops para hilos de FastAPI.
+    Includes price cache to avoid redundant IB queries.
     """
     _instance = None
     _lock = Lock()     # Lock para el patrón Singleton
     _ib_lock = Lock()  # Lock CRÍTICO para operaciones con IB
+    _failed_symbols: Set[str] = set()  # Caché de símbolos que fallaron
+    _failed_isins: Set[str] = set()  # Caché de ISINs que fallaron
+    _price_cache: Dict[str, tuple] = {}  # Caché de precios: symbol -> (LivePrice, timestamp)
+    _cache_ttl: int = 10  # Segundos de validez del caché
     
     def __new__(cls):
         if cls._instance is None:
@@ -99,7 +104,7 @@ class IBKRLiveDataService:
                     host=self.gateway_host, 
                     port=self.gateway_port, 
                     clientId=self.client_id,
-                    timeout=10,
+                    timeout=5,  # Reducido de 10 a 5 segundos
                     readonly=True
                 )
                 self.ib.reqMarketDataType(self.market_data_type)
@@ -119,92 +124,213 @@ class IBKRLiveDataService:
         isins: Optional[List[str]] = None,
         isin_symbol_map: Optional[Dict[str, str]] = None
     ) -> Dict[str, LivePrice]:
-        
-        targets = set()
-        if symbols: targets.update(symbols)
-        
+        """
+        Obtiene precios en vivo. Valida en batch pero maneja errores individualmente.
+        Uses non-blocking lock with timeout to prevent request pile-up.
+        Uses price cache to avoid redundant IB queries.
+        """
+        targets = list(set([s for s in (symbols or []) if s not in self._failed_symbols]))
         isin_map = isin_symbol_map or {}
-        if isins and isin_symbol_map:
-            for isin in isins:
-                if isin in isin_map:
-                    targets.add(isin_map[isin])
 
         if not targets:
             return {}
 
         result = {}
+        now = datetime.now()
+        symbols_to_fetch = []
+        
+        # Check cache first
+        for symbol in targets:
+            if symbol in self._price_cache:
+                cached_price, cached_time = self._price_cache[symbol]
+                age = (now - cached_time).total_seconds()
+                if age < self._cache_ttl:
+                    result[symbol] = cached_price
+                    # Also add by ISIN if available
+                    if cached_price.isin:
+                        result[cached_price.isin] = cached_price
+                    continue
+            symbols_to_fetch.append(symbol)
+        
+        # If all prices are cached, return immediately (no lock needed)
+        if not symbols_to_fetch:
+            logger.info(f"✓ Devolviendo {len(result)} precios desde caché")
+            return result
+        
+        logger.info(f"Cache: {len(targets) - len(symbols_to_fetch)} hits, {len(symbols_to_fetch)} misses")
 
-        # SECCIÓN CRÍTICA
-        with self._ib_lock:
+        # Try to acquire lock with timeout (don't block other requests)
+        lock_acquired = self._ib_lock.acquire(timeout=2)
+        if not lock_acquired:
+            logger.warning("Could not acquire IB lock (another request in progress), returning cached results only")
+            return result
+        
+        try:
             try:
                 self._ensure_connected()
                 
-                contracts = [Stock(s, 'SMART', 'USD') for s in targets]
+                logger.info(f"Validando {len(symbols_to_fetch)} contratos en batch...")
                 
-                logger.info(f"Validando {len(contracts)} contratos...")
-                qualified_contracts = self.ib.qualifyContracts(*contracts)
+                # Crear todos los contratos
+                contracts = [Stock(s, 'SMART', 'USD') for s in symbols_to_fetch]
                 
-                if not qualified_contracts:
-                    logger.warning("Ningún contrato pudo ser validado.")
-                    return {}
-
-                logger.info(f"Solicitando precios para {len(qualified_contracts)} activos...")
-                tickers = self.ib.reqTickers(*qualified_contracts)
+                # Validar todos de una vez (más rápido)
+                try:
+                    qualified_contracts = self.ib.qualifyContracts(*contracts)
+                except Exception as e:
+                    logger.warning(f"Error en batch validation: {e}")
+                    qualified_contracts = []
                 
-                for ticker in tickers:
-                    symbol = ticker.contract.symbol
-                    price = ticker.marketPrice()
-                    
-                    # Fallback de precio
-                    if not price or str(price) == 'nan' or price <= 0:
-                        price = ticker.last if ticker.last else ticker.close
-                        
-                    if not price or str(price) == 'nan' or price <= 0:
-                        continue
-
-                    live_price = LivePrice(
-                        symbol=symbol,
-                        isin=None,
-                        price=float(price),
-                        bid=ticker.bid if ticker.bid else None,
-                        ask=ticker.ask if ticker.ask else None,
-                        last=ticker.last,
-                        close=ticker.close,
-                        timestamp=datetime.now(),
-                        currency="USD"
-                    )
-                    
-                    result[symbol] = live_price
-                    for isin, sym in isin_map.items():
+                # Mapear contratos válidos por symbol
+                valid_by_symbol = {}
+                for contract in qualified_contracts:
+                    valid_by_symbol[contract.symbol] = contract
+                
+                # Identificar cuáles fallaron y reintentar con ISIN
+                failed_symbols = set(symbols_to_fetch) - set(valid_by_symbol.keys())
+                isin_contracts = []
+                isin_to_symbol = {}
+                
+                for symbol in failed_symbols:
+                    # Buscar ISIN asociado
+                    isin = None
+                    for isin_key, sym in isin_map.items():
                         if sym == symbol:
-                            result[isin] = live_price
-                            live_price.isin = isin
+                            isin = isin_key
+                            break
+                    
+                    if isin and isin not in self._failed_isins:
+                        isin_contract = Stock(isin, 'SMART', 'USD')
+                        isin_contracts.append(isin_contract)
+                        isin_to_symbol[isin] = symbol
+                
+                # Validar contratos con ISIN
+                if isin_contracts:
+                    logger.info(f"Reintentando {len(isin_contracts)} símbolos con ISIN...")
+                    try:
+                        qualified_isin = self.ib.qualifyContracts(*isin_contracts)
+                        for contract in qualified_isin:
+                            # El símbolo puede ser ISIN o el symbol real
+                            original_symbol = isin_to_symbol.get(contract.symbol)
+                            if original_symbol:
+                                valid_by_symbol[original_symbol] = contract
+                                logger.info(f"✓ Encontrado por ISIN: {contract.symbol} -> {original_symbol}")
+                    except Exception as e:
+                        logger.debug(f"Error validando ISINs: {e}")
+                
+                # Cachear los que definitivamente fallaron
+                still_failed = set(symbols_to_fetch) - set(valid_by_symbol.keys())
+                for symbol in still_failed:
+                    self._failed_symbols.add(symbol)
+                    # También cachear ISIN si existe
+                    for isin_key, sym in isin_map.items():
+                        if sym == symbol:
+                            self._failed_isins.add(isin_key)
+                    logger.debug(f"✗ Cacheado como fallido: {symbol}")
+                
+                # Obtener precios solo para contratos válidos
+                if valid_by_symbol:
+                    logger.info(f"Obteniendo precios para {len(valid_by_symbol)} contratos...")
+                    
+                    # Request tickers with a timeout
+                    try:
+                        tickers = self.ib.reqTickers(*valid_by_symbol.values())
+                        # Give IB time to respond (max 5 seconds)
+                        self.ib.sleep(2)
+                    except Exception as ticker_err:
+                        logger.error(f"Error en reqTickers: {ticker_err}")
+                        tickers = []
+                    
+                    for ticker in tickers:
+                        try:
+                            symbol = ticker.contract.symbol
+                            price = ticker.marketPrice()
                             
+                            if not price or str(price) == 'nan' or price <= 0:
+                                price = ticker.last if ticker.last else ticker.close
+                            
+                            if not price or str(price) == 'nan' or price <= 0:
+                                continue
+                            
+                            # Encontrar el símbolo original
+                            original_symbol = symbol
+                            for sym, contract in valid_by_symbol.items():
+                                if contract.symbol == symbol:
+                                    original_symbol = sym
+                                    break
+                            
+                            # Buscar ISIN
+                            isin = None
+                            for isin_key, sym in isin_map.items():
+                                if sym == original_symbol:
+                                    isin = isin_key
+                                    break
+                            
+                            live_price = LivePrice(
+                                symbol=original_symbol,
+                                isin=isin,
+                                price=float(price),
+                                bid=ticker.bid if ticker.bid else None,
+                                ask=ticker.ask if ticker.ask else None,
+                                last=ticker.last,
+                                close=ticker.close,
+                                timestamp=datetime.now(),
+                                currency="USD"
+                            )
+                            
+                            result[original_symbol] = live_price
+                            if isin:
+                                result[isin] = live_price
+                            
+                            # Update cache
+                            self._price_cache[original_symbol] = (live_price, datetime.now())
+                        except Exception as e:
+                            logger.error(f"Error procesando ticker: {e}")
+                            continue
+                
+                fetched_count = len([k for k in result if k in symbols_to_fetch])
+                logger.info(f"✓ Obtenidos {fetched_count} precios de {len(symbols_to_fetch)} intentos (total: {len(result)})")
                 return result
 
             except Exception as e:
                 logger.error(f"Error obteniendo precios: {e}")
+                logger.error(traceback.format_exc())
                 try:
                     self.ib.disconnect()
                 except:
                     pass
                 return {}
+        finally:
+            # Always release the lock
+            self._ib_lock.release()
 
     def get_live_prices_batch(self, asset_identifiers: List[Dict[str, str]]) -> Dict[str, LivePrice]:
-        """Wrapper para compatibilidad con endpoints."""
-        symbols_to_fetch = set()
+        """
+        Wrapper para compatibilidad con endpoints.
+        Filtra assets ya cacheados como fallidos y busca el resto.
+        """
+        symbols_to_fetch = []
         isin_to_symbol = {}
         
         for asset in asset_identifiers:
             symbol = asset.get('symbol')
             isin = asset.get('isin')
-            if symbol:
-                symbols_to_fetch.add(symbol)
-                if isin:
+            
+            # Solo intentar si no está en caché de fallidos
+            if symbol and symbol not in self._failed_symbols:
+                symbols_to_fetch.append(symbol)
+                if isin and isin not in self._failed_isins:
                     isin_to_symbol[isin] = symbol
         
+        if not symbols_to_fetch:
+            logger.warning("No hay símbolos para consultar (todos en caché de fallidos)")
+            return {}
+        
+        logger.info(f"Consultando {len(symbols_to_fetch)} activos (caché: {len(self._failed_symbols)} symbols, {len(self._failed_isins)} ISINs)")
+        
+        # Una sola pasada: el método interno maneja symbol + ISIN automáticamente
         return self.get_live_prices(
-            symbols=list(symbols_to_fetch),
+            symbols=symbols_to_fetch,
             isin_symbol_map=isin_to_symbol
         )
 
