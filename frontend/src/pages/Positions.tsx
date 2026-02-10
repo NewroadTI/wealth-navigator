@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Radio, Wifi, WifiOff } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/config';
+import { toast } from 'sonner';
+import { useLivePricesSSE, LivePriceData } from '@/hooks/useLivePricesSSE';
 
 const ITEMS_PER_PAGE = 15;
 // getApiBaseUrl() returns the API URL with runtime protocol detection
@@ -131,7 +133,8 @@ interface LivePriceItem {
   currency: string;
 }
 
-const LIVE_DATA_INTERVAL = 20000; // 20 seconds
+// LocalStorage key for persisting Live Data state
+const LIVE_DATA_STORAGE_KEY = 'wealthroad_live_data_enabled';
 
 const Positions = () => {
   // Helper function to format currency with dual display if not USD
@@ -169,13 +172,12 @@ const Positions = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Live Data State
-  const [liveDataEnabled, setLiveDataEnabled] = useState(false);
-  const [liveDataConnected, setLiveDataConnected] = useState(false);
-  const [liveDataLoading, setLiveDataLoading] = useState(false);
-  const [livePrices, setLivePrices] = useState<Map<number, LivePriceItem>>(new Map());
-  const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
-  const liveDataIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Live Data State - using SSE (persisted in localStorage)
+  const [liveDataEnabled, setLiveDataEnabled] = useState(() => {
+    // Read initial state from localStorage
+    const stored = localStorage.getItem(LIVE_DATA_STORAGE_KEY);
+    return stored === 'true';
+  });
 
   // Load filter options on mount
   useEffect(() => {
@@ -401,46 +403,58 @@ const Positions = () => {
     return filteredPositions.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredPositions, currentPage]);
 
-  // ==================== LIVE DATA LOGIC ====================
+  // ==================== LIVE DATA LOGIC (SSE) ====================
   
-  // Fetch live prices for current page positions
-  const fetchLivePrices = useCallback(async () => {
-    if (!liveDataEnabled || paginatedPositions.length === 0) return;
-
-    setLiveDataLoading(true);
-    try {
-      // Get asset IDs from current page only
-      const assetIds = paginatedPositions.map(p => p.asset_id);
-
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/live-prices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset_ids: assetIds }),
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch live prices');
-      const data = await response.json();
-
-      setLiveDataConnected(data.connected);
-
-      if (data.success && data.prices) {
-        const pricesMap = new Map<number, LivePriceItem>();
-        data.prices.forEach((price: LivePriceItem) => {
-          pricesMap.set(price.asset_id, price);
-        });
-        setLivePrices(pricesMap);
-        setLastLiveUpdate(new Date());
-
-        // Also fetch live movers based on current page assets
-        fetchLiveMovers(assetIds);
+  // Get all asset IDs to subscribe to (all filtered positions, not just current page)
+  const allAssetIds = useMemo(() => {
+    return filteredPositions.map(p => p.asset_id);
+  }, [filteredPositions]);
+  
+  // Use the SSE hook for live price streaming
+  const { 
+    state: sseState, 
+    prices: ssePrices, 
+    disconnect: sseDisconnect,
+    reconnect: sseReconnect,
+    clearCache: sseClearCache
+  } = useLivePricesSSE({
+    enabled: liveDataEnabled,
+    assetIds: allAssetIds,
+    onPrices: (prices) => {
+      // Fetch live movers when we get new prices
+      if (prices.length > 0) {
+        fetchLiveMovers(prices.map(p => p.asset_id));
       }
-    } catch (err) {
-      console.error('Error fetching live prices:', err);
-      setLiveDataConnected(false);
-    } finally {
-      setLiveDataLoading(false);
-    }
-  }, [liveDataEnabled, paginatedPositions]);
+    },
+    reconnectDelay: 3000,
+    maxReconnectAttempts: 5,
+  });
+  
+  // Convert SSE prices to the LivePriceItem format expected by the component
+  const livePrices = useMemo(() => {
+    const map = new Map<number, LivePriceItem>();
+    ssePrices.forEach((price, assetId) => {
+      map.set(assetId, {
+        asset_id: price.asset_id,
+        symbol: price.symbol || null,
+        isin: price.isin,
+        live_price: price.live_price,
+        previous_close: price.previous_close,
+        day_change_pct: price.day_change_pct,
+        bid: price.bid,
+        ask: price.ask,
+        last: price.last,
+        timestamp: price.timestamp,
+        currency: price.currency,
+      });
+    });
+    return map;
+  }, [ssePrices]);
+  
+  // Derived state from SSE
+  const liveDataConnected = sseState.connected;
+  const liveDataLoading = sseState.connecting;
+  const lastLiveUpdate = sseState.lastUpdate;
 
   // Fetch live movers for current page
   const fetchLiveMovers = async (assetIds: number[]) => {
@@ -462,44 +476,25 @@ const Positions = () => {
   // Toggle live data on/off
   const toggleLiveData = useCallback(() => {
     if (liveDataEnabled) {
-      // Turn off
+      console.log('[Live Data] Turning off...');
       setLiveDataEnabled(false);
-      setLiveDataConnected(false);
-      setLivePrices(new Map());
-      if (liveDataIntervalRef.current) {
-        clearInterval(liveDataIntervalRef.current);
-        liveDataIntervalRef.current = null;
-      }
+      localStorage.setItem(LIVE_DATA_STORAGE_KEY, 'false');
+      sseDisconnect();
+      // Clear cached prices when manually disabling
+      sseClearCache();
     } else {
-      // Turn on
+      console.log('[Live Data] Turning on...');
       setLiveDataEnabled(true);
+      localStorage.setItem(LIVE_DATA_STORAGE_KEY, 'true');
     }
-  }, [liveDataEnabled]);
+  }, [liveDataEnabled, sseDisconnect, sseClearCache]);
 
-  // Setup polling interval when live data is enabled
+  // Handle SSE errors
   useEffect(() => {
-    if (liveDataEnabled) {
-      // Fetch immediately
-      fetchLivePrices();
-
-      // Then fetch every 20 seconds
-      liveDataIntervalRef.current = setInterval(fetchLivePrices, LIVE_DATA_INTERVAL);
-
-      return () => {
-        if (liveDataIntervalRef.current) {
-          clearInterval(liveDataIntervalRef.current);
-          liveDataIntervalRef.current = null;
-        }
-      };
+    if (sseState.error) {
+      toast.error(`Live Data: ${sseState.error}`);
     }
-  }, [liveDataEnabled, fetchLivePrices]);
-
-  // Refetch live prices when page changes or filters change
-  useEffect(() => {
-    if (liveDataEnabled && paginatedPositions.length > 0) {
-      fetchLivePrices();
-    }
-  }, [currentPage, liveDataEnabled, paginatedPositions.length]);
+  }, [sseState.error]);
 
   // ==================== END LIVE DATA LOGIC ====================
 

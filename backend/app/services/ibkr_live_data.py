@@ -1,29 +1,19 @@
-"""
-IBKR Live Data Service
-======================
-Connects to IB Gateway to fetch real-time market prices.
-Uses ib_insync library for communication with TWS/Gateway.
-"""
-
 import logging
 import os
+import asyncio
 from typing import Dict, List, Optional, Set
 from datetime import datetime
 from dataclasses import dataclass
 from threading import Lock
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
 import traceback
+
+# Importamos las clases necesarias de ib_insync
+from ib_insync import IB, Stock, util
 
 logger = logging.getLogger(__name__)
 
-# Thread pool for running ib_insync operations
-_executor = ThreadPoolExecutor(max_workers=1)
-
-
 @dataclass
 class LivePrice:
-    """Live price data for an asset."""
     symbol: str
     isin: Optional[str]
     price: float
@@ -34,20 +24,19 @@ class LivePrice:
     timestamp: Optional[datetime] = None
     currency: str = "USD"
 
-
 class IBKRLiveDataService:
     """
-    Service to fetch real-time market data from IB Gateway.
-    
-    The IB Gateway container runs on the same Docker network.
-    Connection details:
-    - Host: ib-gateway (container name) or host.docker.internal for host access
-    - Port: 4001 (mapped from 4003 internal)
+    Servicio robusto para IBKR.
+    Maneja la conexión síncrona y la creación de Event Loops para hilos de FastAPI.
+    Includes price cache to avoid redundant IB queries.
     """
-    
-    # Class-level connection to reuse across requests
     _instance = None
-    _lock = Lock()
+    _lock = Lock()     # Lock para el patrón Singleton
+    _ib_lock = Lock()  # Lock CRÍTICO para operaciones con IB
+    _failed_symbols: Set[str] = set()  # Caché de símbolos que fallaron
+    _failed_isins: Set[str] = set()  # Caché de ISINs que fallaron
+    _price_cache: Dict[str, tuple] = {}  # Caché de precios: symbol -> (LivePrice, timestamp)
+    _cache_ttl: int = 10  # Segundos de validez del caché
     
     def __new__(cls):
         if cls._instance is None:
@@ -62,140 +51,73 @@ class IBKRLiveDataService:
             return
             
         self._initialized = True
-        self.ib = None
-        self._connected = False
-        self._contracts_cache: Dict[str, any] = {}  # symbol -> qualified contract
-        self._isin_to_symbol: Dict[str, str] = {}   # isin -> symbol mapping
         
-        # Connection settings - configurable via environment
-        # For Docker: use host.docker.internal to reach host network
-        # For local dev: use 127.0.0.1
+        # IMPORTANTE: IB() necesita un loop. Lo instanciamos de forma segura.
+        # Si falla aquí, se intentará recrear en la conexión.
+        try:
+            self._fix_event_loop()
+            self.ib = IB()
+        except Exception as e:
+            logger.warning(f"Advertencia al instanciar IB: {e}")
+            self.ib = IB() # Reintento simple
+        
+        # Configuración de red
         self.gateway_host = os.getenv("IBKR_GATEWAY_HOST", "host.docker.internal")
         self.gateway_port = int(os.getenv("IBKR_GATEWAY_PORT", "4001"))
         self.client_id = int(os.getenv("IBKR_CLIENT_ID", "10"))
         
-        # Market data type: 1=Live (real-time), 2=Frozen, 3=Delayed, 4=Delayed Frozen
-        # Default to 1 (real-time) if you have active subscriptions
-        self.market_data_type = int(os.getenv("IBKR_MARKET_DATA_TYPE", "1"))
+        # Tipo de datos: 3 (Delayed) por defecto
+        self.market_data_type = int(os.getenv("IBKR_MARKET_DATA_TYPE", "3"))
         
-        logger.info(f"IBKRLiveDataService initialized - Host: {self.gateway_host}:{self.gateway_port}, Data Type: {self.market_data_type}")
-    
-    def connect(self) -> bool:
-        """
-        Connect to IB Gateway. Returns True if successful.
-        Runs in a separate thread with its own event loop.
-        """
-        if self._connected and self.ib and self.ib.isConnected():
-            return True
-        
-        def _connect_sync():
-            """Synchronous connection logic to run in thread pool."""
-            try:
-                from ib_insync import IB, util
-                import asyncio
-                
-                # Create a new event loop for this thread
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-                if self.ib is None:
-                    self.ib = IB()
-                
-                if not self.ib.isConnected():
-                    logger.info(f"Connecting to IB Gateway at {self.gateway_host}:{self.gateway_port}...")
-                    
-                    # Use util.run to properly execute async operations
-                    util.run(
-                        self.ib.connectAsync(
-                            host=self.gateway_host,
-                            port=self.gateway_port,
-                            clientId=self.client_id,
-                            readonly=True,
-                            timeout=10
-                        )
-                    )
-                    
-                    # Request market data type: 1=Live/Real-time (requires subscription)
-                    # 3=Delayed (free, 15-20 min delay)
-                    self.ib.reqMarketDataType(self.market_data_type)
-                    
-                    self._connected = True
-                    data_type_name = "Real-time" if self.market_data_type == 1 else "Delayed" if self.market_data_type == 3 else f"Type {self.market_data_type}"
-                    logger.info(f"Successfully connected to IB Gateway - Using {data_type_name} market data")
-                    
-                return True
-                
-            except Exception as e:
-                logger.error(f"Failed to connect to IB Gateway: {e}")
-                logger.error(f"Connection error traceback: {traceback.format_exc()}")
-                self._connected = False
-                return False
-        
-        # Run connection in thread pool to avoid event loop conflicts
+        logger.info(f"IBKRLiveDataService inicializado -> {self.gateway_host}:{self.gateway_port}")
+
+    def _fix_event_loop(self):
+        """Asegura que existe un Event Loop en el hilo actual."""
         try:
-            future = _executor.submit(_connect_sync)
-            return future.result(timeout=15)
-        except Exception as e:
-            logger.error(f"Failed to connect to IB Gateway: {e}")
-            logger.error(f"Connection outer error traceback: {traceback.format_exc()}")
-            self._connected = False
-            return False
-    
+            asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+    def is_connected(self) -> bool:
+        """Método helper para compatibilidad con la API."""
+        return self.ib.isConnected() if hasattr(self, 'ib') and self.ib else False
+
     def disconnect(self):
-        """Disconnect from IB Gateway."""
-        if self.ib and self.ib.isConnected():
+        """Desconecta limpiamente."""
+        if self.is_connected():
             try:
                 self.ib.disconnect()
-                self._connected = False
-                logger.info("Disconnected from IB Gateway")
             except Exception as e:
-                logger.error(f"Error disconnecting: {e}")
-    
-    def is_connected(self) -> bool:
-        """Check if connected to IB Gateway."""
-        return self._connected and self.ib and self.ib.isConnected()
-    
-    def _qualify_contracts(self, symbols: List[str]) -> List[any]:
-        """
-        Qualify stock contracts for the given symbols.
-        Uses cache to avoid re-qualifying known contracts.
-        Must be called from a thread with an event loop.
-        """
-        from ib_insync import Stock
-        
-        contracts_to_qualify = []
-        qualified_contracts = []
-        
-        for symbol in symbols:
-            if symbol in self._contracts_cache:
-                qualified_contracts.append(self._contracts_cache[symbol])
-            else:
-                # Create stock contract - SMART routing, USD currency
-                contract = Stock(symbol, 'SMART', 'USD')
-                contracts_to_qualify.append((symbol, contract))
-        
-        if contracts_to_qualify:
-            # Batch qualify new contracts
-            new_contracts = [c[1] for c in contracts_to_qualify]
+                logger.error(f"Error al desconectar: {e}")
+
+    def _ensure_connected(self):
+        """Revisa la conexión y reconecta si es necesario (Dentro del Lock)."""
+        # Paso crítico: Asegurar que el hilo tiene un Loop antes de que IB intente nada
+        self._fix_event_loop()
+
+        if not self.ib.isConnected():
+            logger.info(f"Conectando a {self.gateway_host}:{self.gateway_port}...")
             try:
-                # Call directly - we're already in the right thread with event loop
-                logger.info(f"Qualifying {len(new_contracts)} new contracts...")
-                qualified = self.ib.qualifyContracts(*new_contracts)
-                logger.info(f"Qualification complete, got {len(qualified)} results")
-                
-                # Cache successful qualifications
-                for i, (symbol, _) in enumerate(contracts_to_qualify):
-                    if i < len(qualified) and qualified[i]:
-                        self._contracts_cache[symbol] = qualified[i]
-                        qualified_contracts.append(qualified[i])
-                        logger.info(f"Qualified {symbol}: {qualified[i]}")
-                        
+                # Conexión Síncrona Bloqueante
+                self.ib.connect(
+                    host=self.gateway_host, 
+                    port=self.gateway_port, 
+                    clientId=self.client_id,
+                    timeout=5,  # Reducido de 10 a 5 segundos
+                    readonly=True
+                )
+                self.ib.reqMarketDataType(self.market_data_type)
+                logger.info(f"Conectado. MarketDataType: {self.market_data_type}")
             except Exception as e:
-                logger.error(f"Error qualifying contracts: {e}")
-                logger.error(f"Qualification error traceback: {traceback.format_exc()}")
-        
-        return qualified_contracts
-    
+                logger.error(f"Error de conexión IBKR: {e}")
+                # Si falla, a veces ayuda limpiar la instancia
+                try:
+                    self.ib.disconnect()
+                except:
+                    pass
+                raise
+
     def get_live_prices(
         self, 
         symbols: Optional[List[str]] = None,
@@ -203,174 +125,219 @@ class IBKRLiveDataService:
         isin_symbol_map: Optional[Dict[str, str]] = None
     ) -> Dict[str, LivePrice]:
         """
-        Get live prices for the given symbols or ISINs.
-        Runs in thread pool to avoid event loop conflicts.
-        
-        Args:
-            symbols: List of stock symbols (e.g., ['AAPL', 'MSFT'])
-            isins: List of ISINs (e.g., ['US0378331005'])
-            isin_symbol_map: Mapping from ISIN to symbol for lookup
-            
-        Returns:
-            Dictionary mapping symbol/isin to LivePrice
+        Obtiene precios en vivo. Valida en batch pero maneja errores individualmente.
+        Uses non-blocking lock with timeout to prevent request pile-up.
+        Uses price cache to avoid redundant IB queries.
         """
-        if not self.connect():
-            logger.warning("Cannot fetch live prices - not connected to IB Gateway")
+        targets = list(set([s for s in (symbols or []) if s not in self._failed_symbols]))
+        isin_map = isin_symbol_map or {}
+
+        if not targets:
             return {}
+
+        result = {}
+        now = datetime.now()
+        symbols_to_fetch = []
         
-        # Build list of symbols to fetch
-        fetch_symbols: Set[str] = set()
-        isin_to_symbol: Dict[str, str] = isin_symbol_map or {}
+        # Check cache first
+        for symbol in targets:
+            if symbol in self._price_cache:
+                cached_price, cached_time = self._price_cache[symbol]
+                age = (now - cached_time).total_seconds()
+                if age < self._cache_ttl:
+                    result[symbol] = cached_price
+                    # Also add by ISIN if available
+                    if cached_price.isin:
+                        result[cached_price.isin] = cached_price
+                    continue
+            symbols_to_fetch.append(symbol)
         
-        if symbols:
-            fetch_symbols.update(symbols)
-            
-        if isins and isin_symbol_map:
-            for isin in isins:
-                if isin in isin_symbol_map:
-                    symbol = isin_symbol_map[isin]
-                    fetch_symbols.add(symbol)
-                    isin_to_symbol[isin] = symbol
+        # If all prices are cached, return immediately (no lock needed)
+        if not symbols_to_fetch:
+            logger.info(f"✓ Devolviendo {len(result)} precios desde caché")
+            return result
         
-        if not fetch_symbols:
-            return {}
+        logger.info(f"Cache: {len(targets) - len(symbols_to_fetch)} hits, {len(symbols_to_fetch)} misses")
+
+        # Try to acquire lock with timeout (don't block other requests)
+        lock_acquired = self._ib_lock.acquire(timeout=2)
+        if not lock_acquired:
+            logger.warning("Could not acquire IB lock (another request in progress), returning cached results only")
+            return result
         
-        def _fetch_prices_sync():
-            """Synchronous price fetching to run in thread pool."""
+        try:
             try:
-                import asyncio
+                self._ensure_connected()
                 
-                logger.info(f"Starting price fetch for {len(fetch_symbols)} symbols")
+                logger.info(f"Validando {len(symbols_to_fetch)} contratos en batch...")
                 
-                # Ensure we have an event loop in this thread
+                # Crear todos los contratos
+                contracts = [Stock(s, 'SMART', 'USD') for s in symbols_to_fetch]
+                
+                # Validar todos de una vez (más rápido)
                 try:
-                    loop = asyncio.get_event_loop()
-                    logger.info("Using existing event loop")
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    logger.info("Created new event loop")
+                    qualified_contracts = self.ib.qualifyContracts(*contracts)
+                except Exception as e:
+                    logger.warning(f"Error en batch validation: {e}")
+                    qualified_contracts = []
                 
-                # Qualify contracts
-                symbol_list = list(fetch_symbols)
-                logger.info(f"Qualifying contracts for symbols: {symbol_list}")
-                contracts = self._qualify_contracts(symbol_list)
+                # Mapear contratos válidos por symbol
+                valid_by_symbol = {}
+                for contract in qualified_contracts:
+                    valid_by_symbol[contract.symbol] = contract
                 
-                if not contracts:
-                    logger.warning("No contracts could be qualified")
-                    return {}
+                # Identificar cuáles fallaron y reintentar con ISIN
+                failed_symbols = set(symbols_to_fetch) - set(valid_by_symbol.keys())
+                isin_contracts = []
+                isin_to_symbol = {}
                 
-                logger.info(f"Successfully qualified {len(contracts)} contracts")
-                
-                # Fetch tickers in batches of 100 (IB API limit)
-                all_tickers = []
-                batch_size = 100
-                
-                for i in range(0, len(contracts), batch_size):
-                    batch = contracts[i:i + batch_size]
-                    logger.info(f"Requesting tickers for batch {i//batch_size + 1} ({len(batch)} contracts)")
-                    # Call directly - we're already in the right thread with event loop
-                    tickers = self.ib.reqTickers(*batch)
-                    all_tickers.extend(tickers)
-                    logger.info(f"Received {len(tickers)} tickers")
+                for symbol in failed_symbols:
+                    # Buscar ISIN asociado
+                    isin = None
+                    for isin_key, sym in isin_map.items():
+                        if sym == symbol:
+                            isin = isin_key
+                            break
                     
-                    # Small sleep between batches to be nice to the API
-                    if i + batch_size < len(contracts):
-                        import time
-                        time.sleep(0.1)
+                    if isin and isin not in self._failed_isins:
+                        isin_contract = Stock(isin, 'SMART', 'USD')
+                        isin_contracts.append(isin_contract)
+                        isin_to_symbol[isin] = symbol
                 
-                # Build result dictionary
-                result: Dict[str, LivePrice] = {}
+                # Validar contratos con ISIN
+                if isin_contracts:
+                    logger.info(f"Reintentando {len(isin_contracts)} símbolos con ISIN...")
+                    try:
+                        qualified_isin = self.ib.qualifyContracts(*isin_contracts)
+                        for contract in qualified_isin:
+                            # El símbolo puede ser ISIN o el symbol real
+                            original_symbol = isin_to_symbol.get(contract.symbol)
+                            if original_symbol:
+                                valid_by_symbol[original_symbol] = contract
+                                logger.info(f"✓ Encontrado por ISIN: {contract.symbol} -> {original_symbol}")
+                    except Exception as e:
+                        logger.debug(f"Error validando ISINs: {e}")
                 
-                for ticker in all_tickers:
-                    if ticker and ticker.contract:
-                        symbol = ticker.contract.symbol
-                        
-                        # Get market price (uses best available: last, close, or mid)
-                        price = ticker.marketPrice()
-                        
-                        if price is not None and price > 0:
+                # Cachear los que definitivamente fallaron
+                still_failed = set(symbols_to_fetch) - set(valid_by_symbol.keys())
+                for symbol in still_failed:
+                    self._failed_symbols.add(symbol)
+                    # También cachear ISIN si existe
+                    for isin_key, sym in isin_map.items():
+                        if sym == symbol:
+                            self._failed_isins.add(isin_key)
+                    logger.debug(f"✗ Cacheado como fallido: {symbol}")
+                
+                # Obtener precios solo para contratos válidos
+                if valid_by_symbol:
+                    logger.info(f"Obteniendo precios para {len(valid_by_symbol)} contratos...")
+                    
+                    # Request tickers with a timeout
+                    try:
+                        tickers = self.ib.reqTickers(*valid_by_symbol.values())
+                        # Give IB time to respond (max 5 seconds)
+                        self.ib.sleep(2)
+                    except Exception as ticker_err:
+                        logger.error(f"Error en reqTickers: {ticker_err}")
+                        tickers = []
+                    
+                    for ticker in tickers:
+                        try:
+                            symbol = ticker.contract.symbol
+                            price = ticker.marketPrice()
+                            
+                            if not price or str(price) == 'nan' or price <= 0:
+                                price = ticker.last if ticker.last else ticker.close
+                            
+                            if not price or str(price) == 'nan' or price <= 0:
+                                continue
+                            
+                            # Encontrar el símbolo original
+                            original_symbol = symbol
+                            for sym, contract in valid_by_symbol.items():
+                                if contract.symbol == symbol:
+                                    original_symbol = sym
+                                    break
+                            
+                            # Buscar ISIN
+                            isin = None
+                            for isin_key, sym in isin_map.items():
+                                if sym == original_symbol:
+                                    isin = isin_key
+                                    break
+                            
                             live_price = LivePrice(
-                                symbol=symbol,
-                                isin=None,  # Will be filled from map
-                                price=price,
-                                bid=ticker.bid if hasattr(ticker, 'bid') else None,
-                                ask=ticker.ask if hasattr(ticker, 'ask') else None,
-                                last=ticker.last if hasattr(ticker, 'last') else None,
-                                close=ticker.close if hasattr(ticker, 'close') else None,
+                                symbol=original_symbol,
+                                isin=isin,
+                                price=float(price),
+                                bid=ticker.bid if ticker.bid else None,
+                                ask=ticker.ask if ticker.ask else None,
+                                last=ticker.last,
+                                close=ticker.close,
                                 timestamp=datetime.now(),
                                 currency="USD"
                             )
                             
-                            # Store by symbol
-                            result[symbol] = live_price
+                            result[original_symbol] = live_price
+                            if isin:
+                                result[isin] = live_price
                             
-                            # Also store by ISIN if we have the mapping
-                            for isin, sym in isin_to_symbol.items():
-                                if sym == symbol:
-                                    result[isin] = live_price
-                                    live_price.isin = isin
+                            # Update cache
+                            self._price_cache[original_symbol] = (live_price, datetime.now())
+                        except Exception as e:
+                            logger.error(f"Error procesando ticker: {e}")
+                            continue
                 
-                logger.info(f"Fetched {len(result)} live prices from IB Gateway")
+                fetched_count = len([k for k in result if k in symbols_to_fetch])
+                logger.info(f"✓ Obtenidos {fetched_count} precios de {len(symbols_to_fetch)} intentos (total: {len(result)})")
                 return result
-                
+
             except Exception as e:
-                logger.error(f"Error fetching live prices: {e}")
-                logger.error(f"Fetch prices error traceback: {traceback.format_exc()}")
+                logger.error(f"Error obteniendo precios: {e}")
+                logger.error(traceback.format_exc())
+                try:
+                    self.ib.disconnect()
+                except:
+                    pass
                 return {}
-        
-        # Run in thread pool to avoid event loop conflicts
-        try:
-            future = _executor.submit(_fetch_prices_sync)
-            result = future.result(timeout=30)
-            logger.info(f"get_live_prices returning {len(result)} prices")
-            return result
-        except Exception as e:
-            logger.error(f"Error fetching live prices: {e}")
-            logger.error(f"Outer fetch error traceback: {traceback.format_exc()}")
-            return {}
-    
-    def get_live_prices_batch(
-        self,
-        asset_identifiers: List[Dict[str, str]]
-    ) -> Dict[str, LivePrice]:
+        finally:
+            # Always release the lock
+            self._ib_lock.release()
+
+    def get_live_prices_batch(self, asset_identifiers: List[Dict[str, str]]) -> Dict[str, LivePrice]:
         """
-        Get live prices for a batch of assets identified by ISIN or symbol.
-        
-        Args:
-            asset_identifiers: List of dicts with 'isin' and/or 'symbol' keys
-            
-        Returns:
-            Dictionary mapping identifier (isin or symbol) to LivePrice
+        Wrapper para compatibilidad con endpoints.
+        Filtra assets ya cacheados como fallidos y busca el resto.
         """
-        if not self.connect():
-            return {}
-        
-        # Collect all symbols, preferring ISIN->symbol lookup
-        symbols_to_fetch: Set[str] = set()
-        isin_to_symbol: Dict[str, str] = {}
+        symbols_to_fetch = []
+        isin_to_symbol = {}
         
         for asset in asset_identifiers:
             symbol = asset.get('symbol')
             isin = asset.get('isin')
             
-            if symbol:
-                symbols_to_fetch.add(symbol)
-                if isin:
+            # Solo intentar si no está en caché de fallidos
+            if symbol and symbol not in self._failed_symbols:
+                symbols_to_fetch.append(symbol)
+                if isin and isin not in self._failed_isins:
                     isin_to_symbol[isin] = symbol
         
+        if not symbols_to_fetch:
+            logger.warning("No hay símbolos para consultar (todos en caché de fallidos)")
+            return {}
+        
+        logger.info(f"Consultando {len(symbols_to_fetch)} activos (caché: {len(self._failed_symbols)} symbols, {len(self._failed_isins)} ISINs)")
+        
+        # Una sola pasada: el método interno maneja symbol + ISIN automáticamente
         return self.get_live_prices(
-            symbols=list(symbols_to_fetch),
+            symbols=symbols_to_fetch,
             isin_symbol_map=isin_to_symbol
         )
 
-
-# Singleton instance
+# Singleton
 _service_instance: Optional[IBKRLiveDataService] = None
 
-
 def get_ibkr_service() -> IBKRLiveDataService:
-    """Get or create the IBKR live data service singleton."""
     global _service_instance
     if _service_instance is None:
         _service_instance = IBKRLiveDataService()

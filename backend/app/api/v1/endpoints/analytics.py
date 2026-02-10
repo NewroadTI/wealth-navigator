@@ -1,20 +1,26 @@
 from typing import List, Optional
 from datetime import date
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
+import asyncio
+import json
+import logging
 
 from app.api import deps
 from app.models.asset import Position
 from app.models.asset import Asset, AssetClass
 from app.models.portfolio import Account, Portfolio
 from app.models.user import User
+from app.db.session import SessionLocal
 from app.schemas.analytics import (
     PositionAggregated, MoversResponse, TopMover,
     LivePriceRequest, LivePriceResponse, LivePriceItem
 )
 
 router = APIRouter()
+sse_logger = logging.getLogger(__name__)
 
 def get_previous_date(db: Session, target_date: date) -> Optional[date]:
     """Busca la fecha disponible anterior más cercana a la target_date."""
@@ -427,8 +433,7 @@ def get_filter_options(
 
 @router.post("/live-prices", response_model=LivePriceResponse)
 def get_live_prices(
-    request: LivePriceRequest,
-    db: Session = Depends(deps.get_db)
+    request: LivePriceRequest
 ):
     """
     Fetch live market prices from IB Gateway for the specified assets.
@@ -456,21 +461,55 @@ def get_live_prices(
             message="No assets requested"
         )
     
-    # 1. Get asset info (symbol, isin) for the requested asset_ids
-    assets = db.query(
-        Asset.asset_id,
-        Asset.symbol,
-        Asset.isin,
-        Asset.description
-    ).filter(Asset.asset_id.in_(request.asset_ids)).all()
+    # Init vars
+    assets = []
+    prev_prices_map = {}
     
-    if not assets:
-        return LivePriceResponse(
-            prices=[],
-            success=False,
-            connected=False,
-            message="No assets found for the given IDs"
-        )
+    # 1. & 2. Get asset info and previous prices - SHORT LIVED DB CONNECTION
+    with SessionLocal() as db:
+        assets = db.query(
+            Asset.asset_id,
+            Asset.symbol,
+            Asset.isin,
+            Asset.description
+        ).filter(Asset.asset_id.in_(request.asset_ids)).all()
+        
+        if not assets:
+            return LivePriceResponse(
+                prices=[],
+                success=False,
+                connected=False,
+                message="No assets found for the given IDs"
+            )
+        
+        # Get previous day prices for day change calculation
+        try:
+            latest_date = db.query(func.max(Position.report_date)).scalar()
+            prev_date = get_previous_date(db, latest_date) if latest_date else None
+            
+            if prev_date:
+                prev_positions = db.query(
+                    Position.asset_id,
+                    Position.mark_price
+                ).filter(
+                    Position.report_date == prev_date,
+                    Position.asset_id.in_(request.asset_ids)
+                ).all()
+                
+                # Average if multiple positions per asset
+                from collections import defaultdict
+                temp_prices = defaultdict(list)
+                for p in prev_positions:
+                    temp_prices[p.asset_id].append(float(p.mark_price or 0))
+                
+                for aid, prices in temp_prices.items():
+                    prev_prices_map[aid] = sum(prices) / len(prices) if prices else 0
+        except Exception as e:
+            logger.error(f"Error fetching previous prices: {e}")
+            # Continue without previous prices
+    
+    # --- END OF DB SESSION ---
+    # Connection is now closed and returned to pool
     
     # Build lookup structures
     asset_by_id = {a.asset_id: a for a in assets}
@@ -492,31 +531,8 @@ def get_live_prices(
             
         asset_identifiers.append(identifier)
     
-    # 2. Get previous day prices for day change calculation
-    # Use the latest available report date
-    latest_date = db.query(func.max(Position.report_date)).scalar()
-    prev_date = get_previous_date(db, latest_date) if latest_date else None
-    
-    prev_prices_map = {}
-    if prev_date:
-        prev_positions = db.query(
-            Position.asset_id,
-            Position.mark_price
-        ).filter(
-            Position.report_date == prev_date,
-            Position.asset_id.in_(request.asset_ids)
-        ).all()
-        
-        # Average if multiple positions per asset
-        from collections import defaultdict
-        temp_prices = defaultdict(list)
-        for p in prev_positions:
-            temp_prices[p.asset_id].append(float(p.mark_price or 0))
-        
-        for aid, prices in temp_prices.items():
-            prev_prices_map[aid] = sum(prices) / len(prices) if prices else 0
-    
     # 3. Connect to IB Gateway and fetch live prices
+
     ibkr_service = get_ibkr_service()
     
     try:
@@ -695,4 +711,162 @@ def get_live_data_status():
         "gateway_host": service.gateway_host,
         "gateway_port": service.gateway_port,
         "message": "Connected to IB Gateway" if connected else "Not connected to IB Gateway"
+    }
+
+
+# ==================== SSE LIVE PRICES ====================
+
+@router.get("/live-prices/stream")
+async def live_prices_stream(
+    request: Request,
+    asset_ids: str = Query(None, description="Comma-separated list of asset IDs to subscribe to (optional, can use POST /subscribe after connecting)")
+):
+    """
+    Server-Sent Events endpoint for live price streaming.
+    
+    The client can optionally subscribe with a list of asset IDs in the URL,
+    or connect first and then use POST /live-prices/subscribe to set the subscription.
+    The server fetches prices every 15 seconds and pushes updates to all connected clients.
+    
+    Usage:
+        // Connect without initial subscription
+        const evtSource = new EventSource('/api/v1/analytics/live-prices/stream');
+        evtSource.addEventListener('connected', (e) => {
+            const data = JSON.parse(e.data);
+            // Use data.connection_id to subscribe via POST /live-prices/subscribe
+        });
+        
+        // Or connect with immediate subscription (for small lists)
+        const evtSource = new EventSource('/api/v1/analytics/live-prices/stream?asset_ids=1,2,3');
+        
+        evtSource.addEventListener('prices', (e) => {
+            const data = JSON.parse(e.data);
+            console.log(data.prices);
+        });
+    
+    Events:
+        - connected: Initial connection confirmation with connection_id and cached prices
+        - prices: Price updates (every ~15 seconds)
+        - heartbeat: Keep-alive signal (every ~30 seconds)
+        - error: Error messages
+    """
+    from app.services.live_prices_sse import get_sse_manager, SSEMessage
+    from dataclasses import asdict
+    
+    # Parse asset IDs if provided
+    parsed_asset_ids = []
+    if asset_ids:
+        try:
+            parsed_asset_ids = [int(x.strip()) for x in asset_ids.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid asset_ids format. Use comma-separated integers.")
+        
+        if len(parsed_asset_ids) > 100:
+            raise HTTPException(status_code=400, detail="Maximum 100 assets per subscription")
+    
+    manager = get_sse_manager()
+    
+    async def event_generator():
+        """Generate SSE events for the client."""
+        connection = manager.create_connection()
+        manager.update_subscription(connection.connection_id, parsed_asset_ids)
+        
+        try:
+            # Send initial connected event with cached prices
+            cached = manager.get_cached_prices(parsed_asset_ids)
+            await connection.send(SSEMessage(
+                event="connected",
+                data={
+                    "connection_id": connection.connection_id,
+                    "subscribed_assets": len(parsed_asset_ids),
+                    "cached_prices": [asdict(p) for p in cached] if cached else [],
+                    "message": "Connected to live prices stream"
+                }
+            ))
+            
+            # Main event loop
+            while True:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    sse_logger.info(f"Client disconnected: {connection.connection_id[:8]}")
+                    break
+                
+                try:
+                    # Wait for message with timeout (for heartbeat)
+                    message = await asyncio.wait_for(
+                        connection.queue.get(),
+                        timeout=35.0  # Slightly longer than heartbeat interval
+                    )
+                    yield message.format()
+                    
+                except asyncio.TimeoutError:
+                    # Send heartbeat if no messages
+                    heartbeat = SSEMessage(
+                        event="heartbeat",
+                        data={"timestamp": asyncio.get_event_loop().time()}
+                    )
+                    yield heartbeat.format()
+                    
+        except asyncio.CancelledError:
+            sse_logger.info(f"SSE connection cancelled: {connection.connection_id[:8]}")
+        except Exception as e:
+            sse_logger.error(f"SSE error: {e}")
+            error_msg = SSEMessage(
+                event="error",
+                data={"message": str(e)}
+            )
+            yield error_msg.format()
+        finally:
+            manager.remove_connection(connection.connection_id)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
+@router.post("/live-prices/subscribe")
+async def update_subscription(
+    request: LivePriceRequest,
+    connection_id: str = Query(..., description="SSE connection ID to update")
+):
+    """
+    Update the asset subscription for an existing SSE connection.
+    
+    This allows changing which assets a client receives updates for
+    without reconnecting.
+    """
+    from app.services.live_prices_sse import get_sse_manager
+    
+    manager = get_sse_manager()
+    manager.update_subscription(connection_id, request.asset_ids)
+    
+    return {
+        "success": True,
+        "connection_id": connection_id,
+        "subscribed_assets": len(request.asset_ids)
+    }
+
+
+@router.get("/live-prices/status")
+def get_sse_status():
+    """Get the status of the SSE live prices service."""
+    from app.services.live_prices_sse import get_sse_manager
+    from app.services.ibkr_live_data import get_ibkr_service
+    
+    manager = get_sse_manager()
+    ibkr = get_ibkr_service()
+    
+    return {
+        "active_connections": manager.connection_count,
+        "subscribed_assets": manager.subscribed_asset_count,
+        "cached_prices": len(manager._last_prices),
+        "ibkr_connected": ibkr.is_connected(),
+        "fetch_interval_seconds": manager._fetch_interval
     }
