@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
 import { PerformanceChart } from '@/components/dashboard/PerformanceChart';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { portfolios, positions, transactions } from '@/lib/mockData';

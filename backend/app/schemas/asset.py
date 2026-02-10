@@ -275,6 +275,7 @@ class PositionBase(BaseModel):
     vesting_date: Optional[date] = None
     accrued_interest: Optional[float] = None
     fx_rate_to_base: Optional[float] = 1.0
+    currency: Optional[str] = None
 
 class PositionCreate(PositionBase):
     pass

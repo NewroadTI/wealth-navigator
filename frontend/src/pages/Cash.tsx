@@ -1,4 +1,5 @@
 import { AppLayout } from '@/components/layout/AppLayout';
+import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
 import { cashBalances } from '@/lib/mockData';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
@@ -105,6 +106,7 @@ const Cash = () => {
       <div className="bg-card border border-border rounded-xl">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h3 className="font-semibold text-foreground">Recent FX Trades</h3>
+          <span className="text-[10px] bg-amber-500/20 text-amber-500 px-2 py-1 rounded-full font-medium">En desarrollo</span>
           <a href="/transactions" className="text-sm text-primary hover:underline">
             View all
           </a>

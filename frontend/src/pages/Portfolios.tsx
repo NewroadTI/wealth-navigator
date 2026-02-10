@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
 import { PortfolioCard } from '@/components/portfolios/PortfolioCard';
 import { getApiBaseUrl } from '@/lib/config';
 import { Button } from '@/components/ui/button';
@@ -540,6 +541,7 @@ const Portfolios = () => {
                     <div className="flex items-center gap-2 text-sm">
                       <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="mono text-success">YTD: +8.72%</span>
+                      <span className="text-[9px] bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded-full font-medium">Mock</span>
                     </div>
                   </div>
 
