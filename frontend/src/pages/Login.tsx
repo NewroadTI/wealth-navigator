@@ -118,12 +118,12 @@ const Login = () => {
                 </>
               )}
             </Button>
-            <p className="text-sm text-center text-muted-foreground">
-              ¿No tienes cuenta?{' '}
+            {/* <p className="text-sm text-center text-muted-foreground">
+             ¿No tienes cuenta?{' '}
               <Link to="/register" className="text-primary hover:underline">
                 Regístrate aquí
               </Link>
-            </p>
+            </p> */}
           </CardFooter>
         </form>
       </Card>

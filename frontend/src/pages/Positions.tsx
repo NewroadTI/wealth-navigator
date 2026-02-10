@@ -66,10 +66,15 @@ interface AggregatedAsset {
   asset_class: string;
   total_quantity: number;
   avg_cost_price: number;
+  avg_cost_price_original?: number;
   current_mark_price: number;
+  current_mark_price_original?: number;
   total_market_value: number;
+  total_market_value_original?: number;
   total_cost_basis_money: number;
+  total_cost_basis_money_original?: number;
   total_pnl_unrealized: number;
+  total_pnl_unrealized_original?: number;
   day_change_pct: number;
   // Distribución de rendimiento
   gainers_count: number;
@@ -87,10 +92,15 @@ interface AggregatedAsset {
     user_last_name: string | null;
     quantity: number | null;
     avg_cost_price: number | null;
+    avg_cost_price_original?: number;
     cost_basis_money: number | null;
+    cost_basis_money_original?: number;
     market_price: number | null;
+    market_price_original?: number;
     market_value: number | null;
+    market_value_original?: number;
     unrealized_pnl: number | null;
+    unrealized_pnl_original?: number;
     day_change_pct: number | null;
     fx_rate_to_base: number | null;
     currency: string | null;
@@ -178,6 +188,49 @@ const Positions = () => {
     const stored = localStorage.getItem(LIVE_DATA_STORAGE_KEY);
     return stored === 'true';
   });
+
+  // Track price changes for animation (asset_id -> 'up' | 'down' | null)
+  const [priceChanges, setPriceChanges] = useState<Map<number, 'up' | 'down' | null>>(new Map());
+  const previousPricesRef = useRef<Map<number, number>>(new Map());
+  const PRICE_CHANGE_STORAGE_KEY = 'wealthroad_price_change_states';
+
+  const savePriceChangesToStorage = useCallback((map: Map<number, 'up' | 'down' | null>) => {
+    try {
+      const arr = Array.from(map.entries());
+      localStorage.setItem(PRICE_CHANGE_STORAGE_KEY, JSON.stringify(arr));
+    } catch (e) {
+      console.error('[SSE] Error saving price change states:', e);
+    }
+  }, []);
+
+  const loadPriceChangesFromStorage = useCallback((): Map<number, 'up' | 'down' | null> => {
+    try {
+      const raw = localStorage.getItem(PRICE_CHANGE_STORAGE_KEY);
+      if (!raw) return new Map();
+      const parsed = JSON.parse(raw) as Array<[number, 'up' | 'down' | null]>;
+      return new Map(parsed.map(([k, v]) => [Number(k), v]));
+    } catch (e) {
+      console.error('[SSE] Error loading price change states:', e);
+      return new Map();
+    }
+  }, []);
+
+  // Load persisted price change states on mount
+  useEffect(() => {
+    const loaded = loadPriceChangesFromStorage();
+    if (loaded && loaded.size > 0) {
+      setPriceChanges(loaded);
+    }
+  }, [loadPriceChangesFromStorage]);
+
+  // Persist priceChanges whenever it changes (or clear storage when empty)
+  useEffect(() => {
+    if (priceChanges && priceChanges.size > 0) {
+      savePriceChangesToStorage(priceChanges);
+    } else {
+      try { localStorage.removeItem(PRICE_CHANGE_STORAGE_KEY); } catch {}
+    }
+  }, [priceChanges, savePriceChangesToStorage]);
 
   // Load filter options on mount
   useEffect(() => {
@@ -495,6 +548,43 @@ const Positions = () => {
       toast.error(`Live Data: ${sseState.error}`);
     }
   }, [sseState.error]);
+
+  // Detect price changes and trigger animations
+  useEffect(() => {
+    if (!liveDataEnabled || livePrices.size === 0) {
+      // Clear all changes when live data is disabled
+      setPriceChanges(new Map());
+      previousPricesRef.current.clear();
+      return;
+    }
+
+    const newChanges = new Map<number, 'up' | 'down' | null>();
+    let hasAnyPreviousPrice = false;
+
+    livePrices.forEach((currentPrice, assetId) => {
+      const previousPrice = previousPricesRef.current.get(assetId);
+      
+      if (previousPrice !== undefined) {
+        hasAnyPreviousPrice = true;
+        if (currentPrice.live_price !== previousPrice) {
+          // Price changed! Set direction
+          const direction = currentPrice.live_price > previousPrice ? 'up' : 'down';
+          newChanges.set(assetId, direction);
+        }
+      }
+
+      // Update previous price
+      previousPricesRef.current.set(assetId, currentPrice.live_price);
+    });
+
+    // Only update price changes if we had previous prices to compare
+    // On first load after page reload, preserve the colors loaded from localStorage
+    if (hasAnyPreviousPrice) {
+      // Replace all changes (clearing old ones and setting new ones)
+      // This way, colors only show until the next price update
+      setPriceChanges(newChanges);
+    }
+  }, [livePrices, liveDataEnabled]);
 
   // ==================== END LIVE DATA LOGIC ====================
 
@@ -885,6 +975,9 @@ const Positions = () => {
                     ? livePrice.day_change_pct
                     : asset.day_change_pct;
                   const isPositiveDay = (displayDayChange || 0) >= 0;
+                  
+                  // Get price change animation state
+                  const priceChange = priceChanges.get(asset.asset_id);
 
                   return (
                     <Fragment key={asset.asset_id}>
@@ -907,7 +1000,12 @@ const Positions = () => {
                             {liveDataEnabled && livePrice && (
                               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live price" />
                             )}
-                            <span className={cn(liveDataEnabled && livePrice && "text-green-500 font-medium")}>
+                            <span className={cn(
+                              "transition-colors duration-300",
+                              priceChange === 'up' && "text-green-500 font-semibold",
+                              priceChange === 'down' && "text-red-500 font-semibold",
+                              !priceChange && liveDataEnabled && livePrice && "font-medium"
+                            )}>
                               {liveDataEnabled && livePrice 
                                 ? `${displayPrice.toFixed(2)} USD`
                                 : formatCurrencyWithCode(asset.current_mark_price_original, asset.current_mark_price, asset.currency)
@@ -952,7 +1050,7 @@ const Positions = () => {
                               getChangeColor(displayDayChange || 0),
                               liveDataEnabled && livePrice && "font-semibold"
                             )}>
-                              {isPositiveDay ? '+' : ''}{formatPercent(displayDayChange || 0)}
+                              {formatPercent(displayDayChange || 0)}
                             </span>
                           </div>
                         </td>
@@ -1050,7 +1148,7 @@ const Positions = () => {
                                           <td className="text-right py-2 px-3">
                                             <span className={cn('mono', getChangeColor(inst.day_change_pct ?? 0))}>
                                               {inst.day_change_pct !== null && inst.day_change_pct !== 0 
-                                                ? `${instDayPositive ? '+' : ''}${formatPercent(inst.day_change_pct)}`
+                                                ? formatPercent(inst.day_change_pct)
                                                 : '—'
                                               }
                                             </span>

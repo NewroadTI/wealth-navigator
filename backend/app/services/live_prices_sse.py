@@ -13,13 +13,37 @@ This avoids the problems with multiple concurrent requests blocking the IB lock.
 import asyncio
 import json
 import logging
-from typing import Dict, Set, Optional, List
+import math
+from typing import Dict, Set, Optional, List, Any
 from datetime import datetime
 from dataclasses import dataclass, asdict
 from collections import defaultdict
 import uuid
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_value(value: Any) -> Any:
+    """Convert NaN and inf to None for JSON serialization."""
+    if value is None:
+        return None
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+    return value
+
+
+def sanitize_dict(data: dict) -> dict:
+    """Recursively sanitize all values in a dict for JSON serialization."""
+    result = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            result[key] = sanitize_dict(value)
+        elif isinstance(value, list):
+            result[key] = [sanitize_dict(item) if isinstance(item, dict) else sanitize_value(item) for item in value]
+        else:
+            result[key] = sanitize_value(value)
+    return result
 
 
 @dataclass
@@ -68,10 +92,12 @@ class SSEConnection:
         # Filter to only subscribed assets
         relevant_prices = [p for p in prices if p.asset_id in self.subscribed_asset_ids]
         if relevant_prices:
+            # Convert to dict and sanitize NaN values
+            prices_data = [sanitize_dict(asdict(p)) for p in relevant_prices]
             await self.send(SSEMessage(
                 event="prices",
                 data={
-                    "prices": [asdict(p) for p in relevant_prices],
+                    "prices": prices_data,
                     "timestamp": datetime.now().isoformat(),
                     "connected": True
                 }
@@ -293,16 +319,17 @@ class LivePricesSSEManager:
                     if prev_price > 0:
                         day_change_pct = ((live_price.price - prev_price) / prev_price) * 100
                     
+                    # Sanitize all numeric values to avoid NaN in JSON
                     prices.append(LivePriceUpdate(
                         asset_id=asset.asset_id,
                         symbol=asset.symbol or "",
                         isin=asset.isin,
-                        live_price=live_price.price,
-                        previous_close=prev_price if prev_price > 0 else None,
-                        day_change_pct=day_change_pct,
-                        bid=live_price.bid,
-                        ask=live_price.ask,
-                        last=live_price.last,
+                        live_price=sanitize_value(live_price.price),
+                        previous_close=sanitize_value(prev_price) if prev_price > 0 else None,
+                        day_change_pct=sanitize_value(day_change_pct),
+                        bid=sanitize_value(live_price.bid),
+                        ask=sanitize_value(live_price.ask),
+                        last=sanitize_value(live_price.last),
                         timestamp=live_price.timestamp.isoformat() if live_price.timestamp else datetime.now().isoformat(),
                         currency=live_price.currency
                     ))

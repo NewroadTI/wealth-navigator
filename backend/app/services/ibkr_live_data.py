@@ -12,6 +12,10 @@ from ib_insync import IB, Stock, util
 
 logger = logging.getLogger(__name__)
 
+# Constants for batch processing
+BATCH_SIZE = 50  # Max contracts per batch to avoid socket overload
+BATCH_DELAY = 0.5  # Delay between batches in seconds
+
 @dataclass
 class LivePrice:
     symbol: str
@@ -171,15 +175,40 @@ class IBKRLiveDataService:
                 
                 logger.info(f"Validando {len(symbols_to_fetch)} contratos en batch...")
                 
-                # Crear todos los contratos
-                contracts = [Stock(s, 'SMART', 'USD') for s in symbols_to_fetch]
+                # Dividir en chunks para evitar sobrecargar el socket
+                all_qualified = []
+                chunks = [symbols_to_fetch[i:i + BATCH_SIZE] for i in range(0, len(symbols_to_fetch), BATCH_SIZE)]
                 
-                # Validar todos de una vez (más rápido)
-                try:
-                    qualified_contracts = self.ib.qualifyContracts(*contracts)
-                except Exception as e:
-                    logger.warning(f"Error en batch validation: {e}")
-                    qualified_contracts = []
+                for chunk_idx, chunk in enumerate(chunks, 1):
+                    try:
+                        # Verificar conexión antes de cada chunk
+                        if not self.ib.isConnected():
+                            logger.warning(f"Reconectando antes del chunk {chunk_idx}...")
+                            self._ensure_connected()
+                        
+                        logger.info(f"Procesando chunk {chunk_idx}/{len(chunks)} ({len(chunk)} contratos)...")
+                        contracts = [Stock(s, 'SMART', 'USD') for s in chunk]
+                        
+                        # Validar este chunk
+                        qualified = self.ib.qualifyContracts(*contracts)
+                        all_qualified.extend(qualified)
+                        
+                        # Pequeño delay entre chunks para no saturar
+                        if chunk_idx < len(chunks):
+                            self.ib.sleep(BATCH_DELAY)
+                            
+                    except Exception as e:
+                        logger.warning(f"Error en chunk {chunk_idx}: {e}")
+                        # Intentar reconectar para el siguiente chunk
+                        try:
+                            self.ib.disconnect()
+                            self.ib.sleep(1)
+                            self._ensure_connected()
+                        except Exception as reconn_err:
+                            logger.error(f"Error reconectando: {reconn_err}")
+                        continue
+                
+                qualified_contracts = all_qualified
                 
                 # Mapear contratos válidos por symbol
                 valid_by_symbol = {}
@@ -204,19 +233,40 @@ class IBKRLiveDataService:
                         isin_contracts.append(isin_contract)
                         isin_to_symbol[isin] = symbol
                 
-                # Validar contratos con ISIN
+                # Validar contratos con ISIN (también en chunks)
                 if isin_contracts:
                     logger.info(f"Reintentando {len(isin_contracts)} símbolos con ISIN...")
-                    try:
-                        qualified_isin = self.ib.qualifyContracts(*isin_contracts)
-                        for contract in qualified_isin:
-                            # El símbolo puede ser ISIN o el symbol real
-                            original_symbol = isin_to_symbol.get(contract.symbol)
-                            if original_symbol:
-                                valid_by_symbol[original_symbol] = contract
-                                logger.info(f"✓ Encontrado por ISIN: {contract.symbol} -> {original_symbol}")
-                    except Exception as e:
-                        logger.debug(f"Error validando ISINs: {e}")
+                    isin_chunks = [isin_contracts[i:i + BATCH_SIZE] for i in range(0, len(isin_contracts), BATCH_SIZE)]
+                    
+                    for chunk_idx, isin_chunk in enumerate(isin_chunks, 1):
+                        try:
+                            # Verificar conexión
+                            if not self.ib.isConnected():
+                                logger.warning(f"Reconectando para ISINs chunk {chunk_idx}...")
+                                self._ensure_connected()
+                            
+                            qualified_isin = self.ib.qualifyContracts(*isin_chunk)
+                            for contract in qualified_isin:
+                                # El símbolo puede ser ISIN o el symbol real
+                                original_symbol = isin_to_symbol.get(contract.symbol)
+                                if original_symbol:
+                                    valid_by_symbol[original_symbol] = contract
+                                    logger.info(f"✓ Encontrado por ISIN: {contract.symbol} -> {original_symbol}")
+                            
+                            # Delay entre chunks de ISIN
+                            if chunk_idx < len(isin_chunks):
+                                self.ib.sleep(BATCH_DELAY)
+                                
+                        except Exception as e:
+                            logger.debug(f"Error validando ISINs chunk {chunk_idx}: {e}")
+                            # Intentar reconectar
+                            try:
+                                self.ib.disconnect()
+                                self.ib.sleep(1)
+                                self._ensure_connected()
+                            except:
+                                pass
+                            continue
                 
                 # Cachear los que definitivamente fallaron
                 still_failed = set(symbols_to_fetch) - set(valid_by_symbol.keys())
@@ -228,18 +278,44 @@ class IBKRLiveDataService:
                             self._failed_isins.add(isin_key)
                     logger.debug(f"✗ Cacheado como fallido: {symbol}")
                 
-                # Obtener precios solo para contratos válidos
+                # Obtener precios solo para contratos válidos (también en chunks)
                 if valid_by_symbol:
                     logger.info(f"Obteniendo precios para {len(valid_by_symbol)} contratos...")
                     
-                    # Request tickers with a timeout
-                    try:
-                        tickers = self.ib.reqTickers(*valid_by_symbol.values())
-                        # Give IB time to respond (max 5 seconds)
-                        self.ib.sleep(2)
-                    except Exception as ticker_err:
-                        logger.error(f"Error en reqTickers: {ticker_err}")
-                        tickers = []
+                    # Dividir contratos válidos en chunks para reqTickers
+                    all_tickers = []
+                    valid_contracts = list(valid_by_symbol.values())
+                    ticker_chunks = [valid_contracts[i:i + BATCH_SIZE] for i in range(0, len(valid_contracts), BATCH_SIZE)]
+                    
+                    for chunk_idx, ticker_chunk in enumerate(ticker_chunks, 1):
+                        try:
+                            # Verificar conexión
+                            if not self.ib.isConnected():
+                                logger.warning(f"Reconectando para ticker chunk {chunk_idx}...")
+                                self._ensure_connected()
+                            
+                            logger.info(f"Solicitando precios chunk {chunk_idx}/{len(ticker_chunks)} ({len(ticker_chunk)} contratos)...")
+                            tickers = self.ib.reqTickers(*ticker_chunk)
+                            # Give IB time to respond
+                            self.ib.sleep(1)
+                            all_tickers.extend(tickers)
+                            
+                            # Delay entre chunks
+                            if chunk_idx < len(ticker_chunks):
+                                self.ib.sleep(BATCH_DELAY)
+                                
+                        except Exception as ticker_err:
+                            logger.error(f"Error en reqTickers chunk {chunk_idx}: {ticker_err}")
+                            # Intentar reconectar
+                            try:
+                                self.ib.disconnect()
+                                self.ib.sleep(1)
+                                self._ensure_connected()
+                            except:
+                                pass
+                            continue
+                    
+                    tickers = all_tickers
                     
                     for ticker in tickers:
                         try:
@@ -308,29 +384,49 @@ class IBKRLiveDataService:
         """
         Wrapper para compatibilidad con endpoints.
         Filtra assets ya cacheados como fallidos y busca el resto.
+        Detecta ISINs automáticamente para evitar buscarlos como símbolos.
         """
         symbols_to_fetch = []
         isin_to_symbol = {}
+        
+        def is_isin(value: str) -> bool:
+            """Detectar si un string es un ISIN (12 chars, starts with 2 letters)."""
+            if not value or len(value) != 12:
+                return False
+            # ISINs empiezan con 2 letras (código de país) seguidas de alfanuméricos
+            return value[:2].isalpha() and value[2:].isalnum()
         
         for asset in asset_identifiers:
             symbol = asset.get('symbol')
             isin = asset.get('isin')
             
+            # Si symbol parece ser un ISIN, moverlo a isin
+            if symbol and is_isin(symbol):
+                logger.debug(f"Detectado ISIN en campo symbol: {symbol}")
+                if not isin:
+                    isin = symbol
+                symbol = None  # No intentar buscar como symbol
+            
             # Solo intentar si no está en caché de fallidos
-            if symbol and symbol not in self._failed_symbols:
+            if symbol and not is_isin(symbol) and symbol not in self._failed_symbols:
                 symbols_to_fetch.append(symbol)
                 if isin and isin not in self._failed_isins:
                     isin_to_symbol[isin] = symbol
+            elif not symbol and isin and isin not in self._failed_isins:
+                # Si no hay symbol pero sí ISIN, agregarlo al mapa con el ISIN como clave
+                isin_to_symbol[isin] = isin  # Usamos ISIN como fallback
         
-        if not symbols_to_fetch:
-            logger.warning("No hay símbolos para consultar (todos en caché de fallidos)")
+        if not symbols_to_fetch and not isin_to_symbol:
+            logger.warning("No hay símbolos para consultar (todos en caché de fallidos o son ISINs inválidos)")
             return {}
         
         logger.info(f"Consultando {len(symbols_to_fetch)} activos (caché: {len(self._failed_symbols)} symbols, {len(self._failed_isins)} ISINs)")
+        if isin_to_symbol:
+            logger.info(f"Mapeo ISIN->Symbol: {len(isin_to_symbol)} pares")
         
         # Una sola pasada: el método interno maneja symbol + ISIN automáticamente
         return self.get_live_prices(
-            symbols=symbols_to_fetch,
+            symbols=symbols_to_fetch if symbols_to_fetch else None,
             isin_symbol_map=isin_to_symbol
         )
 
