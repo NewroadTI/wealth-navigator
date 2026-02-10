@@ -42,6 +42,7 @@ import { assetsApi, catalogsApi, AssetClass } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 // ==========================================================================
 // TYPES
@@ -149,6 +150,10 @@ const RecordDetailsCard = ({
     const reason = isSkipped ? record.reason : record.error;
     const rowIndex = record.row_index !== undefined ? record.row_index : index;
 
+    // Enhanced details for better error context
+    const clientName = record.client_name || record.row_data?.cliente || record.row_data?.client_name;
+    const assetDesc = record.asset_description || record.row_data?.security_description || record.row_data?.description;
+
     return (
         <AccordionItem value={`record-${index}`} className="border-slate-800">
             <AccordionTrigger className="hover:no-underline py-3">
@@ -170,6 +175,13 @@ const RecordDetailsCard = ({
                         <p className={`text-xs mt-1 truncate ${reasonColor}`}>
                             {reason}
                         </p>
+                        {/* New: Display Client Name or Asset Description in the header summary if available */}
+                        {(clientName || assetDesc) && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                                {clientName && <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">Client: {clientName}</span>}
+                                {assetDesc && <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">Asset: {assetDesc}</span>}
+                            </div>
+                        )}
                     </div>
                 </div>
             </AccordionTrigger>
@@ -179,9 +191,15 @@ const RecordDetailsCard = ({
                         <h4 className={`text-xs font-semibold mb-2 uppercase tracking-wider ${contentTitleColor}`}>
                             {isSkipped ? 'Skip Reason' : 'Error Message'}
                         </h4>
-                        <p className={`text-sm p-3 rounded border ${contentBg}`}>
-                            {reason}
-                        </p>
+                        <div className={`p-3 rounded border ${contentBg} space-y-2`}>
+                            <p className="text-sm font-medium">{reason}</p>
+                            {(clientName || assetDesc) && (
+                                <div className="text-xs space-y-1 pt-2 border-t border-amber-900/30">
+                                    {clientName && <div className="flex gap-2"><span className="text-amber-500/70 w-20">Client:</span> <span className="text-amber-100">{clientName}</span></div>}
+                                    {assetDesc && <div className="flex gap-2"><span className="text-amber-500/70 w-20">Asset:</span> <span className="text-amber-100">{assetDesc}</span></div>}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div>
@@ -431,10 +449,14 @@ const MissingAccountCard = ({
     onResolved: () => void;
 }) => {
     const [isResolving, setIsResolving] = useState(false);
-    const [parsedName, setParsedName] = useState<string | null>(null);
+    // Initialize parsedName from account prop if available (backend provided)
+    const [parsedName, setParsedName] = useState<string | null>(account.parsed_name || null);
     const [loadingName, setLoadingName] = useState(false);
-    const [matchedUser, setMatchedUser] = useState<any | null>(null);
+    // Changed: Store multiple candidates instead of single matchedUser
+    const [candidates, setCandidates] = useState<any[]>([]);
     const [isDone, setIsDone] = useState(account.done || false);
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [linkingUserId, setLinkingUserId] = useState<number | null>(null);
     const apiBaseUrl = getApiBaseUrl();
     const { toast } = useToast();
 
@@ -442,6 +464,14 @@ const MissingAccountCard = ({
     useEffect(() => {
         setIsDone(account.done || false);
     }, [account.done]);
+
+    // Sync parsedName if prop updates
+    useEffect(() => {
+        if (account.parsed_name) {
+            setParsedName(account.parsed_name);
+        }
+    }, [account.parsed_name]);
+
 
     // Mark the account as done in the backend
     const markAsDone = async () => {
@@ -473,6 +503,7 @@ const MissingAccountCard = ({
     };
 
     const handleLinkExistingUser = async (userId: number) => {
+        setLinkingUserId(userId);
         try {
             const res = await fetch(`${apiBaseUrl}/api/v1/persh-accounts/create-account`, {
                 method: 'POST',
@@ -502,15 +533,23 @@ const MissingAccountCard = ({
                 title: 'Error',
                 description: error instanceof Error ? error.message : 'Failed to link account',
             });
+        } finally {
+            setLinkingUserId(null);
         }
     };
 
     const startResolution = async () => {
         setIsResolving(true);
-        // Try to fetch parsed name if we have CSV
-        if (csvFilename && !parsedName) {
-            setLoadingName(true);
-            try {
+        setLoadingName(true);
+        setCandidates([]);
+        setShowCreateForm(false);
+
+        try {
+            // Get name to match (from backend or CSV extraction)
+            let nameToMatch = parsedName;
+
+            // If no parsed name from backend, try CSV extraction (legacy flow)
+            if (!nameToMatch && csvFilename) {
                 const res = await fetch(`${apiBaseUrl}/api/v1/persh-accounts/extract-names`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -518,46 +557,39 @@ const MissingAccountCard = ({
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    console.log('Extract names response:', data);
                     const match = data.names?.find((n: any) => n.account_code === account.account_code);
-                    console.log('Match found for', account.account_code, ':', match);
-                    console.log('Parsed name from match:', match?.parsed_name);
-
-                    let currentParsedName = null;
                     if (match?.parsed_name) {
-                        currentParsedName = match.parsed_name;
+                        nameToMatch = match.parsed_name;
                         setParsedName(match.parsed_name);
-                        console.log('✅ Set parsedName to:', match.parsed_name);
-                    } else {
-                        console.warn('⚠️ No parsed_name found for account:', account.account_code);
-                        console.warn('Match object:', match);
-                    }
-
-                    // Now try to fuzzy match against existing users
-                    const matchRes = await fetch(`${apiBaseUrl}/api/v1/persh-accounts/match-users`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            missing_accounts: [{
-                                account_code: account.account_code,
-                                parsed_name: currentParsedName || ""
-                            }]
-                        }),
-                    });
-
-                    if (matchRes.ok) {
-                        const matchData = await matchRes.json();
-                        const result = matchData.results?.[0];
-                        if (result && result.match_found && result.confidence > 60) {
-                            setMatchedUser(result);
-                        }
                     }
                 }
-            } catch (e) {
-                console.error("Failed to fetch name", e);
-            } finally {
-                setLoadingName(false);
             }
+
+            // Call match-users endpoint (now returns multiple candidates)
+            if (nameToMatch) {
+                const matchRes = await fetch(`${apiBaseUrl}/api/v1/persh-accounts/match-users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        missing_accounts: [{
+                            account_code: account.account_code,
+                            parsed_name: nameToMatch
+                        }]
+                    }),
+                });
+
+                if (matchRes.ok) {
+                    const matchData = await matchRes.json();
+                    const result = matchData.results?.[0];
+                    if (result?.candidates && result.candidates.length > 0) {
+                        setCandidates(result.candidates);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch matches", e);
+        } finally {
+            setLoadingName(false);
         }
     };
 
@@ -595,6 +627,11 @@ const MissingAccountCard = ({
                         <div>
                             <p className="font-semibold text-blue-400">{account.account_code}</p>
                             <p className="text-xs text-gray-400">{account.reason}</p>
+                            {parsedName && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Parsed name: <span className="text-gray-300">{parsedName}</span>
+                                </p>
+                            )}
                         </div>
                         {!isResolving && (
                             <Button
@@ -614,21 +651,83 @@ const MissingAccountCard = ({
                             {loadingName ? (
                                 <div className="flex items-center gap-2 text-xs text-gray-300 py-2">
                                     <Loader2 className="h-3 w-3 animate-spin" />
-                                    Analyzing account details...
+                                    Searching for matching users...
                                 </div>
-                            ) : matchedUser ? (
+                            ) : showCreateForm ? (
+                                <CreateInvestorForm
+                                    initialName={parsedName || account.account_code}
+                                    accountCode={account.account_code}
+                                    onSuccess={handleFormSuccess}
+                                    onCancel={() => setShowCreateForm(false)}
+                                />
+                            ) : (
                                 <div className="space-y-3">
-                                    <div className="bg-blue-900/20 p-3 rounded border border-blue-800">
-                                        <p className="text-sm text-blue-300 font-medium">Existing User Found</p>
-                                        <div className="mt-2 text-sm text-gray-300">
-                                            <p><span className="text-gray-500">Name:</span> {matchedUser.matched_user_name}</p>
-                                            <p><span className="text-gray-500">Email:</span> {matchedUser.matched_user_email}</p>
-                                            <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900 text-blue-200">
-                                                Match Confidence: {matchedUser.confidence}%
-                                            </div>
+                                    {/* Show candidates if any */}
+                                    {candidates.length > 0 && (
+                                        <div className="space-y-2">
+                                            <p className="text-sm text-gray-300 font-medium">
+                                                Potential Matches Found ({candidates.length}):
+                                            </p>
+                                            {candidates.map((candidate, idx) => (
+                                                <div
+                                                    key={candidate.user_id}
+                                                    className="bg-blue-900/20 p-3 rounded border border-blue-800 flex justify-between items-center"
+                                                >
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm text-blue-300 font-medium">
+                                                            {candidate.full_name}
+                                                        </p>
+                                                        <p className="text-xs text-gray-400">
+                                                            {candidate.email}
+                                                        </p>
+                                                        <Badge
+                                                            className={`text-xs ${candidate.confidence >= 90
+                                                                ? 'bg-green-900 text-green-200'
+                                                                : candidate.confidence >= 80
+                                                                    ? 'bg-blue-900 text-blue-200'
+                                                                    : 'bg-amber-900 text-amber-200'
+                                                                }`}
+                                                        >
+                                                            {candidate.confidence}% match
+                                                        </Badge>
+                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => handleLinkExistingUser(candidate.user_id)}
+                                                        disabled={linkingUserId !== null}
+                                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                                    >
+                                                        {linkingUserId === candidate.user_id ? (
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                        ) : (
+                                                            <>Link</>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            ))}
                                         </div>
+                                    )}
+
+                                    {/* No matches message */}
+                                    {candidates.length === 0 && (
+                                        <div className="bg-amber-900/20 p-3 rounded border border-amber-800">
+                                            <p className="text-sm text-amber-300">
+                                                No matching users found above threshold.
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                You can create a new investor below.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Separator and Create New option */}
+                                    <div className="flex items-center gap-3 my-3">
+                                        <Separator className="flex-1 bg-gray-700" />
+                                        <span className="text-xs text-gray-500">OR</span>
+                                        <Separator className="flex-1 bg-gray-700" />
                                     </div>
-                                    <div className="flex justify-end gap-2">
+
+                                    <div className="flex justify-between">
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -639,20 +738,15 @@ const MissingAccountCard = ({
                                         </Button>
                                         <Button
                                             size="sm"
-                                            onClick={() => handleLinkExistingUser(matchedUser.matched_user_id)}
-                                            className="bg-green-600 hover:bg-green-700 text-white"
+                                            variant="outline"
+                                            onClick={() => setShowCreateForm(true)}
+                                            className="border-blue-600 text-blue-400 hover:bg-blue-900/30"
                                         >
-                                            Link Account to User
+                                            <UserPlus className="h-3 w-3 mr-1" />
+                                            Create New Investor
                                         </Button>
                                     </div>
                                 </div>
-                            ) : (
-                                <CreateInvestorForm
-                                    initialName={parsedName || account.account_code}
-                                    accountCode={account.account_code}
-                                    onSuccess={handleFormSuccess}
-                                    onCancel={() => setIsResolving(false)}
-                                />
                             )}
                         </div>
                     )}
@@ -938,7 +1032,13 @@ const ETLJobDetails = () => {
                 <div className="flex items-center justify-between">
                     <Button
                         variant="outline"
-                        onClick={() => navigate('/pershing')}
+                        onClick={() => {
+                            if (data.job_type && data.job_type.includes('PERSHING')) {
+                                navigate('/etl/pershing');
+                            } else {
+                                navigate('/etl/ibkr');
+                            }
+                        }}
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to Dashboard

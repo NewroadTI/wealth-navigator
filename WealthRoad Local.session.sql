@@ -1,1 +1,1 @@
-SELECT * FROM positions ORDER BY report_date desc;
+select * from users;

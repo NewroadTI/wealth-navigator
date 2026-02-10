@@ -27,6 +27,14 @@ services:
     environment:
       # Conexión a la DB usando el nombre del servicio 'db'
       DATABASE_URL: postgresql://admin:securepassword123@db:5432/wealthroad
+      # IB Gateway connection - use container name now that it's on the same network
+      IBKR_GATEWAY_HOST: ib-local-ib-gateway-1
+      IBKR_GATEWAY_PORT: "4003"
+      IBKR_CLIENT_ID: "100"
+      # Market data type: 1=Real-time (requires subscription), 3=Delayed (free)
+      IBKR_MARKET_DATA_TYPE: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - db
     volumes:

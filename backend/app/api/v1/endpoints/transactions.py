@@ -813,6 +813,7 @@ def create_positions_bulk(
                 existing.vesting_date = pos_in.vesting_date
                 existing.accrued_interest = pos_in.accrued_interest
                 existing.fx_rate_to_base = pos_in.fx_rate_to_base
+                existing.currency = pos_in.currency
                 
                 updated_count += 1
             else:
@@ -834,7 +835,8 @@ def create_positions_bulk(
                     open_date_time=pos_in.open_date_time,
                     vesting_date=pos_in.vesting_date,
                     accrued_interest=pos_in.accrued_interest,
-                    fx_rate_to_base=pos_in.fx_rate_to_base
+                    fx_rate_to_base=pos_in.fx_rate_to_base,
+                    currency=pos_in.currency
                 )
                 db.add(db_position)
                 created_count += 1

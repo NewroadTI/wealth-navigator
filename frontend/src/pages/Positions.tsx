@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, useEffect } from 'react';
+import { Fragment, useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { formatCurrency, formatNumber, formatPercent, getChangeColor, formatDate } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Radio, Wifi, WifiOff } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/config';
+import { toast } from 'sonner';
+import { useLivePricesSSE, LivePriceData } from '@/hooks/useLivePricesSSE';
 
 const ITEMS_PER_PAGE = 15;
 // getApiBaseUrl() returns the API URL with runtime protocol detection
@@ -64,10 +66,15 @@ interface AggregatedAsset {
   asset_class: string;
   total_quantity: number;
   avg_cost_price: number;
+  avg_cost_price_original?: number;
   current_mark_price: number;
+  current_mark_price_original?: number;
   total_market_value: number;
+  total_market_value_original?: number;
   total_cost_basis_money: number;
+  total_cost_basis_money_original?: number;
   total_pnl_unrealized: number;
+  total_pnl_unrealized_original?: number;
   day_change_pct: number;
   // Distribución de rendimiento
   gainers_count: number;
@@ -81,17 +88,26 @@ interface AggregatedAsset {
     institution: string;
     account_id: number;
     user_name: string | null;
+    user_first_name: string | null;
+    user_last_name: string | null;
     quantity: number | null;
     avg_cost_price: number | null;
+    avg_cost_price_original?: number;
     cost_basis_money: number | null;
+    cost_basis_money_original?: number;
     market_price: number | null;
+    market_price_original?: number;
     market_value: number | null;
+    market_value_original?: number;
     unrealized_pnl: number | null;
+    unrealized_pnl_original?: number;
     day_change_pct: number | null;
     fx_rate_to_base: number | null;
+    currency: string | null;
   }>;
   account_ids: number[];
   fx_rate_to_base: number;
+  currency: string;
 }
 
 interface TopMover {
@@ -112,7 +128,40 @@ interface FilterOptions {
   available_dates: string[];
 }
 
+// Live price data from IBKR
+interface LivePriceItem {
+  asset_id: number;
+  symbol: string | null;
+  isin: string | null;
+  live_price: number;
+  previous_close: number | null;
+  day_change_pct: number | null;
+  bid: number | null;
+  ask: number | null;
+  last: number | null;
+  timestamp: string | null;
+  currency: string;
+}
+
+// LocalStorage key for persisting Live Data state
+const LIVE_DATA_STORAGE_KEY = 'wealthroad_live_data_enabled';
+
 const Positions = () => {
+  // Helper function to format currency with dual display if not USD
+  const formatCurrencyWithCode = (valueOriginal: number, valueUSD: number, currency: string = 'USD') => {
+    const formatValue = (val: number) => val.toFixed(2);
+    
+    if (currency === 'USD' || !currency) {
+      return `${formatValue(valueUSD)} USD`;
+    }
+    // Show: original value in local currency - converted value in USD
+    return (
+      <span className="whitespace-nowrap">
+        {formatValue(valueOriginal)} {currency} - {formatValue(valueUSD)} USD
+      </span>
+    );
+  };
+
   // Filters State
   const [reportDate, setReportDate] = useState<string>('');
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('');
@@ -132,6 +181,56 @@ const Positions = () => {
   const [movers, setMovers] = useState<{ gainers: TopMover[]; losers: TopMover[] }>({ gainers: [], losers: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Live Data State - using SSE (persisted in localStorage)
+  const [liveDataEnabled, setLiveDataEnabled] = useState(() => {
+    // Read initial state from localStorage
+    const stored = localStorage.getItem(LIVE_DATA_STORAGE_KEY);
+    return stored === 'true';
+  });
+
+  // Track price changes for animation (asset_id -> 'up' | 'down' | null)
+  const [priceChanges, setPriceChanges] = useState<Map<number, 'up' | 'down' | null>>(new Map());
+  const previousPricesRef = useRef<Map<number, number>>(new Map());
+  const PRICE_CHANGE_STORAGE_KEY = 'wealthroad_price_change_states';
+
+  const savePriceChangesToStorage = useCallback((map: Map<number, 'up' | 'down' | null>) => {
+    try {
+      const arr = Array.from(map.entries());
+      localStorage.setItem(PRICE_CHANGE_STORAGE_KEY, JSON.stringify(arr));
+    } catch (e) {
+      console.error('[SSE] Error saving price change states:', e);
+    }
+  }, []);
+
+  const loadPriceChangesFromStorage = useCallback((): Map<number, 'up' | 'down' | null> => {
+    try {
+      const raw = localStorage.getItem(PRICE_CHANGE_STORAGE_KEY);
+      if (!raw) return new Map();
+      const parsed = JSON.parse(raw) as Array<[number, 'up' | 'down' | null]>;
+      return new Map(parsed.map(([k, v]) => [Number(k), v]));
+    } catch (e) {
+      console.error('[SSE] Error loading price change states:', e);
+      return new Map();
+    }
+  }, []);
+
+  // Load persisted price change states on mount
+  useEffect(() => {
+    const loaded = loadPriceChangesFromStorage();
+    if (loaded && loaded.size > 0) {
+      setPriceChanges(loaded);
+    }
+  }, [loadPriceChangesFromStorage]);
+
+  // Persist priceChanges whenever it changes (or clear storage when empty)
+  useEffect(() => {
+    if (priceChanges && priceChanges.size > 0) {
+      savePriceChangesToStorage(priceChanges);
+    } else {
+      try { localStorage.removeItem(PRICE_CHANGE_STORAGE_KEY); } catch {}
+    }
+  }, [priceChanges, savePriceChangesToStorage]);
 
   // Load filter options on mount
   useEffect(() => {
@@ -175,15 +274,30 @@ const Positions = () => {
         const data = await response.json();
         
         // Apply fx_rate_to_base transformation to all monetary values
-        const transformedData = data.map((asset: AggregatedAsset) => ({
+        // Keep both original and converted values for display
+        const transformedData = data.map((asset: any) => ({
           ...asset,
+          // Store original values with _original suffix
+          avg_cost_price_original: asset.avg_cost_price,
+          total_cost_basis_money_original: asset.total_cost_basis_money,
+          current_mark_price_original: asset.current_mark_price,
+          total_market_value_original: asset.total_market_value,
+          total_pnl_unrealized_original: asset.total_pnl_unrealized,
+          // Convert to USD
           avg_cost_price: asset.avg_cost_price * (asset.fx_rate_to_base || 1),
           total_cost_basis_money: asset.total_cost_basis_money * (asset.fx_rate_to_base || 1),
           current_mark_price: asset.current_mark_price * (asset.fx_rate_to_base || 1),
           total_market_value: asset.total_market_value * (asset.fx_rate_to_base || 1),
           total_pnl_unrealized: asset.total_pnl_unrealized * (asset.fx_rate_to_base || 1),
-          institutions: asset.institutions.map(inst => ({
+          institutions: asset.institutions.map((inst: any) => ({
             ...inst,
+            // Store original values
+            avg_cost_price_original: inst.avg_cost_price ?? 0,
+            cost_basis_money_original: inst.cost_basis_money ?? 0,
+            market_price_original: inst.market_price ?? 0,
+            market_value_original: inst.market_value ?? 0,
+            unrealized_pnl_original: inst.unrealized_pnl ?? 0,
+            // Convert to USD
             avg_cost_price: (inst.avg_cost_price ?? 0) * (inst.fx_rate_to_base ?? 1),
             cost_basis_money: (inst.cost_basis_money ?? 0) * (inst.fx_rate_to_base ?? 1),
             market_price: (inst.market_price ?? 0) * (inst.fx_rate_to_base ?? 1),
@@ -260,9 +374,9 @@ const Positions = () => {
       result = result.filter(p =>
         p.asset_symbol.toLowerCase().includes(query) ||
         p.institutions.some(inst => {
-          const displayName = inst.user_name 
-            ? `${inst.institution.toLowerCase()}-${inst.user_name}`
-            : inst.institution.toLowerCase();
+          const displayName = inst.user_first_name && inst.user_last_name
+            ? `${inst.institution}-${inst.user_first_name} ${inst.user_last_name}`
+            : inst.institution;
           return displayName.toLowerCase().includes(query);
         })
       );
@@ -342,6 +456,138 @@ const Positions = () => {
     return filteredPositions.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredPositions, currentPage]);
 
+  // ==================== LIVE DATA LOGIC (SSE) ====================
+  
+  // Get all asset IDs to subscribe to (all filtered positions, not just current page)
+  const allAssetIds = useMemo(() => {
+    return filteredPositions.map(p => p.asset_id);
+  }, [filteredPositions]);
+  
+  // Use the SSE hook for live price streaming
+  const { 
+    state: sseState, 
+    prices: ssePrices, 
+    disconnect: sseDisconnect,
+    reconnect: sseReconnect,
+    clearCache: sseClearCache
+  } = useLivePricesSSE({
+    enabled: liveDataEnabled,
+    assetIds: allAssetIds,
+    onPrices: (prices) => {
+      // Fetch live movers when we get new prices
+      if (prices.length > 0) {
+        fetchLiveMovers(prices.map(p => p.asset_id));
+      }
+    },
+    reconnectDelay: 3000,
+    maxReconnectAttempts: 5,
+  });
+  
+  // Convert SSE prices to the LivePriceItem format expected by the component
+  const livePrices = useMemo(() => {
+    const map = new Map<number, LivePriceItem>();
+    ssePrices.forEach((price, assetId) => {
+      map.set(assetId, {
+        asset_id: price.asset_id,
+        symbol: price.symbol || null,
+        isin: price.isin,
+        live_price: price.live_price,
+        previous_close: price.previous_close,
+        day_change_pct: price.day_change_pct,
+        bid: price.bid,
+        ask: price.ask,
+        last: price.last,
+        timestamp: price.timestamp,
+        currency: price.currency,
+      });
+    });
+    return map;
+  }, [ssePrices]);
+  
+  // Derived state from SSE
+  const liveDataConnected = sseState.connected;
+  const liveDataLoading = sseState.connecting;
+  const lastLiveUpdate = sseState.lastUpdate;
+
+  // Fetch live movers for current page
+  const fetchLiveMovers = async (assetIds: number[]) => {
+    try {
+      const params = new URLSearchParams({
+        limit: '5',
+      });
+      assetIds.forEach(id => params.append('asset_ids', id.toString()));
+
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/live-movers?${params}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setMovers(data);
+    } catch (err) {
+      console.error('Error fetching live movers:', err);
+    }
+  };
+
+  // Toggle live data on/off
+  const toggleLiveData = useCallback(() => {
+    if (liveDataEnabled) {
+      console.log('[Live Data] Turning off...');
+      setLiveDataEnabled(false);
+      localStorage.setItem(LIVE_DATA_STORAGE_KEY, 'false');
+      sseDisconnect();
+      // Clear cached prices when manually disabling
+      sseClearCache();
+    } else {
+      console.log('[Live Data] Turning on...');
+      setLiveDataEnabled(true);
+      localStorage.setItem(LIVE_DATA_STORAGE_KEY, 'true');
+    }
+  }, [liveDataEnabled, sseDisconnect, sseClearCache]);
+
+  // Handle SSE errors
+  useEffect(() => {
+    if (sseState.error) {
+      toast.error(`Live Data: ${sseState.error}`);
+    }
+  }, [sseState.error]);
+
+  // Detect price changes and trigger animations
+  useEffect(() => {
+    if (!liveDataEnabled || livePrices.size === 0) {
+      // Clear all changes when live data is disabled
+      setPriceChanges(new Map());
+      previousPricesRef.current.clear();
+      return;
+    }
+
+    const newChanges = new Map<number, 'up' | 'down' | null>();
+    let hasAnyPreviousPrice = false;
+
+    livePrices.forEach((currentPrice, assetId) => {
+      const previousPrice = previousPricesRef.current.get(assetId);
+      
+      if (previousPrice !== undefined) {
+        hasAnyPreviousPrice = true;
+        if (currentPrice.live_price !== previousPrice) {
+          // Price changed! Set direction
+          const direction = currentPrice.live_price > previousPrice ? 'up' : 'down';
+          newChanges.set(assetId, direction);
+        }
+      }
+
+      // Update previous price
+      previousPricesRef.current.set(assetId, currentPrice.live_price);
+    });
+
+    // Only update price changes if we had previous prices to compare
+    // On first load after page reload, preserve the colors loaded from localStorage
+    if (hasAnyPreviousPrice) {
+      // Replace all changes (clearing old ones and setting new ones)
+      // This way, colors only show until the next price update
+      setPriceChanges(newChanges);
+    }
+  }, [livePrices, liveDataEnabled]);
+
+  // ==================== END LIVE DATA LOGIC ====================
+
   const buildFilterString = () => {
     const params = new URLSearchParams();
     if (selectedPortfolio) params.set('portfolio', selectedPortfolio);
@@ -413,6 +659,55 @@ const Positions = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Live Data Toggle Button */}
+          <Button
+            variant={liveDataEnabled ? "default" : "outline"}
+            size="sm"
+            onClick={toggleLiveData}
+            className={cn(
+              "gap-2 transition-all",
+              liveDataEnabled && "bg-green-600 hover:bg-green-700 text-white",
+              liveDataEnabled && liveDataLoading && "animate-pulse"
+            )}
+          >
+            {liveDataEnabled ? (
+              liveDataConnected ? (
+                <Wifi className="h-4 w-4" />
+              ) : (
+                <WifiOff className="h-4 w-4" />
+              )
+            ) : (
+              <Radio className="h-4 w-4" />
+            )}
+            {liveDataEnabled ? (
+              <>
+                Live Data
+                {liveDataConnected && lastLiveUpdate && (
+                  <span className="text-[10px] opacity-75">
+                    {lastLiveUpdate.toLocaleTimeString()}
+                  </span>
+                )}
+              </>
+            ) : (
+              "Live Data"
+            )}
+          </Button>
+
+          {/* Live Data Status Badge */}
+          {liveDataEnabled && (
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-xs",
+                liveDataConnected 
+                  ? "bg-green-500/10 text-green-500 border-green-500/30" 
+                  : "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
+              )}
+            >
+              {liveDataConnected ? "Connected" : "Connecting..."}
+            </Badge>
+          )}
 
           {/* Portfolio Filter */}
           <div className="relative flex items-center gap-1">
@@ -548,7 +843,10 @@ const Positions = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-gain" />
-              Top Gainers Today
+              Top Gainers {liveDataEnabled ? "(Live)" : "Today"}
+              {liveDataEnabled && liveDataConnected && (
+                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -579,7 +877,10 @@ const Positions = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-loss" />
-              Top Losers Today
+              Top Losers {liveDataEnabled ? "(Live)" : "Today"}
+              {liveDataEnabled && liveDataConnected && (
+                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -650,11 +951,11 @@ const Positions = () => {
                 <tr>
                   <SortableHeader column="symbol" label="Asset" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                   <SortableHeader column="quantity" label="Qty" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="avg_cost" label="Avg Price" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="cost_basis" label="Cost Basis" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="market_price" label="Market Price" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="market_value" label="Market Value" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                  <SortableHeader column="pnl" label="Unrealized P&L" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="avg_cost" label="Avg Price (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="cost_basis" label="Cost Basis (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="market_price" label="Market Price (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="market_value" label="Market Value (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                  <SortableHeader column="pnl" label="Unrealized P&L (USD)" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
                   <th className="text-center">Distribution</th>
                   <SortableHeader column="day_change" label="Day Chg %" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
                   <SortableHeader column="accounts" label="Accounts" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} align="right" />
@@ -664,7 +965,19 @@ const Positions = () => {
                 {paginatedPositions.length > 0 ? paginatedPositions.map((asset) => {
                   const isSelected = selectedAssetInTable === asset.asset_id;
                   const isPositivePL = asset.total_pnl_unrealized >= 0;
-                  const isPositiveDay = asset.day_change_pct >= 0;
+                  
+                  // Get live price data if available
+                  const livePrice = livePrices.get(asset.asset_id);
+                  const displayPrice = liveDataEnabled && livePrice 
+                    ? livePrice.live_price 
+                    : asset.current_mark_price;
+                  const displayDayChange = liveDataEnabled && livePrice && livePrice.day_change_pct !== null
+                    ? livePrice.day_change_pct
+                    : asset.day_change_pct;
+                  const isPositiveDay = (displayDayChange || 0) >= 0;
+                  
+                  // Get price change animation state
+                  const priceChange = priceChanges.get(asset.asset_id);
 
                   return (
                     <Fragment key={asset.asset_id}>
@@ -680,10 +993,27 @@ const Positions = () => {
                           </div>
                         </td>
                         <td className="text-right mono">{formatNumber(asset.total_quantity)}</td>
-                        <td className="text-right mono">{formatCurrency(asset.avg_cost_price)}</td>
-                        <td className="text-right mono">{formatCurrency(asset.total_cost_basis_money)}</td>
-                        <td className="text-right mono">{formatCurrency(asset.current_mark_price)}</td>
-                        <td className="text-right mono font-medium">{formatCurrency(asset.total_market_value)}</td>
+                        <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.avg_cost_price_original, asset.avg_cost_price, asset.currency)}</td>
+                        <td className="text-right mono text-xs">{formatCurrencyWithCode(asset.total_cost_basis_money_original, asset.total_cost_basis_money, asset.currency)}</td>
+                        <td className="text-right mono text-xs">
+                          <div className="flex items-center justify-end gap-1">
+                            {liveDataEnabled && livePrice && (
+                              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live price" />
+                            )}
+                            <span className={cn(
+                              "transition-colors duration-300",
+                              priceChange === 'up' && "text-green-500 font-semibold",
+                              priceChange === 'down' && "text-red-500 font-semibold",
+                              !priceChange && liveDataEnabled && livePrice && "font-medium"
+                            )}>
+                              {liveDataEnabled && livePrice 
+                                ? `${displayPrice.toFixed(2)} USD`
+                                : formatCurrencyWithCode(asset.current_mark_price_original, asset.current_mark_price, asset.currency)
+                              }
+                            </span>
+                          </div>
+                        </td>
+                        <td className="text-right mono font-medium text-xs">{formatCurrencyWithCode(asset.total_market_value_original, asset.total_market_value, asset.currency)}</td>
                         <td className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {isPositivePL ? (
@@ -691,8 +1021,8 @@ const Positions = () => {
                             ) : (
                               <ArrowDownRight className="h-3.5 w-3.5 text-loss" />
                             )}
-                            <p className={cn('text-sm font-medium mono', getChangeColor(asset.total_pnl_unrealized))}>
-                              {isPositivePL ? '+' : ''}{formatCurrency(asset.total_pnl_unrealized)}
+                            <p className={cn('text-xs font-medium mono', getChangeColor(asset.total_pnl_unrealized))}>
+                              {isPositivePL ? '+' : ''}{formatCurrencyWithCode(asset.total_pnl_unrealized_original, asset.total_pnl_unrealized, asset.currency)}
                             </p>
                           </div>
                         </td>
@@ -711,9 +1041,18 @@ const Positions = () => {
                           </div>
                         </td>
                         <td className="text-right">
-                          <span className={cn('text-sm mono', getChangeColor(asset.day_change_pct))}>
-                            {isPositiveDay ? '+' : ''}{formatPercent(asset.day_change_pct)}
-                          </span>
+                          <div className="flex items-center justify-end gap-1">
+                            {liveDataEnabled && livePrice && (
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                            )}
+                            <span className={cn(
+                              'text-sm mono', 
+                              getChangeColor(displayDayChange || 0),
+                              liveDataEnabled && livePrice && "font-semibold"
+                            )}>
+                              {formatPercent(displayDayChange || 0)}
+                            </span>
+                          </div>
                         </td>
                         <td className="text-right">
                           <Badge variant="secondary" className="text-xs">
@@ -782,9 +1121,9 @@ const Positions = () => {
                                   </thead>
                                   <tbody>
                                     {asset.institutions.map((inst) => {
-                                      const displayName = inst.user_name 
-                                        ? `${inst.institution.toLowerCase()}-${inst.user_name}`
-                                        : inst.institution.toLowerCase();
+                                      const displayName = inst.user_first_name && inst.user_last_name
+                                        ? `${inst.institution}-${inst.user_first_name} ${inst.user_last_name}`
+                                        : inst.institution;
                                       const instPnlPositive = (inst.unrealized_pnl ?? 0) >= 0;
                                       const instDayPositive = (inst.day_change_pct ?? 0) >= 0;
                                       
@@ -795,21 +1134,21 @@ const Positions = () => {
                                         >
                                           <td className="py-2 px-3 font-medium text-foreground">{displayName}</td>
                                           <td className="text-right py-2 px-3 mono">{formatNumber(inst.quantity ?? 0)}</td>
-                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.avg_cost_price ?? 0)}</td>
-                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.cost_basis_money ?? 0)}</td>
-                                          <td className="text-right py-2 px-3 mono text-muted-foreground">
-                                            {inst.market_price ? formatCurrency(inst.market_price) : '—'}
+                                          <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.avg_cost_price_original, inst.avg_cost_price, inst.currency ?? 'USD')}</td>
+                                          <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.cost_basis_money_original, inst.cost_basis_money, inst.currency ?? 'USD')}</td>
+                                          <td className="text-right py-2 px-3 mono text-muted-foreground text-xs">
+                                            {inst.market_price ? formatCurrencyWithCode(inst.market_price_original, inst.market_price, inst.currency ?? 'USD') : '—'}
                                           </td>
-                                          <td className="text-right py-2 px-3 mono">{formatCurrency(inst.market_value ?? 0)}</td>
+                                          <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.market_value_original, inst.market_value, inst.currency ?? 'USD')}</td>
                                           <td className="text-right py-2 px-3">
-                                            <span className={cn('mono', getChangeColor(inst.unrealized_pnl ?? 0))}>
-                                              {instPnlPositive ? '+' : ''}{formatCurrency(inst.unrealized_pnl ?? 0)}
+                                            <span className={cn('mono text-xs', getChangeColor(inst.unrealized_pnl ?? 0))}>
+                                              {instPnlPositive ? '+' : ''}{formatCurrencyWithCode(inst.unrealized_pnl_original, inst.unrealized_pnl, inst.currency ?? 'USD')}
                                             </span>
                                           </td>
                                           <td className="text-right py-2 px-3">
                                             <span className={cn('mono', getChangeColor(inst.day_change_pct ?? 0))}>
                                               {inst.day_change_pct !== null && inst.day_change_pct !== 0 
-                                                ? `${instDayPositive ? '+' : ''}${formatPercent(inst.day_change_pct)}`
+                                                ? formatPercent(inst.day_change_pct)
                                                 : '—'
                                               }
                                             </span>
