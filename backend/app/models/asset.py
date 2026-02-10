@@ -101,6 +101,8 @@ class Asset(Base):
     # Detalles de Subyacentes (JSONB)
     # Aquí guardarás la lista: [{'ticker': '9888 HK', 'initial_level': 143.8}, ...]
     structured_note_details = Column(JSONB, nullable=True) 
+
+    inviu_code = Column(String, nullable=True)
     
     is_active = Column(Boolean, default=True)
     
