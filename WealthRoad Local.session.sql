@@ -1,1 +1,1 @@
-select * from positions ;
+select * FROM positions

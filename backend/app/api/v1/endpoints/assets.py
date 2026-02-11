@@ -144,7 +144,8 @@ def delete_asset(
     asset_id: int,
 ) -> Any:
     """
-    Delete an asset.
+    Delete an asset. Related references (trades, positions, etc.) will have their asset_id set to NULL.
+    Market prices for this asset will be deleted (CASCADE).
     """
     asset = db.query(Asset).filter(Asset.asset_id == asset_id).first()
     if not asset:
@@ -153,13 +154,10 @@ def delete_asset(
     try:
         db.delete(asset)
         db.commit()
+        return asset
     except Exception as e:
         db.rollback()
-        # Esto ocurre si el activo ya se usó en Trades, Positions, etc.
-        # Postgres protege la integridad referencial.
         raise HTTPException(
             status_code=400, 
-            detail=f"No se puede eliminar el activo. Es probable que esté referenciado en operaciones (Trades/Portfolios). Error: {str(e)}"
+            detail=f"Error deleting asset: {str(e)}"
         )
-    
-    return asset

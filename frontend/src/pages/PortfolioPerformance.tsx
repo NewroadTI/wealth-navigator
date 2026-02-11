@@ -1,10 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { portfolios, positions, performanceData } from '@/lib/mockData';
 import { formatCurrency, formatPercent, getChangeColor } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -15,6 +17,7 @@ import {
   BarChart3,
   Globe,
   Building2,
+  Loader2,
 } from 'lucide-react';
 import {
   LineChart,
@@ -31,151 +34,257 @@ import {
   Bar,
 } from 'recharts';
 
-// Mock allocation data
-const assetAllocationData = [
-  { name: 'Equity', value: 55, color: 'hsl(220, 82%, 44%)' },
-  { name: 'Fixed Income', value: 25, color: 'hsl(38, 70%, 55%)' },
-  { name: 'Funds', value: 15, color: 'hsl(142, 70%, 45%)' },
-  { name: 'Cash', value: 5, color: 'hsl(220, 14%, 55%)' },
-];
+// API Types
+interface TopMover {
+  symbol: string;
+  name: string;
+  asset_id: number;
+  change: number;
+  change_percent: number;
+  current_value: number;
+  previous_value: number;
+}
 
-const sectorAllocationData = [
-  { name: 'Technology', value: 35, color: 'hsl(220, 82%, 44%)' },
-  { name: 'Healthcare', value: 18, color: 'hsl(142, 70%, 45%)' },
-  { name: 'Financial', value: 15, color: 'hsl(38, 70%, 55%)' },
-  { name: 'Consumer', value: 12, color: 'hsl(280, 60%, 55%)' },
-  { name: 'Industrial', value: 10, color: 'hsl(200, 70%, 50%)' },
-  { name: 'Other', value: 10, color: 'hsl(220, 14%, 55%)' },
-];
+interface TopMoversResponse {
+  gainers: TopMover[];
+  losers: TopMover[];
+  report_date: string;
+  previous_date: string;
+}
 
-const countryAllocationData = [
-  { name: 'USA', value: 65, color: 'hsl(220, 82%, 44%)' },
-  { name: 'Europe', value: 20, color: 'hsl(38, 70%, 55%)' },
-  { name: 'Asia', value: 10, color: 'hsl(142, 70%, 45%)' },
-  { name: 'Other', value: 5, color: 'hsl(220, 14%, 55%)' },
-];
+interface AllocationItem {
+  name: string;
+  value: number;
+  percentage: number;
+  color: string | null;
+}
 
-// Mock gainers/losers
-const mockGainersLosers = {
-  day: {
-    gainers: [
-      { symbol: 'NVDA', name: 'NVIDIA', change: 5.23, changePercent: 2.15 },
-      { symbol: 'AAPL', name: 'Apple', change: 2.34, changePercent: 1.25 },
-      { symbol: 'MSFT', name: 'Microsoft', change: 1.89, changePercent: 0.52 },
-    ],
-    losers: [
-      { symbol: 'TSLA', name: 'Tesla', change: -5.23, changePercent: -2.57 },
-      { symbol: 'AMD', name: 'AMD', change: -2.45, changePercent: -1.35 },
-      { symbol: 'AMZN', name: 'Amazon', change: -1.12, changePercent: -0.65 },
-    ],
-  },
-  week: {
-    gainers: [
-      { symbol: 'NVDA', name: 'NVIDIA', change: 45.67, changePercent: 5.45 },
-      { symbol: 'AMD', name: 'AMD', change: 12.34, changePercent: 3.21 },
-      { symbol: 'AAPL', name: 'Apple', change: 8.90, changePercent: 2.12 },
-    ],
-    losers: [
-      { symbol: 'TSLA', name: 'Tesla', change: -15.23, changePercent: -7.25 },
-      { symbol: 'META', name: 'Meta', change: -8.45, changePercent: -2.35 },
-      { symbol: 'GOOGL', name: 'Google', change: -5.12, changePercent: -1.25 },
-    ],
-  },
-  month: {
-    gainers: [
-      { symbol: 'NVDA', name: 'NVIDIA', change: 125.67, changePercent: 15.45 },
-      { symbol: 'AMD', name: 'AMD', change: 45.34, changePercent: 12.21 },
-      { symbol: 'MSFT', name: 'Microsoft', change: 28.90, changePercent: 8.12 },
-    ],
-    losers: [
-      { symbol: 'TSLA', name: 'Tesla', change: -35.23, changePercent: -15.25 },
-      { symbol: 'INTC', name: 'Intel', change: -12.45, changePercent: -8.35 },
-      { symbol: 'DIS', name: 'Disney', change: -8.12, changePercent: -5.25 },
-    ],
-  },
-};
+interface AllocationResponse {
+  data: AllocationItem[];
+  total_value: number;
+  report_date: string;
+}
 
 const PortfolioPerformance = () => {
   const { id } = useParams();
+  const apiBaseUrl = getApiBaseUrl();
   const portfolio = portfolios.find((p) => p.id === id) || portfolios[0];
   const portfolioPositions = positions.filter((p) => p.portfolioId === portfolio.id);
   const isPositive = portfolio.dayChange >= 0;
 
-  const AllocationPieChart = ({ data, title, icon: Icon }: { data: typeof assetAllocationData; title: string; icon: React.ElementType }) => (
-    <div className="bg-card border border-border rounded-xl p-4 md:p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-        <h3 className="text-sm md:text-base font-semibold text-foreground">{title}</h3>
+  // API Data States
+  const [topMovers, setTopMovers] = useState<TopMoversResponse | null>(null);
+  const [assetAllocation, setAssetAllocation] = useState<AllocationResponse | null>(null);
+  const [sectorAllocation, setSectorAllocation] = useState<AllocationResponse | null>(null);
+  const [countryAllocation, setCountryAllocation] = useState<AllocationResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load performance data
+  useEffect(() => {
+    const loadPerformanceData = async () => {
+      if (!id) return;
+      
+      setLoading(true);
+      try {
+        const [moversRes, assetRes, sectorRes, countryRes] = await Promise.all([
+          fetch(`${apiBaseUrl}/api/v1/performance/top-movers/${id}?limit=3`),
+          fetch(`${apiBaseUrl}/api/v1/performance/asset-allocation/${id}`),
+          fetch(`${apiBaseUrl}/api/v1/performance/sector-allocation/${id}`),
+          fetch(`${apiBaseUrl}/api/v1/performance/country-allocation/${id}`),
+        ]);
+
+        if (moversRes.ok) {
+          const moversData = await moversRes.json();
+          setTopMovers(moversData);
+        }
+
+        if (assetRes.ok) {
+          const assetData = await assetRes.json();
+          setAssetAllocation(assetData);
+        }
+
+        if (sectorRes.ok) {
+          const sectorData = await sectorRes.json();
+          setSectorAllocation(sectorData);
+        }
+
+        if (countryRes.ok) {
+          const countryData = await countryRes.json();
+          setCountryAllocation(countryData);
+        }
+      } catch (error) {
+        console.error('Error loading performance data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPerformanceData();
+  }, [id, apiBaseUrl]);
+
+  const AllocationPieChart = ({ 
+    data, 
+    title, 
+    icon: Icon,
+    loading 
+  }: { 
+    data: AllocationResponse | null; 
+    title: string; 
+    icon: React.ElementType;
+    loading: boolean;
+  }) => {
+    if (loading) {
+      return (
+        <div className="bg-card border border-border rounded-xl p-4 md:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h3 className="text-sm md:text-base font-semibold text-foreground">{title}</h3>
+          </div>
+          <div className="flex items-center justify-center h-48">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      );
+    }
+
+    if (!data || data.data.length === 0) {
+      return (
+        <div className="bg-card border border-border rounded-xl p-4 md:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <h3 className="text-sm md:text-base font-semibold text-foreground">{title}</h3>
+          </div>
+          <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
+            No data available
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-card border border-border rounded-xl p-4 md:p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+          <h3 className="text-sm md:text-base font-semibold text-foreground">{title}</h3>
+        </div>
+        <div className="flex flex-col md:flex-row items-center gap-4">
+          <ResponsiveContainer width="100%" height={180}>
+            <RechartsPie>
+              <Pie
+                data={data.data}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={75}
+                paddingAngle={2}
+                dataKey="percentage"
+              >
+                {data.data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color || 'hsl(220, 82%, 44%)'} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(222, 47%, 13%)',
+                  border: '1px solid hsl(222, 35%, 22%)',
+                  borderRadius: '8px',
+                }}
+                formatter={(value: number) => [`${value.toFixed(2)}%`, '']}
+              />
+            </RechartsPie>
+          </ResponsiveContainer>
+          <div className="flex flex-wrap gap-2 justify-center md:flex-col md:gap-1.5">
+            {data.data.map((item) => (
+              <div key={item.name} className="flex items-center gap-2 text-xs">
+                <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color || 'hsl(220, 82%, 44%)' }} />
+                <span className="text-muted-foreground">{item.name}</span>
+                <span className="font-medium text-foreground">{item.percentage.toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="flex flex-col md:flex-row items-center gap-4">
-        <ResponsiveContainer width="100%" height={180}>
-          <RechartsPie>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={50}
-              outerRadius={75}
-              paddingAngle={2}
-              dataKey="value"
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'hsl(222, 47%, 13%)',
-                border: '1px solid hsl(222, 35%, 22%)',
-                borderRadius: '8px',
-              }}
-              formatter={(value: number) => [`${value}%`, '']}
-            />
-          </RechartsPie>
-        </ResponsiveContainer>
-        <div className="flex flex-wrap gap-2 justify-center md:flex-col md:gap-1.5">
-          {data.map((item) => (
-            <div key={item.name} className="flex items-center gap-2 text-xs">
-              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className="text-muted-foreground">{item.name}</span>
-              <span className="font-medium text-foreground">{item.value}%</span>
+    );
+  };
+
+  const GainersLosersCard = ({ 
+    title, 
+    items, 
+    isGainer,
+    loading 
+  }: { 
+    title: string; 
+    items: TopMover[]; 
+    isGainer: boolean;
+    loading: boolean;
+  }) => {
+    if (loading) {
+      return (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            {isGainer ? (
+              <TrendingUp className="h-4 w-4 text-gain" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-loss" />
+            )}
+            <h4 className="text-sm font-medium text-foreground">{title}</h4>
+          </div>
+          <div className="flex items-center justify-center h-32">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      );
+    }
+
+    if (items.length === 0) {
+      return (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            {isGainer ? (
+              <TrendingUp className="h-4 w-4 text-gain" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-loss" />
+            )}
+            <h4 className="text-sm font-medium text-foreground">{title}</h4>
+          </div>
+          <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
+            No data available
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-card border border-border rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          {isGainer ? (
+            <TrendingUp className="h-4 w-4 text-gain" />
+          ) : (
+            <TrendingDown className="h-4 w-4 text-loss" />
+          )}
+          <h4 className="text-sm font-medium text-foreground">{title}</h4>
+        </div>
+        <div className="space-y-2">
+          {items.map((item) => (
+            <div key={item.asset_id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+              <div>
+                <p className="text-sm font-medium text-foreground">{item.symbol}</p>
+                <p className="text-xs text-muted-foreground">{item.name}</p>
+              </div>
+              <div className="text-right">
+                <p className={cn('text-sm font-medium mono', getChangeColor(item.change))}>
+                  {item.change > 0 ? '+' : ''}{formatCurrency(item.change)}
+                </p>
+                <p className={cn('text-xs mono', getChangeColor(item.change_percent))}>
+                  {item.change_percent > 0 ? '+' : ''}{item.change_percent.toFixed(2)}%
+                </p>
+              </div>
             </div>
           ))}
         </div>
       </div>
-    </div>
-  );
-
-  const GainersLosersCard = ({ title, items, isGainer }: { title: string; items: typeof mockGainersLosers.day.gainers; isGainer: boolean }) => (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-3">
-        {isGainer ? (
-          <TrendingUp className="h-4 w-4 text-gain" />
-        ) : (
-          <TrendingDown className="h-4 w-4 text-loss" />
-        )}
-        <h4 className="text-sm font-medium text-foreground">{title}</h4>
-      </div>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div key={item.symbol} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-            <div>
-              <p className="text-sm font-medium text-foreground">{item.symbol}</p>
-              <p className="text-xs text-muted-foreground">{item.name}</p>
-            </div>
-            <div className="text-right">
-              <p className={cn('text-sm font-medium mono', getChangeColor(item.change))}>
-                {item.change > 0 ? '+' : ''}{formatCurrency(item.change)}
-              </p>
-              <p className={cn('text-xs mono', getChangeColor(item.changePercent))}>
-                {item.changePercent > 0 ? '+' : ''}{item.changePercent.toFixed(2)}%
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <AppLayout title={`${portfolio.name} - Performance`} subtitle={`Detailed analytics for ${portfolio.interfaceCode}`}>
@@ -295,38 +404,58 @@ const PortfolioPerformance = () => {
 
       {/* Gainers/Losers Tabs */}
       <div className="bg-card border border-border rounded-xl p-4 md:p-6 mb-6">
-        <h3 className="text-sm md:text-base font-semibold text-foreground mb-4">Top Performers</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm md:text-base font-semibold text-foreground">Top Performers</h3>
+          {topMovers && topMovers.report_date && (
+            <span className="text-xs text-muted-foreground">
+              Based on last 2 report dates: {topMovers.previous_date} → {topMovers.report_date}
+            </span>
+          )}
+        </div>
         <Tabs defaultValue="day" className="space-y-4">
           <TabsList className="bg-muted/50 p-1">
-            <TabsTrigger value="day" className="text-xs data-[state=active]:bg-card">Day</TabsTrigger>
-            <TabsTrigger value="week" className="text-xs data-[state=active]:bg-card">Week</TabsTrigger>
-            <TabsTrigger value="month" className="text-xs data-[state=active]:bg-card">Month</TabsTrigger>
+            <TabsTrigger value="day" className="text-xs data-[state=active]:bg-card">Latest Period</TabsTrigger>
           </TabsList>
 
-          {(['day', 'week', 'month'] as const).map((period) => (
-            <TabsContent key={period} value={period}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <GainersLosersCard
-                  title="Top Gainers"
-                  items={mockGainersLosers[period].gainers}
-                  isGainer={true}
-                />
-                <GainersLosersCard
-                  title="Top Losers"
-                  items={mockGainersLosers[period].losers}
-                  isGainer={false}
-                />
-              </div>
-            </TabsContent>
-          ))}
+          <TabsContent value="day">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <GainersLosersCard
+                title="Top Gainers"
+                items={topMovers?.gainers || []}
+                isGainer={true}
+                loading={loading}
+              />
+              <GainersLosersCard
+                title="Top Losers"
+                items={topMovers?.losers || []}
+                isGainer={false}
+                loading={loading}
+              />
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
 
       {/* Allocations */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        <AllocationPieChart data={assetAllocationData} title="Asset Allocation" icon={PieChart} />
-        <AllocationPieChart data={sectorAllocationData} title="Sector Allocation" icon={Building2} />
-        <AllocationPieChart data={countryAllocationData} title="Country Allocation" icon={Globe} />
+        <AllocationPieChart 
+          data={assetAllocation} 
+          title="Asset Allocation" 
+          icon={PieChart}
+          loading={loading}
+        />
+        <AllocationPieChart 
+          data={sectorAllocation} 
+          title="Sector Allocation" 
+          icon={Building2}
+          loading={loading}
+        />
+        <AllocationPieChart 
+          data={countryAllocation} 
+          title="Country Allocation" 
+          icon={Globe}
+          loading={loading}
+        />
       </div>
     </AppLayout>
   );
