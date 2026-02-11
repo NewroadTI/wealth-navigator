@@ -4,8 +4,6 @@ import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { getApiBaseUrl } from '@/lib/config';
-import { PositionsTable } from '@/components/positions/PositionsTable';
-import { positions } from '@/lib/mockData';
 import { formatCurrency, formatPercent, formatDate, getChangeColor } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -233,6 +231,14 @@ const PortfolioDetail = () => {
 
   // Account balances state
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
+  const [showAllAccounts, setShowAllAccounts] = useState(false);
+
+  // Positions state
+  const [portfolioPositions, setPortfolioPositions] = useState<any[]>([]);
+  const [positionsLoading, setPositionsLoading] = useState(false);
+  const [positionsCurrentPage, setPositionsCurrentPage] = useState(1);
+  const positionsPageSize = 15;
+  const [reportDate, setReportDate] = useState<string>('');
 
   // Load portfolio data
   useEffect(() => {
@@ -404,6 +410,51 @@ const PortfolioDetail = () => {
     loadBalances();
   }, [portfolio?.accounts]);
 
+  // Load available report dates and set the latest one
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v1/analytics/filter-options`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.available_dates && data.available_dates.length > 0) {
+          // Set the latest date as default
+          setReportDate(data.available_dates[0]);
+        }
+      } catch (err) {
+        console.error('Error loading filter options:', err);
+      }
+    };
+    loadFilterOptions();
+  }, [apiBaseUrl]);
+
+  // Load positions for this portfolio
+  useEffect(() => {
+    if (!portfolio || !reportDate) return;
+
+    const loadPositions = async () => {
+      setPositionsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          report_date: reportDate,
+          portfolio_id: portfolio.portfolio_id.toString(),
+        });
+
+        const response = await fetch(`${apiBaseUrl}/api/v1/analytics/positions-report?${params}`);
+        if (!response.ok) throw new Error('Failed to load positions');
+        const data = await response.json();
+        setPortfolioPositions(data);
+      } catch (err) {
+        console.error('Error loading positions:', err);
+        setPortfolioPositions([]);
+      } finally {
+        setPositionsLoading(false);
+      }
+    };
+
+    loadPositions();
+  }, [portfolio, reportDate, apiBaseUrl]);
+
   // Create a map of account_id -> balance for quick lookups
   const accountBalanceMap = useMemo(() => {
     const map = new Map<number, number>();
@@ -468,6 +519,26 @@ const PortfolioDetail = () => {
       paginatedTransactions: txFilteredTransactions.slice((safe - 1) * txPageSize, safe * txPageSize)
     };
   }, [txFilteredTransactions, txCurrentPage, txPageSize]);
+
+  // Calculate total NAV (sum of all market values)
+  const totalNav = useMemo(() => {
+    return portfolioPositions.reduce((sum, pos) => sum + (pos.total_market_value || 0), 0);
+  }, [portfolioPositions]);
+
+  // Positions pagination
+  const positionsPaginationData = useMemo(() => {
+    const total = Math.max(1, Math.ceil(portfolioPositions.length / positionsPageSize));
+    const safe = Math.min(positionsCurrentPage, total);
+    const start = portfolioPositions.length === 0 ? 0 : (safe - 1) * positionsPageSize + 1;
+    const end = Math.min(safe * positionsPageSize, portfolioPositions.length);
+    return {
+      totalPages: total,
+      safePage: safe,
+      pageStart: start,
+      pageEnd: end,
+      paginatedPositions: portfolioPositions.slice((safe - 1) * positionsPageSize, safe * positionsPageSize)
+    };
+  }, [portfolioPositions, positionsCurrentPage, positionsPageSize]);
 
   // Get column value helper
   const getTxColumnValue = (transaction: TransactionDisplay, columnKey: string): string => {
@@ -691,7 +762,6 @@ const PortfolioDetail = () => {
   }
 
   const isPositive = true; // Mockup
-  const portfolioPositions = positions.slice(0, 5); // Mockup positions
 
   return (
     <AppLayout title={portfolio.name} subtitle={`Portfolio ${portfolio.interface_code}`}>
@@ -865,35 +935,60 @@ const PortfolioDetail = () => {
               </tr>
             </thead>
             <tbody>
-              {portfolio.accounts.map((account) => {
-                const strategy = investmentStrategies.find(
-                  s => s.strategy_id === account.investment_strategy_id
-                );
-                const balance = accountBalanceMap.get(account.account_id) || 0;
-                return (
-                  <tr key={account.account_id}>
-                    <td className="font-medium text-foreground text-xs md:text-sm">{account.institution}</td>
-                    <td className="text-foreground text-xs md:text-sm">
-                      <Link
-                        to={`/portfolios/${portfolio.portfolio_id}/accounts/${account.account_id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {account.account_alias || '-'}
-                      </Link>
-                    </td>
-                    <td className="text-muted-foreground text-xs hidden sm:table-cell">{account.account_code}</td>
-                    <td className="text-muted-foreground text-xs hidden md:table-cell">{account.account_type || '-'}</td>
-                    <td className="text-muted-foreground text-xs hidden md:table-cell">{account.currency}</td>
-                    <td className="text-muted-foreground text-xs hidden lg:table-cell">{strategy?.name || '-'}</td>
-                    <td className="font-medium mono text-foreground text-xs md:text-sm text-right">
-                      {formatCurrency(balance)}
-                    </td>
-                  </tr>
-                );
-              })}
+              {portfolio.accounts
+                .filter((account) => {
+                  if (showAllAccounts) return true;
+                  const balance = accountBalanceMap.get(account.account_id) || 0;
+                  return balance > 0 || account.currency === 'USD';
+                })
+                .map((account) => {
+                  const strategy = investmentStrategies.find(
+                    s => s.strategy_id === account.investment_strategy_id
+                  );
+                  const balance = accountBalanceMap.get(account.account_id) || 0;
+                  return (
+                    <tr key={account.account_id}>
+                      <td className="font-medium text-foreground text-xs md:text-sm">{account.institution}</td>
+                      <td className="text-foreground text-xs md:text-sm">
+                        <Link
+                          to={`/portfolios/${portfolio.portfolio_id}/accounts/${account.account_id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {account.account_alias || '-'}
+                        </Link>
+                      </td>
+                      <td className="text-muted-foreground text-xs hidden sm:table-cell">{account.account_code}</td>
+                      <td className="text-muted-foreground text-xs hidden md:table-cell">{account.account_type || '-'}</td>
+                      <td className="text-muted-foreground text-xs hidden md:table-cell">{account.currency}</td>
+                      <td className="text-muted-foreground text-xs hidden lg:table-cell">{strategy?.name || '-'}</td>
+                      <td className="font-medium mono text-foreground text-xs md:text-sm text-right">
+                        {formatCurrency(balance)}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
+        {/* Show All Accounts Button */}
+        {!showAllAccounts && portfolio.accounts.filter(acc => {
+          const balance = accountBalanceMap.get(acc.account_id) || 0;
+          return balance === 0 && acc.currency !== 'USD';
+        }).length > 0 && (
+          <div className="p-3 border-t border-border text-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAllAccounts(true)}
+              className="text-xs"
+            >
+              Show All Accounts ({portfolio.accounts.filter(acc => {
+                const balance = accountBalanceMap.get(acc.account_id) || 0;
+                return balance === 0 && acc.currency !== 'USD';
+              }).length} hidden)
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Tabs Section */}
@@ -925,7 +1020,88 @@ const PortfolioDetail = () => {
                 {portfolioPositions.length} positions
               </span>
             </div>
-            <PositionsTable positions={portfolioPositions} />
+            
+            {positionsLoading ? (
+              <div className="p-8 text-center text-muted-foreground">Loading positions...</div>
+            ) : portfolioPositions.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">No positions found for this portfolio</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-muted/30 border-b border-border">
+                        <th className="text-left p-3">Symbol</th>
+                        <th className="text-right p-3">Quantity</th>
+                        <th className="text-right p-3">Avg Cost</th>
+                        <th className="text-right p-3">Market Price</th>
+                        <th className="text-right p-3">Market Value</th>
+                        <th className="text-right p-3">Unrealized P&L</th>
+                        <th className="text-right p-3">% of NAV</th>
+                        <th className="text-center p-3">Report Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {positionsPaginationData.paginatedPositions.map((position: any) => {
+                        const pnlClass = position.total_pnl_unrealized > 0 ? 'text-gain' : position.total_pnl_unrealized < 0 ? 'text-loss' : 'text-muted-foreground';
+                        const percentOfNav = position.percent_of_nav || 0;
+                        
+                        return (
+                          <tr key={position.asset_id} className="border-b border-border hover:bg-muted/20">
+                            <td className="p-3 font-medium">{position.asset_symbol}</td>
+                            <td className="p-3 text-right font-mono">{position.total_quantity.toFixed(2)}</td>
+                            <td className="p-3 text-right font-mono">${position.avg_cost_price.toFixed(2)}</td>
+                            <td className="p-3 text-right font-mono">${position.current_mark_price.toFixed(2)}</td>
+                            <td className="p-3 text-right font-mono">${position.total_market_value.toFixed(2)}</td>
+                            <td className={`p-3 text-right font-mono ${pnlClass}`}>
+                              ${position.total_pnl_unrealized.toFixed(2)}
+                            </td>
+                            <td className="p-3 text-right font-mono text-muted-foreground">
+                              {percentOfNav.toFixed(2)}%
+                            </td>
+                            <td className="p-3 text-center text-muted-foreground">
+                              {reportDate}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Pagination */}
+                {positionsPaginationData.totalPages > 1 && (
+                  <div className="p-3 border-t border-border flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      Showing {positionsPaginationData.pageStart}-{positionsPaginationData.pageEnd} of {portfolioPositions.length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPositionsCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={positionsPaginationData.safePage === 1}
+                        className="h-7"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Page {positionsPaginationData.safePage} of {positionsPaginationData.totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPositionsCurrentPage(p => Math.min(positionsPaginationData.totalPages, p + 1))}
+                        disabled={positionsPaginationData.safePage === positionsPaginationData.totalPages}
+                        className="h-7"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </TabsContent>
 

@@ -181,7 +181,7 @@ REPORT_DISPLAY_INFO = {
         "description": "Historical price data"
     },
     "STATEMENTFUNDS": {
-        "display_name": "Cash Journal",
+        "display_name": "Statement Funds",
         "description": "Dividends, interest, deposits, withdrawals, fees"
     },
     "TRADES": {
