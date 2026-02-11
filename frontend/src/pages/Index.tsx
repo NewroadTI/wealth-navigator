@@ -69,14 +69,13 @@ const cashBalancesByAccount = [
   { account: 'IB-003', currency: 'USD', balance: 152345.67, portfolio: 'Tech Opportunities' },
 ];
 
-// Available transaction types for filtering
-const txnTypes = ['Dividend', 'Interest', 'Deposit', 'Withdrawal', 'Fee'];
+// Available transaction types for filtering - fixed types based on database tables
+const txnTypes = ['Trade', 'Cash', 'FX', 'Corporate Action'];
 
 const Dashboard = () => {
   const location = useLocation();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('day');
   const [selectedTxnTypes, setSelectedTxnTypes] = useState<string[]>([]);
-  const [selectedInvestor, setSelectedInvestor] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
@@ -117,21 +116,13 @@ const Dashboard = () => {
     [...portfolios].sort((a, b) => b.totalValue - a.totalValue),
   []);
 
-  // Get unique investors for filter
-  const investors = useMemo(() => {
-    const investorMap = new Map<string, string>();
-    portfolios.forEach(p => investorMap.set(p.id, p.investor.name));
-    return Array.from(investorMap.entries()).map(([id, name]) => ({ id, name }));
-  }, []);
+  // (Investor filter removed) — investors list not used anymore
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
     return importantTransactions.filter(t => {
       // Filter by type
       if (selectedTxnTypes.length > 0 && !selectedTxnTypes.includes(t.type)) return false;
-      
-      // Filter by investor (portfolio)
-      if (selectedInvestor !== 'all' && t.portfolioId !== selectedInvestor) return false;
       
       // Filter by date
       const txnDate = new Date(t.date);
@@ -140,7 +131,7 @@ const Dashboard = () => {
       
       return true;
     });
-  }, [importantTransactions, selectedTxnTypes, selectedInvestor, dateFrom, dateTo]);
+  }, [importantTransactions, selectedTxnTypes, dateFrom, dateTo]);
 
   // Toggle transaction type
   const toggleTxnType = (type: string) => {
@@ -153,22 +144,17 @@ const Dashboard = () => {
   const currentFilters = useMemo(() => {
     const params = new URLSearchParams();
     if (selectedTxnTypes.length > 0) params.set('txnTypes', selectedTxnTypes.join(','));
-    if (selectedInvestor !== 'all') params.set('investor', selectedInvestor);
     if (dateFrom) params.set('from', format(dateFrom, 'yyyy-MM-dd'));
     if (dateTo) params.set('to', format(dateTo, 'yyyy-MM-dd'));
     return params.toString();
-  }, [selectedTxnTypes, selectedInvestor, dateFrom, dateTo]);
+  }, [selectedTxnTypes, dateFrom, dateTo]);
 
   const filterTitle = useMemo(() => {
     const parts = ['Dashboard'];
     if (selectedTxnTypes.length > 0) parts.push(selectedTxnTypes.join('+'));
-    if (selectedInvestor !== 'all') {
-      const inv = investors.find(i => i.id === selectedInvestor);
-      if (inv) parts.push(inv.name);
-    }
     if (dateFrom || dateTo) parts.push('Date Range');
     return parts.join(' - ');
-  }, [selectedTxnTypes, selectedInvestor, dateFrom, dateTo, investors]);
+  }, [selectedTxnTypes, dateFrom, dateTo]);
 
   return (
     <AppLayout title="Dashboard" subtitle="Overview of all portfolios and key metrics">
@@ -370,18 +356,7 @@ const Dashboard = () => {
                     ))}
                   </div>
 
-                  {/* Investor Filter */}
-                  <Select value={selectedInvestor} onValueChange={setSelectedInvestor}>
-                    <SelectTrigger className="h-7 text-xs w-32">
-                      <SelectValue placeholder="Investor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Investors</SelectItem>
-                      {investors.map(inv => (
-                        <SelectItem key={inv.id} value={inv.id}>{inv.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Investor filter removed */}
                   
                   {/* Date From */}
                   <Popover>
@@ -420,14 +395,13 @@ const Dashboard = () => {
                   </Popover>
 
                   {/* Clear Filters */}
-                  {(selectedTxnTypes.length > 0 || selectedInvestor !== 'all' || dateFrom || dateTo) && (
+                  {(selectedTxnTypes.length > 0 || dateFrom || dateTo) && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       className="h-7 text-xs"
                       onClick={() => {
                         setSelectedTxnTypes([]);
-                        setSelectedInvestor('all');
                         setDateFrom(undefined);
                         setDateTo(undefined);
                       }}
@@ -450,28 +424,25 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((txn) => {
-                    const portfolio = portfolios.find(p => p.id === txn.portfolioId);
-                    return (
-                      <tr key={`${txn.type}-${txn.id}`}>
-                        <td className="text-xs text-muted-foreground">{formatDate(txn.date)}</td>
-                        <td>
-                          <Badge variant="outline" className="text-[10px]">
-                            {txn.type}
-                          </Badge>
-                        </td>
-                        <td className="text-xs text-muted-foreground hidden sm:table-cell">
-                          {portfolio?.investor?.name || portfolio?.name || '-'}
-                        </td>
-                        <td className="text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
-                          {txn.description}
-                        </td>
-                        <td className={cn('font-medium mono text-xs text-right', txn.signed_amount >= 0 ? 'text-gain' : 'text-loss')}>
-                          {txn.signed_amount >= 0 ? '+' : ''}{formatCurrency(txn.signed_amount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {filteredTransactions.map((txn) => (
+                    <tr key={`${txn.type}-${txn.id}`}>
+                      <td className="text-xs text-muted-foreground">{formatDate(txn.date)}</td>
+                      <td>
+                        <Badge variant="outline" className="text-[10px]">
+                          {txn.type}
+                        </Badge>
+                      </td>
+                      <td className="text-xs text-muted-foreground hidden sm:table-cell">
+                        {txn.investor_name || txn.portfolio_name || '-'}
+                      </td>
+                      <td className="text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
+                        {txn.description}
+                      </td>
+                      <td className={cn('font-medium mono text-xs text-right', txn.signed_amount >= 0 ? 'text-gain' : 'text-loss')}>
+                        {txn.signed_amount >= 0 ? '+' : ''}{formatCurrency(txn.signed_amount)}
+                      </td>
+                    </tr>
+                  ))}
                   {filteredTransactions.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center text-muted-foreground text-xs py-8">

@@ -327,6 +327,127 @@ def get_top_movers(
     return MoversResponse(gainers=[], losers=[])
 
 
+@router.get("/two-day-movers", response_model=MoversResponse)
+def get_two_day_movers(
+    db: Session = Depends(deps.get_db),
+    limit: int = 5,
+    portfolio_id: Optional[int] = None,
+    asset_class_id: Optional[int] = None,
+    asset_subclass_id: Optional[int] = None,
+    asset_id: Optional[int] = None,
+    filter_type: str = Query("all", description="Filter type: all, options, all_except_options")
+):
+    """
+    Calculate top movers between the two most recent trading days.
+    Automatically skips weekends (only uses available trading days).
+    
+    Example: If today is Tuesday Feb 11, compares Monday Feb 10 vs Friday Feb 7
+    
+    filter_type can be:
+    - "all": all assets
+    - "options": only options (OPTION class)
+    - "all_except_options": all except options
+    """
+    from collections import defaultdict
+    
+    # Get the 2 most recent dates with position data
+    recent_dates = db.query(Position.report_date).distinct().order_by(
+        Position.report_date.desc()
+    ).limit(2).all()
+    
+    if len(recent_dates) < 2:
+        return MoversResponse(gainers=[], losers=[])
+    
+    latest_date = recent_dates[0].report_date
+    previous_date = recent_dates[1].report_date
+    
+    # Get OPTION class_id for filtering
+    option_class = db.query(AssetClass).filter(AssetClass.code == 'OPTION').first()
+    option_class_id = option_class.class_id if option_class else None
+    
+    # Build base query for positions
+    def build_position_query(target_date: date):
+        query = db.query(Position).join(Asset).join(Account).join(Portfolio)
+        query = query.filter(Position.report_date == target_date)
+        
+        if portfolio_id:
+            query = query.filter(Portfolio.portfolio_id == portfolio_id)
+        if asset_id:
+            query = query.filter(Position.asset_id == asset_id)
+        if asset_class_id:
+            query = query.filter(Asset.class_id == asset_class_id)
+        if asset_subclass_id:
+            query = query.filter(Asset.sub_class_id == asset_subclass_id)
+        
+        # Apply filter_type
+        if filter_type == "options" and option_class_id:
+            query = query.filter(Asset.class_id == option_class_id)
+        elif filter_type == "all_except_options" and option_class_id:
+            query = query.filter(Asset.class_id != option_class_id)
+        
+        return query
+    
+    # Get positions for both dates
+    latest_positions = build_position_query(latest_date).all()
+    previous_positions = build_position_query(previous_date).all()
+    
+    # Aggregate prices by asset
+    latest_prices_temp = defaultdict(list)
+    for p in latest_positions:
+        latest_prices_temp[p.asset_id].append(float(p.mark_price or 0))
+    
+    latest_prices_map = {}
+    for aid, prices in latest_prices_temp.items():
+        latest_prices_map[aid] = sum(prices) / len(prices) if prices else 0
+    
+    previous_prices_temp = defaultdict(list)
+    for p in previous_positions:
+        previous_prices_temp[p.asset_id].append(float(p.mark_price or 0))
+    
+    previous_prices_map = {}
+    for aid, prices in previous_prices_temp.items():
+        previous_prices_map[aid] = sum(prices) / len(prices) if prices else 0
+    
+    # Get asset info for all assets that have data in both periods
+    common_asset_ids = set(latest_prices_map.keys()) & set(previous_prices_map.keys())
+    
+    if not common_asset_ids:
+        return MoversResponse(gainers=[], losers=[])
+    
+    assets = db.query(
+        Asset.asset_id,
+        Asset.symbol,
+        Asset.description
+    ).filter(Asset.asset_id.in_(list(common_asset_ids))).all()
+    
+    # Calculate movers
+    movers = []
+    
+    for asset in assets:
+        asset_id = asset.asset_id
+        latest_price = latest_prices_map.get(asset_id, 0)
+        previous_price = previous_prices_map.get(asset_id, 0)
+        
+        if previous_price > 0 and latest_price > 0:
+            change_pct = ((latest_price - previous_price) / previous_price) * 100
+            
+            movers.append(TopMover(
+                asset_id=asset_id,
+                asset_symbol=asset.symbol,
+                asset_name=asset.description or asset.symbol,
+                current_price=latest_price,
+                previous_price=previous_price,
+                change_pct=change_pct,
+                direction="UP" if change_pct >= 0 else "DOWN"
+            ))
+    
+    # Sort and return top gainers/losers
+    gainers = sorted(movers, key=lambda x: x.change_pct, reverse=True)[:limit]
+    losers = sorted(movers, key=lambda x: x.change_pct)[:limit]
+    
+    return MoversResponse(gainers=gainers, losers=losers)
+
+
 @router.get("/filter-options")
 def get_filter_options(
     db: Session = Depends(deps.get_db),
