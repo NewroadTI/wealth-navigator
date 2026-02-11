@@ -539,7 +539,7 @@ def import_structured_notes(db: Session = Depends(deps.get_db)):
 
         try:
             db.commit()
-            logger.info(f"✅ Import complete: {created} created, {updated} updated, {skipped} skipped, {len(missing_assets)} missing assets")
+            logger.info(f"Import complete: {created} created, {updated} updated, {skipped} skipped, {len(missing_assets)} missing assets")
         except Exception as e:
             db.rollback()
             job.status = "failed"

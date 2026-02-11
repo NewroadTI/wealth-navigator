@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle } from 'lucide-react';
+import { Plus, Search, Filter, Download, Calendar, Calculator, AlertCircle, X } from 'lucide-react';
 import { ColumnConfigurator } from '@/components/transactions/ColumnConfigurator';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from 'sonner';
@@ -131,30 +131,36 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'ib_trade_id', label: 'IB Trade ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_trade_id || '' },
   { key: 'ib_order_id', label: 'IB Order ID', tables: ['Trade'], getValue: (d) => (d as Trade).ib_order_id || '' },
   { key: 'settlement_date', label: 'Settlement Date', tables: ['Trade'], getValue: (d) => (d as Trade).settlement_date || '' },
-  { key: 'report_date', label: 'Report Date', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d) return (d as Trade).report_date || '';
-    if ('action_id' in d) return (d as CorporateAction).report_date || '';
-    return '';
-  }},
+  {
+    key: 'report_date', label: 'Report Date', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d) return (d as Trade).report_date || '';
+      if ('action_id' in d) return (d as CorporateAction).report_date || '';
+      return '';
+    }
+  },
   { key: 'transaction_type', label: 'Transaction Type', tables: ['Trade'], getValue: (d) => (d as Trade).transaction_type || '' },
   { key: 'exchange', label: 'Exchange', tables: ['Trade'], getValue: (d) => (d as Trade).exchange || '' },
   { key: 'price', label: 'Price', tables: ['Trade'], getValue: (d) => (d as Trade).price || '' },
   { key: 'gross_amount', label: 'Gross Amount', tables: ['Trade'], getValue: (d) => (d as Trade).gross_amount || '' },
   { key: 'net_amount', label: 'Net Amount', tables: ['Trade'], getValue: (d) => (d as Trade).net_amount || '' },
-  { key: 'proceeds', label: 'Proceeds', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d) return (d as Trade).proceeds || '';
-    if ('action_id' in d) return (d as CorporateAction).proceeds || '';
-    return '';
-  }},
+  {
+    key: 'proceeds', label: 'Proceeds', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d) return (d as Trade).proceeds || '';
+      if ('action_id' in d) return (d as CorporateAction).proceeds || '';
+      return '';
+    }
+  },
   { key: 'commission', label: 'Commission', tables: ['Trade'], getValue: (d) => (d as Trade).commission || '' },
   { key: 'tax', label: 'Tax', tables: ['Trade'], getValue: (d) => (d as Trade).tax || '' },
   { key: 'cost_basis', label: 'Cost Basis', tables: ['Trade'], getValue: (d) => (d as Trade).cost_basis || '' },
   { key: 'realized_pnl', label: 'Realized P&L', tables: ['Trade'], getValue: (d) => (d as Trade).realized_pnl || '' },
-  { key: 'mtm_pnl', label: 'MTM P&L', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
-    if ('transaction_id' in d) return (d as Trade).mtm_pnl || '';
-    if ('action_id' in d) return (d as CorporateAction).mtm_pnl || '';
-    return '';
-  }},
+  {
+    key: 'mtm_pnl', label: 'MTM P&L', tables: ['Trade', 'CorporateAction'], getValue: (d) => {
+      if ('transaction_id' in d) return (d as Trade).mtm_pnl || '';
+      if ('action_id' in d) return (d as CorporateAction).mtm_pnl || '';
+      return '';
+    }
+  },
   { key: 'notes', label: 'Notes', tables: ['Trade'], getValue: (d) => (d as Trade).notes || '' },
 
   // Cash Journal-specific columns
@@ -210,6 +216,29 @@ const SORTABLE_NUMERIC_COLUMNS = new Set([
   'ratio_new',
 ]);
 
+// Helper function to extract all unique subtypes from transactions
+const getAllSubtypes = (transactions: TransactionDisplay[]): string[] => {
+  const subtypes = new Set<string>();
+  transactions.forEach((t) => {
+    const data = t.data;
+    let subtype = '';
+
+    if ('transaction_id' in data && 'side' in data) {
+      subtype = `trade/${(data as Trade).side?.toLowerCase() || 'unknown'}`;
+    } else if ('journal_id' in data) {
+      subtype = `cj:${(data as CashJournal).type.toLowerCase()}`;
+    } else if ('fx_id' in data) {
+      subtype = 'fx/fxtrade';
+    } else if ('action_id' in data) {
+      subtype = `ca:${(data as CorporateAction).action_type?.toLowerCase() || 'unknown'}`;
+    }
+
+    if (subtype) subtypes.add(subtype);
+  });
+
+  return Array.from(subtypes).sort();
+};
+
 const Transactions = () => {
   // Component for displaying and filtering transactions
   const location = useLocation();
@@ -224,6 +253,7 @@ const Transactions = () => {
 
   // Filters
   const [selectedTypes, setSelectedTypes] = useState<string[]>(transactionTypeFilters);
+  const [selectedSubtypes, setSelectedSubtypes] = useState<string[]>([]); // Will be initialized with all subtypes
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('all');
   const [portfolioSearchInput, setPortfolioSearchInput] = useState('');
   const [portfolioDropdownOpen, setPortfolioDropdownOpen] = useState(false);
@@ -254,7 +284,7 @@ const Transactions = () => {
     const [removed] = newColumns.splice(fromIndex, 1);
     newColumns.splice(toIndex, 0, removed);
     setVisibleColumns(newColumns);
-    
+
     // Also update the ColumnConfigurator's localStorage data
     const storageKey = 'transactions_column_config_transactions_main';
     const savedConfig = localStorage.getItem(storageKey);
@@ -265,17 +295,17 @@ const Transactions = () => {
         const newConfig = [...config];
         const visibleConfig = config.filter((c: any) => c.visible);
         const reorderedItem = visibleConfig[fromIndex];
-        
+
         if (reorderedItem) {
           // Find the item in the full config and get its position
           const fullConfigFromIndex = config.findIndex((c: any) => c.key === reorderedItem.key);
           const targetConfig = visibleConfig[toIndex];
           const fullConfigToIndex = config.findIndex((c: any) => c.key === targetConfig.key);
-          
+
           // Move the item in the full config
           const [movedItem] = newConfig.splice(fullConfigFromIndex, 1);
           newConfig.splice(fullConfigToIndex, 0, movedItem);
-          
+
           localStorage.setItem(storageKey, JSON.stringify(newConfig));
         }
       } catch (error) {
@@ -393,6 +423,14 @@ const Transactions = () => {
     loadPortfoliosSimple();
   }, []);
 
+  // Initialize selectedSubtypes with all available subtypes when transactions load
+  useEffect(() => {
+    if (allTransactions.length > 0 && selectedSubtypes.length === 0) {
+      const allSubtypes = getAllSubtypes(allTransactions);
+      setSelectedSubtypes(allSubtypes);
+    }
+  }, [allTransactions]);
+
   // Load asset dictionary in bulk for better performance
   useEffect(() => {
     const loadAssetDictionary = async () => {
@@ -478,6 +516,24 @@ const Transactions = () => {
       // Type filter
       if (!selectedTypes.includes(t.type)) return false;
 
+      // Subtype filter
+      if (selectedSubtypes.length > 0) {
+        const data = t.data;
+        let subtype = '';
+
+        if ('transaction_id' in data && 'side' in data) {
+          subtype = `trade/${(data as Trade).side?.toLowerCase() || 'unknown'}`;
+        } else if ('journal_id' in data) {
+          subtype = `cj:${(data as CashJournal).type.toLowerCase()}`;
+        } else if ('fx_id' in data) {
+          subtype = 'fx/fxtrade';
+        } else if ('action_id' in data) {
+          subtype = `ca:${(data as CorporateAction).action_type?.toLowerCase() || 'unknown'}`;
+        }
+
+        if (!selectedSubtypes.includes(subtype)) return false;
+      }
+
       // Date filters
       if (startDate && new Date(t.date) < startDate) return false;
       if (endDate && new Date(t.date) > endDate) return false;
@@ -528,7 +584,7 @@ const Transactions = () => {
 
       return true;
     });
-  }, [allTransactions, selectedTypes, startDate, endDate, searchText, selectedAsset, selectedAssetClass, selectedAssetSubclass, selectedPortfolio, accountMap, assetCache]);
+  }, [allTransactions, selectedTypes, selectedSubtypes, startDate, endDate, searchText, selectedAsset, selectedAssetClass, selectedAssetSubclass, selectedPortfolio, accountMap, assetCache]);
 
   // Get unique asset symbols for filtering
   const availableAssets = useMemo(() => {
@@ -570,14 +626,14 @@ const Transactions = () => {
     if (columnKey === 'account_id' && 'account_id' in data) {
       const account = accountMap.get((data as any).account_id);
       if (!account) return '';
-      
+
       // Get portfolio and then user data
       const portfolio = portfolioMap.get(account.portfolio_id);
       if (!portfolio) return account.account_alias || '';
-      
+
       const user = userMap.get(portfolio.owner_user_id);
       if (!user) return account.account_alias || '';
-      
+
       // Format: institution.toLowerCase()-abbreviated_name
       // Create abbreviated name from full_name or use username
       let userName = '';
@@ -594,11 +650,11 @@ const Transactions = () => {
       } else if (user.username) {
         userName = user.username.toLowerCase();
       }
-      
+
       if (userName) {
         return `${account.institution.toLowerCase()}-${userName}`;
       }
-      
+
       return account.account_alias || account.account_code || '';
     }
 
@@ -608,14 +664,14 @@ const Transactions = () => {
       if (!account) return '';
       const portfolio = portfolioMap.get(account.portfolio_id);
       if (!portfolio) return '';
-      
+
       // Try to get user full name from users table first
       const user = userMap.get(portfolio.owner_user_id);
       if (user && user.full_name) {
         console.log('Showing user full_name:', user.full_name, 'for portfolio:', portfolio.portfolio_id);
         return user.full_name.trim();
       }
-      
+
       // Fallback: extract name from portfolio.name (e.g., "Portfolio Katia R Arana Pimentel" -> "Katia R Arana Pimentel")
       if (portfolio.name) {
         const name = portfolio.name.replace(/^Portfolio\s+/i, '').trim();
@@ -624,7 +680,7 @@ const Transactions = () => {
           return name;
         }
       }
-      
+
       return portfolio.interface_code || '';
     }
 
@@ -741,7 +797,7 @@ const Transactions = () => {
       });
       return;
     }
-    setShowSum(true);
+    setShowSum(!showSum); // Toggle instead of just setting to true
   };
 
   // Build filter title
@@ -765,6 +821,51 @@ const Transactions = () => {
     }
     return params.toString();
   }, [selectedPortfolio, startDate, endDate, selectedTypes]);
+
+  // Calculate sum of amounts from all filtered transactions
+  const calculateSum = useMemo(() => {
+    let total = 0;
+    sortedTransactions.forEach((t) => {
+      const data = t.data;
+      let amount: number = 0;
+
+      if ('transaction_id' in data && 'gross_amount' in data) {
+        amount = Number((data as Trade).gross_amount) || 0;
+      } else if ('journal_id' in data && 'amount' in data) {
+        amount = Number((data as CashJournal).amount) || 0;
+      } else if ('fx_id' in data && 'source_amount' in data) {
+        amount = Number((data as FxTransaction).source_amount) || 0;
+      } else if ('action_id' in data && 'amount' in data) {
+        amount = Number((data as CorporateAction).amount) || 0;
+      }
+
+      total += amount;
+    });
+
+    return total;
+  }, [sortedTransactions]);
+
+  // Get summary title with portfolio and subtype info
+  const getSummaryTitle = useMemo(() => {
+    const parts: string[] = ['Summary'];
+
+    // Add portfolio name if filtered
+    if (selectedPortfolio !== 'all') {
+      const portfolio = portfoliosSimple.find(p => String(p.portfolio_id) === selectedPortfolio);
+      if (portfolio) {
+        parts.push(`(${portfolio.name})`);
+      }
+    }
+
+    // Add subtypes if not all selected
+    const allSubtypes = getAllSubtypes(allTransactions);
+    if (selectedSubtypes.length > 0 && selectedSubtypes.length < allSubtypes.length) {
+      const subtypesStr = selectedSubtypes.join(', ');
+      parts.push(`(${subtypesStr})`);
+    }
+
+    return parts.join(' ');
+  }, [selectedPortfolio, selectedSubtypes, portfoliosSimple, allTransactions]);
 
   if (error) {
     return (
@@ -1017,6 +1118,52 @@ const Transactions = () => {
             </PopoverContent>
           </Popover>
 
+          {/* Subtype Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="border-border h-8 md:h-9 text-xs md:text-sm">
+                <Filter className="h-3.5 w-3.5 mr-1.5" />
+                Subtypes ({selectedSubtypes.length})
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="start">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Transaction Subtypes</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      const allSubtypes = getAllSubtypes(allTransactions);
+                      setSelectedSubtypes(selectedSubtypes.length === allSubtypes.length ? [] : allSubtypes);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {selectedSubtypes.length === getAllSubtypes(allTransactions).length ? 'Clear' : 'All'}
+                  </Button>
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-1">
+                  {getAllSubtypes(allTransactions).map((subtype) => (
+                    <div key={subtype} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`subtype-${subtype}`}
+                        checked={selectedSubtypes.includes(subtype)}
+                        onCheckedChange={() => {
+                          setSelectedSubtypes((prev) =>
+                            prev.includes(subtype) ? prev.filter((t) => t !== subtype) : [...prev, subtype]
+                          );
+                          setCurrentPage(1);
+                        }}
+                      />
+                      <Label htmlFor={`subtype-${subtype}`} className="text-sm cursor-pointer truncate">{subtype}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* Date Range */}
           <Popover>
             <PopoverTrigger asChild>
@@ -1122,9 +1269,12 @@ const Transactions = () => {
 
           {/* Sum Income Button */}
           <Button
-            variant={showSum ? "secondary" : "outline"}
+            variant={showSum ? "default" : "outline"}
             size="sm"
-            className="border-border h-8 md:h-9 text-xs md:text-sm"
+            className={cn(
+              "h-8 md:h-9 text-xs md:text-sm",
+              showSum ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border-border"
+            )}
             onClick={handleSumIncome}
           >
             <Calculator className="h-3.5 w-3.5 mr-1.5" />
@@ -1132,6 +1282,30 @@ const Transactions = () => {
           </Button>
         </div>
       </div>
+
+      {/* Sum Summary Block - Between filters and table */}
+      {showSum && startDate && endDate && (
+        <div className="bg-card border border-border rounded-xl p-4 md:p-6 mb-4 md:mb-6 relative">
+          <button
+            onClick={() => setShowSum(false)}
+            className="absolute top-3 right-3 p-1 rounded-md hover:bg-muted transition-colors"
+            aria-label="Close summary"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+
+          <h3 className="text-sm font-medium text-muted-foreground mb-4">
+            Income Summary ({format(startDate, 'MMM dd, yyyy')} - {format(endDate, 'MMM dd, yyyy')})
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">{getSummaryTitle}</p>
+              <p className="text-lg md:text-2xl font-semibold mono">{formatCurrency(calculateSum)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transactions Table */}
       <TransactionsTable
@@ -1151,30 +1325,6 @@ const Transactions = () => {
         onSort={toggleSort}
         onColumnReorder={handleColumnReorder}
       />
-
-      {/* Sum Display - Below Table */}
-      {showSum && (
-        <div className="mt-4 md:mt-6">
-          {(!startDate || !endDate) ? (
-            <div className="flex items-center gap-2 p-3 md:p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <p className="text-sm text-destructive">Please select a date range to calculate income sum.</p>
-            </div>
-          ) : (
-            <div className="bg-card border border-border rounded-xl p-4 md:p-6">
-              <h3 className="text-sm font-medium text-muted-foreground mb-4">
-                Income Summary ({format(startDate, 'yyyy-MM-dd')} to {format(endDate, 'yyyy-MM-dd')})
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                <div>
-                  <p className="text-xs text-muted-foreground">Summary</p>
-                  <p className="text-lg md:text-2xl font-semibold mono">To be implemented</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </AppLayout>
   );
 };
