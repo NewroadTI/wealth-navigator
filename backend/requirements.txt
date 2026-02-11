@@ -17,3 +17,4 @@ requests
 pandas
 ib_async
 ib_insync
+playwright

@@ -508,3 +508,90 @@ class BulkResponse(BaseModel):
     updated: int = 0
     skipped: int
     errors: List[dict] = []
+
+
+# =============================================================================
+# STRUCTURED NOTES SCHEMAS
+# =============================================================================
+
+class StructuredNoteRead(BaseModel):
+    """Schema for reading a structured note record."""
+    note_id: int
+    asset_id: int
+    isin: str
+    upload_date: date
+
+    bid: Optional[Decimal] = None
+    ask: Optional[Decimal] = None
+
+    underlyings: Optional[List[Dict[str, Any]]] = None
+    underlyings_label: Optional[str] = None
+
+    final_fixing_date: Optional[date] = None
+    initial_fixing_date: Optional[date] = None
+    next_autocall_date: Optional[date] = None
+    next_coupon_date: Optional[date] = None
+    next_observation: Optional[date] = None
+    issue_date: Optional[date] = None
+    redemption_date: Optional[date] = None
+    next_coupon_payment_date: Optional[date] = None
+
+    issuer_pcs: Optional[str] = None
+    reference_underlying: Optional[str] = None
+    final_client: Optional[str] = None
+    status: Optional[str] = None
+    payoff: Optional[str] = None
+    store_observations: Optional[str] = None
+    coupon_frequency: Optional[str] = None
+    callability_frequency: Optional[str] = None
+    issuer: Optional[str] = None
+    product: Optional[str] = None
+    currency: Optional[str] = None
+
+    coupon_trigger: Optional[Decimal] = None
+    capital_barrier: Optional[Decimal] = None
+    autocall_trigger: Optional[Decimal] = None
+    coupon_pa: Optional[Decimal] = None
+    put_strike: Optional[Decimal] = None
+    next_autocall_trigger: Optional[Decimal] = None
+    next_autocall_value: Optional[Decimal] = None
+    ref_underlying_initial_fixing: Optional[Decimal] = None
+    ref_underlying_last_close: Optional[Decimal] = None
+    strike_level: Optional[Decimal] = None
+    dist_average: Optional[Decimal] = None
+    paid_coupons: Optional[Decimal] = None
+    size: Optional[Decimal] = None
+    coupon: Optional[Decimal] = None
+    autocall_value: Optional[Decimal] = None
+    protection: Optional[Decimal] = None
+    performance: Optional[Decimal] = None
+
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class StructuredNoteHolderRead(BaseModel):
+    """Schema for showing who holds a structured note (from positions)."""
+    full_name: str
+    portfolio_name: str
+    quantity: float
+    mark_price: Optional[float] = None
+    cost_basis_price: Optional[float] = None
+    position_value: Optional[float] = None
+    purchase_date: Optional[date] = None
+    report_date: date
+
+
+class StructuredNoteImportResponse(BaseModel):
+    """Response from the structured notes import endpoint."""
+    status: str  # "success", "partial", "error"
+    total_rows: int
+    created: int
+    updated: int
+    skipped: int
+    missing_assets: List[Dict[str, Any]] = []  # [{isin, underlyings_label, done}]
+    errors: List[str] = []
+    job_id: Optional[int] = None
