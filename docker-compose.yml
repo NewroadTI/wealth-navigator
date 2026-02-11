@@ -41,6 +41,7 @@ services:
       - ./backend:/app # Hot-reload: cambios en código se ven al instante
     networks:
       - wealth-net
+      - ib-local_default  # Red del IB Gateway
 
   # --- Frontend (React) ---
   frontend:
@@ -63,3 +64,5 @@ volumes:
 networks:
   wealth-net:
     driver: bridge
+  ib-local_default:
+    external: true  # Red externa donde corre IB Gateway

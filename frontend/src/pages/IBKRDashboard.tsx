@@ -247,13 +247,13 @@ const ReportStatusCard = ({
               variant="ghost"
               size="icon"
               onClick={() => onTrigger(report.report_type)}
-              disabled={report.status === 'running'}
+              disabled={report.status === 'running' || report.report_type !== 'PRICES'}
             >
               <Play className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Run sync</p>
+            <p>{report.report_type === 'PRICES' ? 'Run sync' : 'Not available'}</p>
           </TooltipContent>
         </Tooltip>
       </div>

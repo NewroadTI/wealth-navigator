@@ -50,6 +50,7 @@ class PositionAggregated(BaseModel):
     # PnL y Rendimiento
     total_pnl_unrealized: float
     day_change_pct: Optional[float] = None # Comparación con día anterior
+    percent_of_nav: Optional[float] = None # Porcentaje del NAV total
     
     # Distribución de rendimiento (para ver si el agregado es representativo)
     gainers_count: int = 0          # Cuentas con PnL positivo

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
@@ -6,6 +6,7 @@ import { PerformanceChart } from '@/components/dashboard/PerformanceChart';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { portfolios, positions, transactions } from '@/lib/mockData';
 import { formatCurrency, formatPercent, getChangeColor, formatDate } from '@/lib/formatters';
+import { getApiBaseUrl } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,14 +46,6 @@ const getTopMovers = (type: 'gainers' | 'losers') => {
       : a.dayChangePercent - b.dayChangePercent
   );
   return sorted.slice(0, 5);
-};
-
-// Get important transactions (dividends, interest, large deposits)
-const getImportantTransactions = () => {
-  return transactions
-    .filter(t => ['Dividend', 'Interest', 'Deposit'].includes(t.type) || Math.abs(t.amount) > 10000)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 20);
 };
 
 // Mock performance data for all accounts
@@ -95,7 +88,29 @@ const Dashboard = () => {
 
   const topGainers = useMemo(() => getTopMovers('gainers'), []);
   const topLosers = useMemo(() => getTopMovers('losers'), []);
-  const importantTransactions = useMemo(() => getImportantTransactions(), []);
+  
+  // Important transactions state
+  const [importantTransactions, setImportantTransactions] = useState<any[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  
+  // Load important transactions from API
+  useEffect(() => {
+    const loadTransactions = async () => {
+      setTxLoading(true);
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/transactions/important-transactions?limit=50`);
+        if (!response.ok) throw new Error('Failed to load transactions');
+        const data = await response.json();
+        setImportantTransactions(data);
+      } catch (error) {
+        console.error('Error loading important transactions:', error);
+        setImportantTransactions([]);
+      } finally {
+        setTxLoading(false);
+      }
+    };
+    loadTransactions();
+  }, []);
 
   // Sort portfolios by total value
   const sortedPortfolios = useMemo(() => 
@@ -438,7 +453,7 @@ const Dashboard = () => {
                   {filteredTransactions.map((txn) => {
                     const portfolio = portfolios.find(p => p.id === txn.portfolioId);
                     return (
-                      <tr key={txn.id}>
+                      <tr key={`${txn.type}-${txn.id}`}>
                         <td className="text-xs text-muted-foreground">{formatDate(txn.date)}</td>
                         <td>
                           <Badge variant="outline" className="text-[10px]">
@@ -446,13 +461,13 @@ const Dashboard = () => {
                           </Badge>
                         </td>
                         <td className="text-xs text-muted-foreground hidden sm:table-cell">
-                          {portfolio?.investor.name || '-'}
+                          {portfolio?.investor?.name || portfolio?.name || '-'}
                         </td>
                         <td className="text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
                           {txn.description}
                         </td>
-                        <td className={cn('font-medium mono text-xs text-right', txn.amount >= 0 ? 'text-gain' : 'text-loss')}>
-                          {txn.amount >= 0 ? '+' : ''}{formatCurrency(txn.amount)}
+                        <td className={cn('font-medium mono text-xs text-right', txn.signed_amount >= 0 ? 'text-gain' : 'text-loss')}>
+                          {txn.signed_amount >= 0 ? '+' : ''}{formatCurrency(txn.signed_amount)}
                         </td>
                       </tr>
                     );
@@ -460,7 +475,7 @@ const Dashboard = () => {
                   {filteredTransactions.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center text-muted-foreground text-xs py-8">
-                        No transactions match the selected filters
+                        {txLoading ? 'Loading transactions...' : 'No transactions match the selected filters'}
                       </td>
                     </tr>
                   )}

@@ -64,7 +64,9 @@ def get_positions_aggregated_report(
 
     # 2. Obtener precios del DÍA ANTERIOR (Para calcular % change)
     # Necesitamos el promedio de mkt_price para cada asset en el día anterior
-    prev_date = get_previous_date(db, report_date)
+    # NOTE: OpenPositions ya contiene los mark_prices del día anterior,
+    # por lo que usamos el mismo report_date como 'previous close'
+    prev_date = report_date
     prev_prices_map = {} # Diccionario {asset_id: avg_mark_price}
     
     if prev_date:
@@ -108,7 +110,8 @@ def get_positions_aggregated_report(
                 "accounts": [],
                 "mark_prices": [],  # Lista de mkt_prices para calcular promedio
                 "fx_rates": [],  # Lista de fx_rates para calcular promedio
-                "currencies": []  # Lista de currencies
+                "currencies": [],  # Lista de currencies
+                "percent_of_nav_values": []  # Lista de (percent_of_nav, market_value) para promedio ponderado
             }
         
         # Sumatorias agregadas
@@ -128,6 +131,11 @@ def get_positions_aggregated_report(
         data["mark_prices"].append(mark_price)
         data["fx_rates"].append(fx_rate)
         data["currencies"].append(currency)
+        
+        # Agregar percent_of_nav si existe
+        percent_of_nav = float(pos.percent_of_nav or 0)
+        if percent_of_nav > 0:
+            data["percent_of_nav_values"].append((percent_of_nav, market_value))
         
         # Guardar CADA CUENTA única con todos sus datos
         account_id = pos.account_id
@@ -255,6 +263,14 @@ def get_positions_aggregated_report(
         from collections import Counter
         currency_counts = Counter(data["currencies"])
         predominant_currency = currency_counts.most_common(1)[0][0] if currency_counts else "USD"
+        
+        # Calcular percent_of_nav agregado (promedio ponderado por market value)
+        aggregated_percent_of_nav = None
+        if data["percent_of_nav_values"]:
+            total_weighted = sum(pct * mv for pct, mv in data["percent_of_nav_values"])
+            total_weight = sum(mv for _, mv in data["percent_of_nav_values"])
+            if total_weight > 0:
+                aggregated_percent_of_nav = total_weighted / total_weight
             
         # Crear objeto de respuesta
         item = PositionAggregated(
@@ -270,6 +286,7 @@ def get_positions_aggregated_report(
             
             total_pnl_unrealized=data["pnl"],
             day_change_pct=day_change_pct,
+            percent_of_nav=aggregated_percent_of_nav,
             
             # Distribución de rendimiento
             gainers_count=gainers,
@@ -293,69 +310,21 @@ def get_positions_aggregated_report(
 def get_top_movers(
     db: Session = Depends(deps.get_db),
     report_date: date = Query(..., description="Fecha base para comparar"),
-    limit: int = 5
+    limit: int = 5,
+    filter_type: str = Query("all", description="Filter type: all, options, all_except_options")
 ):
     """
-    Obtiene los Top Gainers y Top Losers basados en el cambio de precio
-    entre report_date y el día anterior disponible.
+    Returns empty movers for offline mode.
+    Use /live-movers endpoint when live data is enabled.
+    
+    filter_type can be:
+    - "all": all assets
+    - "options": only options (OPTION class)
+    - "all_except_options": all except options
     """
-    prev_date = get_previous_date(db, report_date)
-    
-    if not prev_date:
-        # Si no hay histórico, devolvemos listas vacías
-        return MoversResponse(gainers=[], losers=[])
-
-    # SQL Puro o SQLAlchemy optimizado para no traer todas las rows a memoria
-    # Estrategia: Obtener precios de hoy y ayer y calcular en Python (Más seguro por duplicados)
-    
-    # Precios HOY (Distinct por Asset para evitar duplicados si hay múltiples cuentas)
-    today_prices = db.query(
-        Position.asset_id, 
-        Position.mark_price, 
-        Asset.symbol, 
-        Asset.description
-    ).join(Asset).filter(
-        Position.report_date == report_date
-    ).distinct(Position.asset_id).all()
-    
-    # Precios AYER
-    yesterday_prices = db.query(
-        Position.asset_id, 
-        Position.mark_price
-    ).filter(
-        Position.report_date == prev_date
-    ).distinct(Position.asset_id).all()
-    
-    y_prices_map = {p.asset_id: float(p.mark_price or 0) for p in yesterday_prices}
-    
-    calculated_movers = []
-    
-    for item in today_prices:
-        aid = item.asset_id
-        curr_price = float(item.mark_price or 0)
-        prev_price = y_prices_map.get(aid, 0)
-        
-        if prev_price > 0:
-            pct_change = ((curr_price - prev_price) / prev_price) * 100
-            
-            calculated_movers.append(TopMover(
-                asset_id=aid,
-                asset_symbol=item.symbol,
-                asset_name=item.description,
-                current_price=curr_price,
-                previous_price=prev_price,
-                change_pct=pct_change,
-                direction="UP" if pct_change >= 0 else "DOWN"
-            ))
-
-    # Ordenar lista
-    # Gainers: Mayor a menor
-    gainers = sorted(calculated_movers, key=lambda x: x.change_pct, reverse=True)[:limit]
-    
-    # Losers: Menor a mayor
-    losers = sorted(calculated_movers, key=lambda x: x.change_pct)[:limit]
-    
-    return MoversResponse(gainers=gainers, losers=losers)
+    # Return empty movers for offline mode since OpenPositions
+    # contains previous day data, comparing it with itself gives 0%
+    return MoversResponse(gainers=[], losers=[])
 
 
 @router.get("/filter-options")
@@ -485,7 +454,9 @@ def get_live_prices(
         # Get previous day prices for day change calculation
         try:
             latest_date = db.query(func.max(Position.report_date)).scalar()
-            prev_date = get_previous_date(db, latest_date) if latest_date else None
+            # NOTE: OpenPositions ya contiene los mark_prices del día anterior,
+            # por lo que usamos el mismo latest_date como 'previous close'
+            prev_date = latest_date
             
             if prev_date:
                 prev_positions = db.query(
@@ -630,9 +601,9 @@ def get_live_movers(
         return MoversResponse(gainers=[], losers=[])
     
     # Get previous day
-    prev_date = get_previous_date(db, latest_date)
-    if not prev_date:
-        return MoversResponse(gainers=[], losers=[])
+    # NOTE: OpenPositions ya contiene los mark_prices del día anterior,
+    # por lo que usamos el mismo latest_date como 'previous close'
+    prev_date = latest_date
     
     # Get current prices (latest date)
     current_positions = db.query(
@@ -865,7 +836,7 @@ def get_sse_status():
     
     return {
         "active_connections": manager.connection_count,
-        "subscribed_assets": manager.subscribed_asset_count,
+        "subscribed_assets": len(manager._all_subscribed_assets),
         "cached_prices": len(manager._last_prices),
         "ibkr_connected": ibkr.is_connected(),
         "fetch_interval_seconds": manager._fetch_interval

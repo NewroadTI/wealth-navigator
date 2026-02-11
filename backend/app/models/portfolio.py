@@ -56,6 +56,7 @@ class Account(Base):
     return_series = relationship("AccountReturnSeries", back_populates="account")
     performance_attribution = relationship("PerformanceAttribution", back_populates="account")
     corporate_actions = relationship("CorporateAction", back_populates="account")
+    fx_transactions = relationship("FXTransaction", foreign_keys="[FXTransaction.account_id]", back_populates="account")
     positions = relationship("Position", back_populates="account") # Soluciona el error actual
 
 
