@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev &
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Instalamos Playwright y sus dependencias del sistema para Chromium
+RUN playwright install-deps chromium && playwright install chromium
+
 # Copiamos el código
 COPY . .
 

@@ -1,4 +1,6 @@
+import sqlalchemy
 from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Numeric, CHAR, Text, BigInteger
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy import event, DDL
 from sqlalchemy.dialects.postgresql import JSONB  # <--- IMPORTANTE: Agrega esto
@@ -536,6 +538,85 @@ class ETLSyncStatus(Base):
     auto_sync_enabled = Column(Boolean, default=False)
     
     last_job = relationship("ETLJobLog", foreign_keys=[last_run_job_id])
+
+
+# ==========================================================================
+# STRUCTURED NOTES (AIS Products)
+# ==========================================================================
+
+class StructuredNote(Base):
+    """
+    Daily snapshot of structured note data from AIS scraper.
+    Unique constraint on (isin, upload_date) enables daily upsert.
+    """
+    __tablename__ = "structured_notes"
+
+    note_id = Column(Integer, primary_key=True, index=True)
+    asset_id = Column(Integer, ForeignKey("assets.asset_id"), nullable=False)
+    isin = Column(String, nullable=False, index=True)
+    upload_date = Column(Date, nullable=False, index=True)
+
+    # Market Data
+    bid = Column(Numeric, nullable=True)
+    ask = Column(Numeric, nullable=True)
+
+    # Underlyings (dynamic JSONB array)
+    underlyings = Column(JSONB, nullable=True)
+    underlyings_label = Column(String, nullable=True)
+
+    # Dates
+    final_fixing_date = Column(Date, nullable=True)
+    initial_fixing_date = Column(Date, nullable=True)
+    next_autocall_date = Column(Date, nullable=True)
+    next_coupon_date = Column(Date, nullable=True)
+    next_observation = Column(Date, nullable=True)
+    issue_date = Column(Date, nullable=True)
+    redemption_date = Column(Date, nullable=True)
+    next_coupon_payment_date = Column(Date, nullable=True)
+
+    # Identifiers & Labels
+    issuer_pcs = Column(String, nullable=True)
+    reference_underlying = Column(String, nullable=True)
+    final_client = Column(String, nullable=True)
+    status = Column(String, nullable=True)
+    payoff = Column(String, nullable=True)
+    store_observations = Column(String, nullable=True)
+    coupon_frequency = Column(String, nullable=True)
+    callability_frequency = Column(String, nullable=True)
+    issuer = Column(String, nullable=True)
+    product = Column(String, nullable=True)
+    currency = Column(String(3), nullable=True)
+
+    # Numeric Values (percentages stored as decimals)
+    coupon_trigger = Column(Numeric, nullable=True)
+    capital_barrier = Column(Numeric, nullable=True)
+    autocall_trigger = Column(Numeric, nullable=True)
+    coupon_pa = Column(Numeric, nullable=True)
+    put_strike = Column(Numeric, nullable=True)
+    next_autocall_trigger = Column(Numeric, nullable=True)
+    next_autocall_value = Column(Numeric, nullable=True)
+    ref_underlying_initial_fixing = Column(Numeric, nullable=True)
+    ref_underlying_last_close = Column(Numeric, nullable=True)
+    strike_level = Column(Numeric, nullable=True)
+    dist_average = Column(Numeric, nullable=True)
+    paid_coupons = Column(Numeric, nullable=True)
+    size = Column(Numeric, nullable=True)
+    coupon = Column(Numeric, nullable=True)
+    autocall_value = Column(Numeric, nullable=True)
+    protection = Column(Numeric, nullable=True)
+    performance = Column(Numeric, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=True, server_default=func.now())
+    updated_at = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now())
+
+    # Unique constraint: one record per ISIN per day
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint('isin', 'upload_date', name='uq_structured_notes_isin_date'),
+    )
+
+    # Relationships
+    asset = relationship("Asset")
 
 
 event.listen(

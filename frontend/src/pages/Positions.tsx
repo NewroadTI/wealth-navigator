@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Radio, Wifi, WifiOff } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Building2, Briefcase, Filter, X, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Radio, Wifi, WifiOff, Calendar } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/config';
 import { toast } from 'sonner';
 import { useLivePricesSSE, LivePriceData } from '@/hooks/useLivePricesSSE';
@@ -185,6 +185,7 @@ const Positions = () => {
   const [positions, setPositions] = useState<AggregatedAsset[]>([]);
   const [movers, setMovers] = useState<{ gainers: TopMover[]; losers: TopMover[] }>({ gainers: [], losers: [] });
   const [moversFilterType, setMoversFilterType] = useState<'all' | 'options' | 'all_except_options'>('all');
+  const [moversMode, setMoversMode] = useState<'live' | 'twoDay'>('live');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -525,9 +526,13 @@ const Positions = () => {
 
   // Calculate live movers when live prices change
   useEffect(() => {
-    if (!liveDataEnabled || livePrices.size === 0) {
+    // Only calculate live movers if in live mode
+    if (moversMode !== 'live' || !liveDataEnabled || livePrices.size === 0) {
+      console.log('[Live Movers] Skipping - moversMode:', moversMode, 'liveDataEnabled:', liveDataEnabled, 'livePrices size:', livePrices.size);
       return;
     }
+
+    console.log('[Live Movers] Calculating...');
 
     // Get OPTION class_id dynamically
     const optionClass = filterOptions?.asset_classes.find(ac => ac.code === 'OPTION');
@@ -571,7 +576,43 @@ const Positions = () => {
     const losers = sortedByChange.slice(-5).reverse();
 
     setMovers({ gainers, losers });
-  }, [livePrices, positions, moversFilterType, liveDataEnabled, filterOptions]);
+  }, [livePrices, positions, moversFilterType, liveDataEnabled, filterOptions, moversMode]);
+
+  // Load 2-day movers when in twoDay mode
+  useEffect(() => {
+    if (moversMode !== 'twoDay') {
+      return;
+    }
+
+    const loadTwoDayMovers = async () => {
+      try {
+        console.log('[2-Day Movers] Loading data...');
+        const params = new URLSearchParams({
+          limit: '5',
+          filter_type: moversFilterType,
+          ...(selectedPortfolio && { portfolio_id: selectedPortfolio }),
+          ...(selectedAssetClass && { asset_class_id: selectedAssetClass }),
+          ...(selectedAssetSubclass && { asset_subclass_id: selectedAssetSubclass }),
+          ...(selectedAsset && { asset_id: selectedAsset }),
+        });
+
+        const url = `${getApiBaseUrl()}/api/v1/analytics/two-day-movers?${params}`;
+        console.log('[2-Day Movers] Fetching from:', url);
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load 2-day movers');
+        const data = await response.json();
+        
+        console.log('[2-Day Movers] Data received:', data);
+        setMovers(data);
+      } catch (error) {
+        console.error('[2-Day Movers] Error loading:', error);
+        setMovers({ gainers: [], losers: [] });
+      }
+    };
+
+    loadTwoDayMovers();
+  }, [moversMode, moversFilterType, selectedPortfolio, selectedAssetClass, selectedAssetSubclass, selectedAsset]);
 
   // Toggle live data on/off
   const toggleLiveData = useCallback(() => {
@@ -773,6 +814,24 @@ const Positions = () => {
             </Badge>
           )}
 
+          {/* Movers Mode Toggle Button */}
+          <Button
+            variant={moversMode === 'twoDay' ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              const newMode = moversMode === 'live' ? 'twoDay' : 'live';
+              console.log('[Movers Mode] Switching from', moversMode, 'to', newMode);
+              setMoversMode(newMode);
+            }}
+            className={cn(
+              "gap-2",
+              moversMode === 'twoDay' && "bg-blue-600 hover:bg-blue-700 text-white"
+            )}
+          >
+            <Calendar className="h-4 w-4" />
+            2 Last Days Change
+          </Button>
+
           {/* Portfolio Filter with Search */}
           <div className="relative flex items-center gap-1">
             <Select value={selectedPortfolio} onValueChange={setSelectedPortfolio}>
@@ -945,15 +1004,15 @@ const Positions = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-gain" />
-              Top Gainers {liveDataEnabled ? "(Live)" : "Today"}
-              {liveDataEnabled && liveDataConnected && (
+              Top Gainers {moversMode === 'twoDay' ? "(2 Days)" : liveDataEnabled ? "(Live)" : "Today"}
+              {liveDataEnabled && liveDataConnected && moversMode === 'live' && (
                 <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               )}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-2">
-              {!liveDataEnabled ? (
+              {moversMode === 'live' && !liveDataEnabled ? (
                 <div className="text-center py-4">
                   <p className="text-muted-foreground text-sm mb-2">Enable Live Data to see top gainers</p>
                   <Button size="sm" variant="outline" onClick={toggleLiveData}>
@@ -986,15 +1045,15 @@ const Positions = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-loss" />
-              Top Losers {liveDataEnabled ? "(Live)" : "Today"}
-              {liveDataEnabled && liveDataConnected && (
+              Top Losers {moversMode === 'twoDay' ? "(2 Days)" : liveDataEnabled ? "(Live)" : "Today"}
+              {liveDataEnabled && liveDataConnected && moversMode === 'live' && (
                 <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               )}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-2">
-              {!liveDataEnabled ? (
+              {moversMode === 'live' && !liveDataEnabled ? (
                 <div className="text-center py-4">
                   <p className="text-muted-foreground text-sm mb-2">Enable Live Data to see top losers</p>
                   <Button size="sm" variant="outline" onClick={toggleLiveData}>

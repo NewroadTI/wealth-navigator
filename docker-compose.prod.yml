@@ -22,6 +22,8 @@ services:
       - "8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      AIS_USER: ${AIS_USER}
+      AIS_PASS: ${AIS_PASS}
       # --- CONEXIÓN IBKR ---
       IBKR_GATEWAY_HOST: ib-gateway-ib-gateway-1  # <--- Nombre del contenedor vecino
       IBKR_GATEWAY_PORT: 4003                     # <--- Puerto interno (Live)

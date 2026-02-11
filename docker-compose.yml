@@ -33,6 +33,8 @@ services:
       IBKR_CLIENT_ID: "100"
       # Market data type: 1=Real-time (requires subscription), 3=Delayed (free)
       IBKR_MARKET_DATA_TYPE: "1"
+      AIS_USER: ${AIS_USER}
+      AIS_PASS: ${AIS_PASS}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

@@ -29,13 +29,15 @@ class ImportantTransaction(BaseModel):
     """Schema for important transactions."""
     id: int
     date: date
-    type: str  # 'Trade', 'Dividend', 'Interest', 'Fee', 'FX', 'Corporate Action'
+    type: str  # 'Trade', 'Cash', 'FX', 'Corporate Action'
     description: str
     amount: float  # Absolute value for sorting
     signed_amount: float  # Original signed amount
     currency: str
     account_id: int
     portfolioId: Optional[int] = None  # For frontend compatibility
+    portfolio_name: Optional[str] = None
+    investor_name: Optional[str] = None
 
 
 @router.get("/important-transactions", response_model=List[ImportantTransaction])
@@ -45,17 +47,23 @@ def get_important_transactions(
 ):
     """
     Get important transactions from all 4 transaction tables (Trades, CashJournal, FXTransaction, CorporateAction).
-    Returns the transactions with the largest amounts across all tables.
+    Returns the transactions sorted by date (descending), then by amount (descending).
+    Types: 'Trade', 'Cash', 'FX', 'Corporate Action'
     """
     from app.models.portfolio import Account, Portfolio
+    from app.models.user import User
     from sqlalchemy.orm import joinedload
     from sqlalchemy import func
     
     important_transactions = []
     
     # 1. Get trades with largest amounts
-    trades = db.query(Trades).join(Account).join(Portfolio).options(
-        joinedload(Trades.account),
+    trades = db.query(Trades).join(
+        Account, Trades.account_id == Account.account_id
+    ).join(
+        Portfolio, Account.portfolio_id == Portfolio.portfolio_id
+    ).options(
+        joinedload(Trades.account).joinedload(Account.portfolio).joinedload(Portfolio.owner),
         joinedload(Trades.asset)
     ).order_by(
         func.abs(func.coalesce(Trades.quantity, 0) * func.coalesce(Trades.price, 0)).desc()
@@ -68,6 +76,8 @@ def get_important_transactions(
             signed_amount = -signed_amount
         
         symbol = trade.asset.symbol if trade.asset else 'Unknown'
+        portfolio = trade.account.portfolio if trade.account else None
+        owner = portfolio.owner if portfolio else None
         
         important_transactions.append({
             'id': trade.transaction_id,
@@ -78,12 +88,18 @@ def get_important_transactions(
             'signed_amount': signed_amount,
             'currency': trade.currency or 'USD',
             'account_id': trade.account_id,
-            'portfolioId': trade.account.portfolio_id if trade.account else None
+            'portfolioId': portfolio.portfolio_id if portfolio else None,
+            'portfolio_name': portfolio.name if portfolio else None,
+            'investor_name': owner.full_name if owner else None
         })
     
-    # 2. Get cash journal entries (Dividends, Interest, Fees, etc.)
-    cash_entries = db.query(CashJournal).join(Account).join(Portfolio).options(
-        joinedload(CashJournal.account)
+    # 2. Get cash journal entries (all types grouped as 'Cash')
+    cash_entries = db.query(CashJournal).join(
+        Account, CashJournal.account_id == Account.account_id
+    ).join(
+        Portfolio, Account.portfolio_id == Portfolio.portfolio_id
+    ).options(
+        joinedload(CashJournal.account).joinedload(Account.portfolio).joinedload(Portfolio.owner)
     ).order_by(
         func.abs(func.coalesce(CashJournal.amount, 0)).desc()
     ).limit(limit * 2).all()
@@ -91,22 +107,30 @@ def get_important_transactions(
     for entry in cash_entries:
         amount = abs(float(entry.amount or 0))
         signed_amount = float(entry.amount or 0)
+        portfolio = entry.account.portfolio if entry.account else None
+        owner = portfolio.owner if portfolio else None
         
         important_transactions.append({
             'id': entry.journal_id,
             'date': entry.date,
-            'type': entry.type or 'Cash',
+            'type': 'Cash',
             'description': entry.description or f"{entry.type}",
             'amount': amount,
             'signed_amount': signed_amount,
             'currency': entry.currency or 'USD',
             'account_id': entry.account_id,
-            'portfolioId': entry.account.portfolio_id if entry.account else None
+            'portfolioId': portfolio.portfolio_id if portfolio else None,
+            'portfolio_name': portfolio.name if portfolio else None,
+            'investor_name': owner.full_name if owner else None
         })
     
     # 3. Get FX transactions
-    fx_transactions = db.query(FXTransaction).join(Account).join(Portfolio).options(
-        joinedload(FXTransaction.account)
+    fx_transactions = db.query(FXTransaction).join(
+        Account, FXTransaction.account_id == Account.account_id
+    ).join(
+        Portfolio, Account.portfolio_id == Portfolio.portfolio_id
+    ).options(
+        joinedload(FXTransaction.account).joinedload(Account.portfolio).joinedload(Portfolio.owner)
     ).order_by(
         func.abs(func.coalesce(FXTransaction.source_amount, 0)).desc()
     ).limit(limit).all()
@@ -114,6 +138,8 @@ def get_important_transactions(
     for fx in fx_transactions:
         amount = abs(float(fx.source_amount or 0))
         signed_amount = float(fx.source_amount or 0)
+        portfolio = fx.account.portfolio if fx.account else None
+        owner = portfolio.owner if portfolio else None
         
         important_transactions.append({
             'id': fx.fx_id,
@@ -124,12 +150,18 @@ def get_important_transactions(
             'signed_amount': signed_amount,
             'currency': fx.source_currency or 'USD',
             'account_id': fx.account_id,
-            'portfolioId': fx.account.portfolio_id if fx.account else None
+            'portfolioId': portfolio.portfolio_id if portfolio else None,
+            'portfolio_name': portfolio.name if portfolio else None,
+            'investor_name': owner.full_name if owner else None
         })
     
     # 4. Get corporate actions
-    corporate_actions = db.query(CorporateAction).join(Account).join(Portfolio).options(
-        joinedload(CorporateAction.account)
+    corporate_actions = db.query(CorporateAction).join(
+        Account, CorporateAction.account_id == Account.account_id
+    ).join(
+        Portfolio, Account.portfolio_id == Portfolio.portfolio_id
+    ).options(
+        joinedload(CorporateAction.account).joinedload(Account.portfolio).joinedload(Portfolio.owner)
     ).order_by(
         func.abs(func.coalesce(CorporateAction.amount, 0)).desc()
     ).limit(limit).all()
@@ -137,6 +169,8 @@ def get_important_transactions(
     for ca in corporate_actions:
         amount = abs(float(ca.amount or 0))
         signed_amount = float(ca.amount or 0)
+        portfolio = ca.account.portfolio if ca.account else None
+        owner = portfolio.owner if portfolio else None
         
         important_transactions.append({
             'id': ca.action_id,
@@ -147,11 +181,13 @@ def get_important_transactions(
             'signed_amount': signed_amount,
             'currency': ca.currency or 'USD',
             'account_id': ca.account_id,
-            'portfolioId': ca.account.portfolio_id if ca.account else None
+            'portfolioId': portfolio.portfolio_id if portfolio else None,
+            'portfolio_name': portfolio.name if portfolio else None,
+            'investor_name': owner.full_name if owner else None
         })
     
-    # Sort all transactions by amount (descending) and return top N
-    important_transactions.sort(key=lambda x: x['amount'], reverse=True)
+    # Sort all transactions by date (descending) first, then by amount (descending)
+    important_transactions.sort(key=lambda x: (x['date'], x['amount']), reverse=True)
     
     return important_transactions[:limit]
 
