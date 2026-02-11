@@ -60,7 +60,12 @@ const navigation: NavItem[] = [
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isVisible?: boolean;
+  onToggle?: () => void;
+}
+
+export function Sidebar({ isVisible = true, onToggle }: SidebarProps) {
   const location = useLocation();
   const [openSubmenus, setOpenSubmenus] = useState<string[]>(['Investors & Portfolios', 'ETL Sync']);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -83,15 +88,26 @@ export function Sidebar() {
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
-      {/* Logo */}
-      <div className="flex h-14 md:h-16 items-center gap-2 md:gap-3 border-b border-sidebar-border px-4 md:px-6">
+      {/* Logo with Toggle Button */}
+      <div className="flex h-14 md:h-16 items-center gap-2 md:gap-3 border-b border-sidebar-border px-4 md:px-6 relative">
         <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-lg bg-primary">
           <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary-foreground" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-base md:text-lg font-semibold text-sidebar-foreground">NewroadAI</h1>
           <p className="text-[10px] md:text-xs text-muted-foreground">Wealth Management ERP</p>
         </div>
+        {/* Desktop Toggle Button */}
+        {onToggle && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:flex h-8 w-8 hover:bg-sidebar-accent"
+            onClick={onToggle}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -214,7 +230,11 @@ export function Sidebar() {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar hidden md:block">
+      <aside className={cn(
+        "fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-300",
+        "hidden md:block",
+        isVisible ? "translate-x-0" : "-translate-x-full"
+      )}>
         <SidebarContent />
       </aside>
     </>

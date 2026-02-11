@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DevelopmentBanner } from '@/components/common/DevelopmentBanner';
@@ -6,6 +6,7 @@ import { PerformanceChart } from '@/components/dashboard/PerformanceChart';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
 import { portfolios, positions, transactions } from '@/lib/mockData';
 import { formatCurrency, formatPercent, getChangeColor, formatDate } from '@/lib/formatters';
+import { getApiBaseUrl } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,14 +48,6 @@ const getTopMovers = (type: 'gainers' | 'losers') => {
   return sorted.slice(0, 5);
 };
 
-// Get important transactions (dividends, interest, large deposits)
-const getImportantTransactions = () => {
-  return transactions
-    .filter(t => ['Dividend', 'Interest', 'Deposit'].includes(t.type) || Math.abs(t.amount) > 10000)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 20);
-};
-
 // Mock performance data for all accounts
 const allAccountsPerformance = [
   { month: 'Jul', portfolio: 0, benchmark: 0 },
@@ -76,14 +69,13 @@ const cashBalancesByAccount = [
   { account: 'IB-003', currency: 'USD', balance: 152345.67, portfolio: 'Tech Opportunities' },
 ];
 
-// Available transaction types for filtering
-const txnTypes = ['Dividend', 'Interest', 'Deposit', 'Withdrawal', 'Fee'];
+// Available transaction types for filtering - fixed types based on database tables
+const txnTypes = ['Trade', 'Cash', 'FX', 'Corporate Action'];
 
 const Dashboard = () => {
   const location = useLocation();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('day');
   const [selectedTxnTypes, setSelectedTxnTypes] = useState<string[]>([]);
-  const [selectedInvestor, setSelectedInvestor] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
@@ -95,28 +87,42 @@ const Dashboard = () => {
 
   const topGainers = useMemo(() => getTopMovers('gainers'), []);
   const topLosers = useMemo(() => getTopMovers('losers'), []);
-  const importantTransactions = useMemo(() => getImportantTransactions(), []);
+  
+  // Important transactions state
+  const [importantTransactions, setImportantTransactions] = useState<any[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  
+  // Load important transactions from API
+  useEffect(() => {
+    const loadTransactions = async () => {
+      setTxLoading(true);
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/transactions/important-transactions?limit=50`);
+        if (!response.ok) throw new Error('Failed to load transactions');
+        const data = await response.json();
+        setImportantTransactions(data);
+      } catch (error) {
+        console.error('Error loading important transactions:', error);
+        setImportantTransactions([]);
+      } finally {
+        setTxLoading(false);
+      }
+    };
+    loadTransactions();
+  }, []);
 
   // Sort portfolios by total value
   const sortedPortfolios = useMemo(() => 
     [...portfolios].sort((a, b) => b.totalValue - a.totalValue),
   []);
 
-  // Get unique investors for filter
-  const investors = useMemo(() => {
-    const investorMap = new Map<string, string>();
-    portfolios.forEach(p => investorMap.set(p.id, p.investor.name));
-    return Array.from(investorMap.entries()).map(([id, name]) => ({ id, name }));
-  }, []);
+  // (Investor filter removed) — investors list not used anymore
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
     return importantTransactions.filter(t => {
       // Filter by type
       if (selectedTxnTypes.length > 0 && !selectedTxnTypes.includes(t.type)) return false;
-      
-      // Filter by investor (portfolio)
-      if (selectedInvestor !== 'all' && t.portfolioId !== selectedInvestor) return false;
       
       // Filter by date
       const txnDate = new Date(t.date);
@@ -125,7 +131,7 @@ const Dashboard = () => {
       
       return true;
     });
-  }, [importantTransactions, selectedTxnTypes, selectedInvestor, dateFrom, dateTo]);
+  }, [importantTransactions, selectedTxnTypes, dateFrom, dateTo]);
 
   // Toggle transaction type
   const toggleTxnType = (type: string) => {
@@ -138,22 +144,17 @@ const Dashboard = () => {
   const currentFilters = useMemo(() => {
     const params = new URLSearchParams();
     if (selectedTxnTypes.length > 0) params.set('txnTypes', selectedTxnTypes.join(','));
-    if (selectedInvestor !== 'all') params.set('investor', selectedInvestor);
     if (dateFrom) params.set('from', format(dateFrom, 'yyyy-MM-dd'));
     if (dateTo) params.set('to', format(dateTo, 'yyyy-MM-dd'));
     return params.toString();
-  }, [selectedTxnTypes, selectedInvestor, dateFrom, dateTo]);
+  }, [selectedTxnTypes, dateFrom, dateTo]);
 
   const filterTitle = useMemo(() => {
     const parts = ['Dashboard'];
     if (selectedTxnTypes.length > 0) parts.push(selectedTxnTypes.join('+'));
-    if (selectedInvestor !== 'all') {
-      const inv = investors.find(i => i.id === selectedInvestor);
-      if (inv) parts.push(inv.name);
-    }
     if (dateFrom || dateTo) parts.push('Date Range');
     return parts.join(' - ');
-  }, [selectedTxnTypes, selectedInvestor, dateFrom, dateTo, investors]);
+  }, [selectedTxnTypes, dateFrom, dateTo]);
 
   return (
     <AppLayout title="Dashboard" subtitle="Overview of all portfolios and key metrics">
@@ -355,18 +356,7 @@ const Dashboard = () => {
                     ))}
                   </div>
 
-                  {/* Investor Filter */}
-                  <Select value={selectedInvestor} onValueChange={setSelectedInvestor}>
-                    <SelectTrigger className="h-7 text-xs w-32">
-                      <SelectValue placeholder="Investor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Investors</SelectItem>
-                      {investors.map(inv => (
-                        <SelectItem key={inv.id} value={inv.id}>{inv.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Investor filter removed */}
                   
                   {/* Date From */}
                   <Popover>
@@ -405,14 +395,13 @@ const Dashboard = () => {
                   </Popover>
 
                   {/* Clear Filters */}
-                  {(selectedTxnTypes.length > 0 || selectedInvestor !== 'all' || dateFrom || dateTo) && (
+                  {(selectedTxnTypes.length > 0 || dateFrom || dateTo) && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       className="h-7 text-xs"
                       onClick={() => {
                         setSelectedTxnTypes([]);
-                        setSelectedInvestor('all');
                         setDateFrom(undefined);
                         setDateTo(undefined);
                       }}
@@ -435,32 +424,29 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((txn) => {
-                    const portfolio = portfolios.find(p => p.id === txn.portfolioId);
-                    return (
-                      <tr key={txn.id}>
-                        <td className="text-xs text-muted-foreground">{formatDate(txn.date)}</td>
-                        <td>
-                          <Badge variant="outline" className="text-[10px]">
-                            {txn.type}
-                          </Badge>
-                        </td>
-                        <td className="text-xs text-muted-foreground hidden sm:table-cell">
-                          {portfolio?.investor.name || '-'}
-                        </td>
-                        <td className="text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
-                          {txn.description}
-                        </td>
-                        <td className={cn('font-medium mono text-xs text-right', txn.amount >= 0 ? 'text-gain' : 'text-loss')}>
-                          {txn.amount >= 0 ? '+' : ''}{formatCurrency(txn.amount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {filteredTransactions.map((txn) => (
+                    <tr key={`${txn.type}-${txn.id}`}>
+                      <td className="text-xs text-muted-foreground">{formatDate(txn.date)}</td>
+                      <td>
+                        <Badge variant="outline" className="text-[10px]">
+                          {txn.type}
+                        </Badge>
+                      </td>
+                      <td className="text-xs text-muted-foreground hidden sm:table-cell">
+                        {txn.investor_name || txn.portfolio_name || '-'}
+                      </td>
+                      <td className="text-xs text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
+                        {txn.description}
+                      </td>
+                      <td className={cn('font-medium mono text-xs text-right', txn.signed_amount >= 0 ? 'text-gain' : 'text-loss')}>
+                        {txn.signed_amount >= 0 ? '+' : ''}{formatCurrency(txn.signed_amount)}
+                      </td>
+                    </tr>
+                  ))}
                   {filteredTransactions.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center text-muted-foreground text-xs py-8">
-                        No transactions match the selected filters
+                        {txLoading ? 'Loading transactions...' : 'No transactions match the selected filters'}
                       </td>
                     </tr>
                   )}

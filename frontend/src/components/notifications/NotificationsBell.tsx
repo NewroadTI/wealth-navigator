@@ -178,11 +178,6 @@ export function NotificationsBell() {
           className="relative h-8 w-8 md:h-9 md:w-9 text-muted-foreground hover:text-foreground"
         >
           <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -193,50 +188,13 @@ export function NotificationsBell() {
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
           <span className="text-sm font-medium">Notifications</span>
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={markAllAsRead}
-            >
-              Mark all read
-            </Button>
-          )}
         </div>
 
         {/* Notifications List */}
-        {notifications.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No notifications</p>
-          </div>
-        ) : (
-          <ScrollArea className="h-auto max-h-[400px]">
-            {notifications.map(notification => (
-              <NotificationItem
-                key={notification.id}
-                notification={notification}
-                onMarkRead={markAsRead}
-                onDismiss={clearNotification}
-                onMarkJobDone={markJobAsDone}
-              />
-            ))}
-          </ScrollArea>
-        )}
-
-        {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="px-3 py-2 border-t border-border bg-muted/30">
-            <Link
-              to="/etl/pershing"
-              className="text-xs text-primary hover:underline"
-              onClick={() => setOpen(false)}
-            >
-              View dashboard →
-            </Link>
-          </div>
-        )}
+        <div className="py-8 text-center text-sm text-foreground">
+          <Bell className="h-8 w-8 mx-auto mb-2 text-primary" />
+          <p className="font-medium">Welcome to Newroad AI</p>
+        </div>
       </PopoverContent>
     </Popover>
   );
