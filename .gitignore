@@ -13,6 +13,7 @@ dist-ssr
 *.local
 
 auth_state.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

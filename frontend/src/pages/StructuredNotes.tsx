@@ -772,8 +772,7 @@ const StructuredNotes = () => {
                                         <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">Name</th>
                                         <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">Portfolio</th>
                                         <th className="px-4 py-2 text-right font-medium text-muted-foreground uppercase text-xs">Quantity</th>
-                                        <th className="px-4 py-2 text-right font-medium text-muted-foreground uppercase text-xs">Purchase Price</th>
-                                        <th className="px-4 py-2 text-right font-medium text-muted-foreground uppercase text-xs">Purchase Date</th>
+                                        <th className="px-4 py-2 text-right font-medium text-muted-foreground uppercase text-xs">Mark Price</th>
                                         <th className="px-4 py-2 text-right font-medium text-muted-foreground uppercase text-xs">Current Value</th>
                                       </tr>
                                     </thead>
@@ -782,8 +781,8 @@ const StructuredNotes = () => {
                                         const currentValue = holder.quantity && holder.mark_price
                                           ? holder.quantity * holder.mark_price
                                           : null;
-                                        const purchasePricePercent = holder.cost_basis_price
-                                          ? (holder.cost_basis_price * 100).toFixed(2) + '%'
+                                        const markPriceDisplay = holder.mark_price
+                                          ? holder.mark_price.toFixed(2)
                                           : '-';
 
                                         return (
@@ -794,10 +793,7 @@ const StructuredNotes = () => {
                                               {formatCurrency(holder.quantity, note.currency || 'USD')}
                                             </td>
                                             <td className="px-4 py-2 text-right mono">
-                                              {purchasePricePercent}
-                                            </td>
-                                            <td className="px-4 py-2 text-right text-muted-foreground">
-                                              {holder.purchase_date || '-'}
+                                              {markPriceDisplay}
                                             </td>
                                             <td className="px-4 py-2 text-right mono font-medium">
                                               {currentValue != null
