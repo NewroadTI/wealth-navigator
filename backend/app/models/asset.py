@@ -247,6 +247,10 @@ class FXTransaction(Base):
     notes = Column(String, nullable=True)  # "Notes/Codes"
     
     external_id = Column(String, unique=True, nullable=True)
+    
+    # Relaciones
+    account = relationship("Account", foreign_keys=[account_id])
+    target_account = relationship("Account", foreign_keys=[target_account_id])
 
 class PerformanceAttribution(Base):
     __tablename__ = "performance_attribution"

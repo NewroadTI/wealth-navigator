@@ -165,6 +165,7 @@ const Positions = () => {
   // Filters State
   const [reportDate, setReportDate] = useState<string>('');
   const [selectedPortfolio, setSelectedPortfolio] = useState<string>('');
+  const [portfolioSearchQuery, setPortfolioSearchQuery] = useState('');
   const [selectedAssetClass, setSelectedAssetClass] = useState<string>('');
   const [selectedAssetSubclass, setSelectedAssetSubclass] = useState<string>('');
   const [selectedAsset, setSelectedAsset] = useState<string>('');
@@ -175,10 +176,15 @@ const Positions = () => {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
+  // Track value changes for institutions (for color animation)
+  const [institutionValueChanges, setInstitutionValueChanges] = useState<Map<string, 'up' | 'down' | null>>(new Map());
+  const previousInstitutionValuesRef = useRef<Map<string, { mktValue: number; unrealizedPnl: number }>>(new Map());
+
   // Data State
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [positions, setPositions] = useState<AggregatedAsset[]>([]);
   const [movers, setMovers] = useState<{ gainers: TopMover[]; losers: TopMover[] }>({ gainers: [], losers: [] });
+  const [moversFilterType, setMoversFilterType] = useState<'all' | 'options' | 'all_except_options'>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -318,28 +324,42 @@ const Positions = () => {
     loadPositions();
   }, [reportDate, selectedPortfolio, selectedAssetClass, selectedAssetSubclass, selectedAsset]);
 
-  // Load top movers when report date changes
+  // Load top movers when report date changes or live data changes
   useEffect(() => {
     if (!reportDate) return;
 
-    const loadMovers = async () => {
-      try {
-        const params = new URLSearchParams({
-          report_date: reportDate,
-          limit: '5',
-        });
+    // If live data is disabled, clear movers
+    if (!liveDataEnabled) {
+      setMovers({ gainers: [], losers: [] });
+      return;
+    }
 
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/movers?${params}`);
-        if (!response.ok) throw new Error('Failed to load movers');
-        const data = await response.json();
-        setMovers(data);
-      } catch (err) {
-        console.error('Error loading movers:', err);
-      }
-    };
+    // When live data is enabled, movers are calculated from live prices (see below)
+  }, [reportDate, moversFilterType, liveDataEnabled]);
 
-    loadMovers();
-  }, [reportDate]);
+  // Load top movers when report date changes or live data changes
+  useEffect(() => {
+    if (!reportDate) return;
+
+    // If live data is disabled, clear movers
+    if (!liveDataEnabled) {
+      setMovers({ gainers: [], losers: [] });
+      return;
+    }
+
+    // When live data is enabled, movers are calculated from live prices (see below)
+  }, [reportDate, moversFilterType, liveDataEnabled]);
+
+  // Filter portfolios for the Portfolio dropdown based on search
+  const filteredPortfoliosForDropdown = useMemo(() => {
+    if (!filterOptions?.portfolios) return [];
+    if (!portfolioSearchQuery) return filterOptions.portfolios;
+    
+    const query = portfolioSearchQuery.toLowerCase();
+    return filterOptions.portfolios.filter(p => 
+      p.name.toLowerCase().includes(query)
+    );
+  }, [filterOptions?.portfolios, portfolioSearchQuery]);
 
   // Filter assets for the Asset dropdown based on search
   const filteredAssetsForDropdown = useMemo(() => {
@@ -473,12 +493,6 @@ const Positions = () => {
   } = useLivePricesSSE({
     enabled: liveDataEnabled,
     assetIds: allAssetIds,
-    onPrices: (prices) => {
-      // Fetch live movers when we get new prices
-      if (prices.length > 0) {
-        fetchLiveMovers(prices.map(p => p.asset_id));
-      }
-    },
     reconnectDelay: 3000,
     maxReconnectAttempts: 5,
   });
@@ -509,22 +523,55 @@ const Positions = () => {
   const liveDataLoading = sseState.connecting;
   const lastLiveUpdate = sseState.lastUpdate;
 
-  // Fetch live movers for current page
-  const fetchLiveMovers = async (assetIds: number[]) => {
-    try {
-      const params = new URLSearchParams({
-        limit: '5',
-      });
-      assetIds.forEach(id => params.append('asset_ids', id.toString()));
-
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/analytics/live-movers?${params}`);
-      if (!response.ok) return;
-      const data = await response.json();
-      setMovers(data);
-    } catch (err) {
-      console.error('Error fetching live movers:', err);
+  // Calculate live movers when live prices change
+  useEffect(() => {
+    if (!liveDataEnabled || livePrices.size === 0) {
+      return;
     }
-  };
+
+    // Get OPTION class_id dynamically
+    const optionClass = filterOptions?.asset_classes.find(ac => ac.code === 'OPTION');
+    const optionClassId = optionClass?.id.toString();
+
+    // Get all assets with live prices
+    const moversData: TopMover[] = [];
+    
+    livePrices.forEach((priceData, assetId) => {
+      const asset = positions.find(p => p.asset_id === assetId);
+      if (!asset) return;
+
+      // Apply filter
+      if (moversFilterType === 'options') {
+        if (asset.asset_class !== optionClassId) return;
+      } else if (moversFilterType === 'all_except_options') {
+        if (asset.asset_class === optionClassId) return;
+      }
+
+      const currentPrice = priceData.live_price;
+      const previousPrice = asset.current_mark_price;
+
+      if (previousPrice > 0) {
+        const pctChange = ((currentPrice - previousPrice) / previousPrice) * 100;
+        
+        moversData.push({
+          asset_id: assetId,
+          asset_symbol: asset.asset_symbol,
+          asset_name: asset.asset_symbol,
+          current_price: currentPrice,
+          previous_price: previousPrice,
+          change_pct: pctChange,
+          direction: pctChange >= 0 ? 'UP' : 'DOWN',
+        });
+      }
+    });
+
+    // Sort and get top 5 gainers and losers
+    const sortedByChange = [...moversData].sort((a, b) => b.change_pct - a.change_pct);
+    const gainers = sortedByChange.slice(0, 5);
+    const losers = sortedByChange.slice(-5).reverse();
+
+    setMovers({ gainers, losers });
+  }, [livePrices, positions, moversFilterType, liveDataEnabled, filterOptions]);
 
   // Toggle live data on/off
   const toggleLiveData = useCallback(() => {
@@ -602,6 +649,7 @@ const Positions = () => {
     switch (filterType) {
       case 'portfolio':
         setSelectedPortfolio('');
+        setPortfolioSearchQuery('');
         break;
       case 'class':
         setSelectedAssetClass('');
@@ -622,6 +670,7 @@ const Positions = () => {
 
   const clearAllFilters = () => {
     setSelectedPortfolio('');
+    setPortfolioSearchQuery('');
     setSelectedAssetClass('');
     setSelectedAssetSubclass('');
     setSelectedAsset('');
@@ -632,6 +681,21 @@ const Positions = () => {
   };
 
   const hasActiveFilters = selectedPortfolio || selectedAssetClass || selectedAssetSubclass || selectedAsset || tableSearchQuery;
+
+  // Navigate to the page containing the asset and expand it
+  const navigateToAsset = (assetId: number) => {
+    const assetIndex = filteredPositions.findIndex(pos => pos.asset_id === assetId);
+    
+    if (assetIndex === -1) {
+      // Asset not found in current filtered positions
+      console.warn('Asset not found in current filtered positions:', assetId);
+      return;
+    }
+    
+    const targetPage = Math.floor(assetIndex / ITEMS_PER_PAGE) + 1;
+    setCurrentPage(targetPage);
+    setSelectedAssetInTable(assetId);
+  };
 
   return (
     <AppLayout title="Positions" subtitle="Real-time positions with advanced filtering">
@@ -709,14 +773,21 @@ const Positions = () => {
             </Badge>
           )}
 
-          {/* Portfolio Filter */}
+          {/* Portfolio Filter with Search */}
           <div className="relative flex items-center gap-1">
             <Select value={selectedPortfolio} onValueChange={setSelectedPortfolio}>
               <SelectTrigger className="w-40 bg-muted/50 border-border">
                 <SelectValue placeholder="All Portfolios" />
               </SelectTrigger>
               <SelectContent>
-                {filterOptions?.portfolios.map(p => (
+                <Input
+                  placeholder="Search portfolios..."
+                  value={portfolioSearchQuery}
+                  onChange={(e) => setPortfolioSearchQuery(e.target.value)}
+                  className="m-2 mb-3 h-8"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {filteredPortfoliosForDropdown.map(p => (
                   <SelectItem key={p.id} value={p.id.toString()}>
                     {p.name}
                   </SelectItem>
@@ -838,6 +909,37 @@ const Positions = () => {
       </div>
 
       {/* Top Movers - Day Only */}
+      {/* Movers Filter Buttons */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm text-muted-foreground">Filter:</span>
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant={moversFilterType === 'all' ? 'default' : 'outline'}
+            onClick={() => setMoversFilterType('all')}
+            className="h-7 text-xs"
+          >
+            All Assets
+          </Button>
+          <Button
+            size="sm"
+            variant={moversFilterType === 'options' ? 'default' : 'outline'}
+            onClick={() => setMoversFilterType('options')}
+            className="h-7 text-xs"
+          >
+            Options
+          </Button>
+          <Button
+            size="sm"
+            variant={moversFilterType === 'all_except_options' ? 'default' : 'outline'}
+            onClick={() => setMoversFilterType('all_except_options')}
+            className="h-7 text-xs"
+          >
+            All Except Options
+          </Button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <Card className="border-border">
           <CardHeader className="pb-3">
@@ -851,11 +953,18 @@ const Positions = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-2">
-              {movers.gainers.length > 0 ? movers.gainers.map((asset) => (
+              {!liveDataEnabled ? (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground text-sm mb-2">Enable Live Data to see top gainers</p>
+                  <Button size="sm" variant="outline" onClick={toggleLiveData}>
+                    Enable Live Data
+                  </Button>
+                </div>
+              ) : movers.gainers.length > 0 ? movers.gainers.map((asset) => (
                 <div 
                   key={`gainers-${asset.asset_id}`}
                   className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => setSelectedAssetInTable(asset.asset_id === selectedAssetInTable ? null : asset.asset_id)}
+                  onClick={() => navigateToAsset(asset.asset_id)}
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-foreground">{asset.asset_symbol}</span>
@@ -867,7 +976,7 @@ const Positions = () => {
                   </div>
                 </div>
               )) : (
-                <p className="text-muted-foreground text-sm py-2">No gainers today</p>
+                <p className="text-muted-foreground text-sm py-2">No gainers available</p>
               )}
             </div>
           </CardContent>
@@ -885,11 +994,18 @@ const Positions = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-2">
-              {movers.losers.length > 0 ? movers.losers.map((asset) => (
+              {!liveDataEnabled ? (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground text-sm mb-2">Enable Live Data to see top losers</p>
+                  <Button size="sm" variant="outline" onClick={toggleLiveData}>
+                    Enable Live Data
+                  </Button>
+                </div>
+              ) : movers.losers.length > 0 ? movers.losers.map((asset) => (
                 <div 
                   key={`losers-${asset.asset_id}`}
                   className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => setSelectedAssetInTable(asset.asset_id === selectedAssetInTable ? null : asset.asset_id)}
+                  onClick={() => navigateToAsset(asset.asset_id)}
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-foreground">{asset.asset_symbol}</span>
@@ -901,7 +1017,7 @@ const Positions = () => {
                   </div>
                 </div>
               )) : (
-                <p className="text-muted-foreground text-sm py-2">No losers today</p>
+                <p className="text-muted-foreground text-sm py-2">No losers available</p>
               )}
             </div>
           </CardContent>
@@ -1116,7 +1232,7 @@ const Positions = () => {
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Mkt Price</th>
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Mkt Value</th>
                                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unrealized P&L</th>
-                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Day Chg %</th>
+                                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unrealized PNL %</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1124,8 +1240,42 @@ const Positions = () => {
                                       const displayName = inst.user_first_name && inst.user_last_name
                                         ? `${inst.institution}-${inst.user_first_name} ${inst.user_last_name}`
                                         : inst.institution;
-                                      const instPnlPositive = (inst.unrealized_pnl ?? 0) >= 0;
-                                      const instDayPositive = (inst.day_change_pct ?? 0) >= 0;
+                                      
+                                      // Calculate live values if live data is available
+                                      const liveAssetPrice = liveDataEnabled && livePrice ? livePrice.live_price : null;
+                                      const instMktPrice = liveAssetPrice || (inst.market_price ?? 0);
+                                      const instMktValue = inst.quantity ? (inst.quantity * instMktPrice) : (inst.market_value ?? 0);
+                                      const instUnrealizedPnl = inst.cost_basis_money ? (instMktValue - inst.cost_basis_money) : (inst.unrealized_pnl ?? 0);
+                                      const instUnrealizedPnlPct = inst.cost_basis_money && inst.cost_basis_money > 0 
+                                        ? (instUnrealizedPnl / inst.cost_basis_money) * 100 
+                                        : 0;
+                                      
+                                      const instPnlPositive = instUnrealizedPnl >= 0;
+                                      
+                                      // Track value changes for color animation
+                                      const instKey = `${asset.asset_id}-${inst.account_id}`;
+                                      const prevValues = previousInstitutionValuesRef.current.get(instKey);
+                                      let valueChangeDirection: 'up' | 'down' | null = null;
+                                      
+                                      if (prevValues && liveDataEnabled) {
+                                        if (instMktValue > prevValues.mktValue) {
+                                          valueChangeDirection = 'up';
+                                        } else if (instMktValue < prevValues.mktValue) {
+                                          valueChangeDirection = 'down';
+                                        }
+                                        
+                                        // Update previous values
+                                        previousInstitutionValuesRef.current.set(instKey, {
+                                          mktValue: instMktValue,
+                                          unrealizedPnl: instUnrealizedPnl
+                                        });
+                                      } else if (liveDataEnabled) {
+                                        // First time tracking
+                                        previousInstitutionValuesRef.current.set(instKey, {
+                                          mktValue: instMktValue,
+                                          unrealizedPnl: instUnrealizedPnl
+                                        });
+                                      }
                                       
                                       return (
                                         <tr 
@@ -1136,19 +1286,41 @@ const Positions = () => {
                                           <td className="text-right py-2 px-3 mono">{formatNumber(inst.quantity ?? 0)}</td>
                                           <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.avg_cost_price_original, inst.avg_cost_price, inst.currency ?? 'USD')}</td>
                                           <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.cost_basis_money_original, inst.cost_basis_money, inst.currency ?? 'USD')}</td>
-                                          <td className="text-right py-2 px-3 mono text-muted-foreground text-xs">
-                                            {inst.market_price ? formatCurrencyWithCode(inst.market_price_original, inst.market_price, inst.currency ?? 'USD') : '—'}
+                                          <td className={cn(
+                                            "text-right py-2 px-3 mono text-xs transition-colors duration-300",
+                                            valueChangeDirection === 'up' && "text-green-500 font-semibold",
+                                            valueChangeDirection === 'down' && "text-red-500 font-semibold",
+                                            !valueChangeDirection && liveDataEnabled && liveAssetPrice && "text-foreground",
+                                            !liveDataEnabled && "text-muted-foreground"
+                                          )}>
+                                            {liveAssetPrice ? `${instMktPrice.toFixed(2)} USD` : (inst.market_price ? formatCurrencyWithCode(inst.market_price_original, inst.market_price, inst.currency ?? 'USD') : '—')}
                                           </td>
-                                          <td className="text-right py-2 px-3 mono text-xs">{formatCurrencyWithCode(inst.market_value_original, inst.market_value, inst.currency ?? 'USD')}</td>
+                                          <td className={cn(
+                                            "text-right py-2 px-3 mono text-xs transition-colors duration-300",
+                                            valueChangeDirection === 'up' && "text-green-500 font-semibold",
+                                            valueChangeDirection === 'down' && "text-red-500 font-semibold"
+                                          )}>
+                                            {instMktValue.toFixed(2)} USD
+                                          </td>
                                           <td className="text-right py-2 px-3">
-                                            <span className={cn('mono text-xs', getChangeColor(inst.unrealized_pnl ?? 0))}>
-                                              {instPnlPositive ? '+' : ''}{formatCurrencyWithCode(inst.unrealized_pnl_original, inst.unrealized_pnl, inst.currency ?? 'USD')}
+                                            <span className={cn(
+                                              'mono text-xs transition-colors duration-300',
+                                              valueChangeDirection === 'up' && "text-green-500 font-semibold",
+                                              valueChangeDirection === 'down' && "text-red-500 font-semibold",
+                                              !valueChangeDirection && getChangeColor(instUnrealizedPnl)
+                                            )}>
+                                              {instPnlPositive ? '+' : ''}{instUnrealizedPnl.toFixed(2)} USD
                                             </span>
                                           </td>
                                           <td className="text-right py-2 px-3">
-                                            <span className={cn('mono', getChangeColor(inst.day_change_pct ?? 0))}>
-                                              {inst.day_change_pct !== null && inst.day_change_pct !== 0 
-                                                ? formatPercent(inst.day_change_pct)
+                                            <span className={cn(
+                                              'mono transition-colors duration-300',
+                                              valueChangeDirection === 'up' && "text-green-500 font-semibold",
+                                              valueChangeDirection === 'down' && "text-red-500 font-semibold",
+                                              !valueChangeDirection && getChangeColor(instUnrealizedPnlPct)
+                                            )}>
+                                              {instUnrealizedPnlPct !== 0 
+                                                ? formatPercent(instUnrealizedPnlPct)
                                                 : '—'
                                               }
                                             </span>
