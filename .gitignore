@@ -51,3 +51,4 @@ backend/seed_data/insertion_summary.json
 backend/seed_data/persh/data
 
 venv/
+*.csv#

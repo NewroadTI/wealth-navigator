@@ -18,7 +18,8 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- IBKR FLEX QUERY CONFIGURATION ---
 IBKR_TOKEN = os.getenv("IBKR_TOKEN", "181787535917845028470530")
-
+#cash status = 1373922
+#nlvhistory = 1399474
 # Flex Query IDs - These generate the CSV reports
 FLEX_QUERIES = {
     "CORPORATES": "1126752",
