@@ -1,29 +1,58 @@
-import { Fragment, useState, useMemo, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SaveFilterButton } from '@/components/common/SaveFilterButton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search,
-  Download,
+  RefreshCw,
+  Filter,
+  Users,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  Building2,
+  Calendar,
+  DollarSign,
+  TrendingUp,
   ChevronDown,
   ChevronRight,
-  Users,
-  RefreshCw,
+  ChevronUp,
+  Columns3,
+  ExternalLink,
+  Download,
   AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Calendar,
   Plus,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  CheckCircle,
 } from 'lucide-react';
-import { formatCurrency, formatPercent } from '@/lib/formatters';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
+import { CreateAssetDialog } from '@/components/assets/CreateAssetDialog';
+import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { API_V1_URL, getApiBaseUrl } from '@/lib/config';
 import { catalogsApi, AssetClass } from '@/lib/api';
 import {
@@ -31,38 +60,57 @@ import {
   AssetFormState,
   defaultAssetFormState,
 } from './AssetsSection';
+// --- Types ---
 
-// =============================================================================
-// TYPES
-// =============================================================================
+interface Underlying {
+  ticker: string;
+  strike: number;
+  spot: number;
+  perf: number;
+}
 
 interface StructuredNote {
   note_id: number;
   asset_id: number;
   isin: string;
-  upload_date: string;
-  bid: number | null;
-  ask: number | null;
-  underlyings: any[] | null;
-  underlyings_label: string | null;
-  issuer: string | null;
-  issuer_pcs: string | null;
-  product: string | null;
-  size: number | null;
-  currency: string | null;
-  coupon: number | null;
-  coupon_pa: number | null;
-  autocall_value: number | null;
-  autocall_trigger: number | null;
-  protection: number | null;
-  performance: number | null;
-  coupon_trigger: number | null;
-  capital_barrier: number | null;
-  status: string | null;
-  final_fixing_date: string | null;
-  redemption_date: string | null;
-  next_coupon_payment_date: string | null;
-  coupon_frequency: string | null;
+  upload_date: string; // YYYY-MM-DD
+  dealer?: string;
+  code?: string;
+  status?: string;
+  product_type?: string;
+  issuer?: string;
+  custodian?: string;
+  advisor?: string;
+  nominal?: number;
+  size?: number;
+  underlyings?: Underlying[];
+  maturity_date?: string;
+  issue_date?: string;
+  strike_date?: string;
+  last_autocall_obs?: string;
+  next_autocall_obs?: string;
+  next_coupon_obs?: string;
+  next_payment_date?: string;
+  coupon_annual_pct?: number;
+  coupon_periodic_pct?: number;
+  coupon_annual_amount?: number;
+  coupon_periodic_amount?: number;
+  coupon_type?: string;
+  cap_pct?: number;
+  capital_protected_pct?: number;
+  autocall_trigger?: number;
+  step_down?: number;
+  autocall_obs_count?: number;
+  protection_barrier?: number;
+  coupon_barrier?: number;
+  observation_frequency?: string;
+  termsheet?: string;
+  termsheet_url?: string;
+  coupons_paid_count?: number;
+  coupons_paid_amount?: number;
+  gross_yield_pct?: number;
+  bid?: number;
+  ask?: number;
 }
 
 interface NoteHolder {
@@ -70,17 +118,20 @@ interface NoteHolder {
   portfolio_name: string;
   quantity: number;
   mark_price: number | null;
-  cost_basis_price: number | null;
-  position_value: number | null;
-  purchase_date: string | null;
+  market_value: number;
+  avg_price: number;
+  unrealized_pnl: number;
   report_date: string;
 }
 
 interface MissingAsset {
   isin: string;
-  underlyings_label: string;
-  product: string;
-  issuer: string;
+  description: string;
+  currency: string;
+  suggested_ticker: string;
+  product?: string;
+  issuer?: string;
+  underlyings_label?: string;
   done: boolean;
 }
 
@@ -92,7 +143,6 @@ interface ImportResult {
   skipped: number;
   missing_assets: MissingAsset[];
   errors: string[];
-  job_id?: number;
 }
 
 interface StructuredNotesJob {
@@ -109,9 +159,63 @@ interface StructuredNotesJob {
   records_created: number;
   records_updated: number;
   records_skipped: number;
+  started_at: string;
+  completed_at?: string;
 }
 
 type RefreshStep = 'idle' | 'exporting' | 'importing' | 'done' | 'error';
+
+// Column definitions for the table
+type ColumnType = 'text' | 'number' | 'date' | 'pct' | 'amount' | 'badge' | 'underlyings' | 'link' | 'underlyings-data';
+
+interface ColumnDef {
+  key: keyof StructuredNote | 'strike' | 'spot' | 'perf'; // Added virtual keys
+  label: string;
+  type: ColumnType;
+  sortable?: boolean;
+  minWidth?: string;
+}
+
+const ALL_COLUMNS: ColumnDef[] = [
+  { key: 'isin', label: 'ISIN', type: 'text', sortable: true, minWidth: '130px' },
+  { key: 'issuer', label: 'Issuer', type: 'text', sortable: true },
+  { key: 'product_type', label: 'Product Type', type: 'text', sortable: true, minWidth: '180px' },
+  { key: 'status', label: 'Status', type: 'badge', sortable: true },
+  { key: 'underlyings', label: 'Underlyings', type: 'underlyings', minWidth: '180px' },
+  { key: 'strike', label: 'Strikes', type: 'underlyings-data', minWidth: '200px' }, // New
+  { key: 'spot', label: 'Spots', type: 'underlyings-data', minWidth: '200px' },     // New
+  { key: 'perf', label: 'Perfs', type: 'underlyings-data', minWidth: '200px' },     // New
+  { key: 'nominal', label: 'Nominal', type: 'amount', sortable: true },
+  { key: 'size', label: 'Size', type: 'number', sortable: true },
+  { key: 'bid', label: 'Bid', type: 'pct', sortable: true },
+  { key: 'ask', label: 'Ask', type: 'pct', sortable: true },
+  { key: 'coupon_annual_pct', label: 'Cpn p.a.', type: 'pct', sortable: true },
+  { key: 'coupon_barrier', label: 'Cpn Barr', type: 'pct' },
+  { key: 'protection_barrier', label: 'Prot Barr', type: 'pct' },
+  { key: 'autocall_trigger', label: 'Autocall', type: 'pct' },
+  { key: 'next_autocall_obs', label: 'Next Autocall', type: 'date', sortable: true },
+  { key: 'next_coupon_obs', label: 'Next Obs', type: 'date', sortable: true },
+  { key: 'next_payment_date', label: 'Next Pay', type: 'date', sortable: true },
+  { key: 'maturity_date', label: 'Maturity', type: 'date', sortable: true },
+  { key: 'issue_date', label: 'Issue Date', type: 'date', sortable: true },
+  { key: 'strike_date', label: 'Strike Date', type: 'date', sortable: true },
+  { key: 'observation_frequency', label: 'Freq', type: 'text' },
+  { key: 'coupon_type', label: 'Cpn Type', type: 'text' },
+  { key: 'dealer', label: 'Dealer', type: 'text' },
+  { key: 'custodian', label: 'Custodian', type: 'text' },
+  { key: 'advisor', label: 'Advisor', type: 'text' },
+  { key: 'termsheet', label: 'Termsheet', type: 'link' }, // Changed to link
+  { key: 'code', label: 'Code', type: 'text' },
+];
+
+// Default visible columns
+const DEFAULT_VISIBLE_KEYS = [
+  'isin', 'issuer', 'product_type', 'status',
+  'underlyings', 'perf',
+  'nominal', 'size', 'bid', 'maturity_date', 'next_autocall_obs', 'coupon_annual_pct'
+];
+
+const STORAGE_KEY = 'wealth_navigator_structured_notes_columns';
 
 // =============================================================================
 // COMPONENT
@@ -123,6 +227,24 @@ const StructuredNotes = () => {
   const apiBaseUrl = getApiBaseUrl();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIsin, setExpandedIsin] = useState<string | null>(null);
+
+  // Column visibility (persisted)
+  const [visibleKeys, setVisibleKeys] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch { }
+    return DEFAULT_VISIBLE_KEYS;
+  });
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+
+  // Sorting
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Status & issuer filters
+  const [statusFilter, setStatusFilter] = useState<string>('Vigente');
+  const [issuerFilter, setIssuerFilter] = useState<string>('');
 
   // Data state
   const [notes, setNotes] = useState<StructuredNote[]>([]);
@@ -239,12 +361,17 @@ const StructuredNotes = () => {
     }
   }, [selectedDate]);
 
-  // ── Fetch notes for selected date ──
+  // ── Fetch notes for selected date (with status/issuer filters) ──
   const fetchNotes = useCallback(async (dateStr?: string) => {
     setIsLoading(true);
     try {
-      const params = dateStr ? `?upload_date=${dateStr}` : '';
-      const res = await fetch(`${API_V1_URL}/ais-etl/notes${params}`);
+      const params = new URLSearchParams();
+      if (dateStr) params.set('upload_date', dateStr);
+      if (statusFilter) {
+        params.set('status', statusFilter === 'All' ? 'all' : statusFilter);
+      }
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_V1_URL}/ais-etl/notes${qs}`);
       if (res.ok) {
         const data: StructuredNote[] = await res.json();
         setNotes(data);
@@ -257,7 +384,7 @@ const StructuredNotes = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   // ── Fetch holders for expanded note ──
   const fetchHolders = useCallback(async (isin: string) => {
@@ -289,7 +416,7 @@ const StructuredNotes = () => {
     } else {
       fetchNotes();
     }
-  }, [selectedDate, fetchNotes]);
+  }, [selectedDate, fetchNotes, statusFilter, issuerFilter]);
 
   // ── Refresh: Export → Import → Refetch ──
   const handleRefresh = async () => {
@@ -391,11 +518,14 @@ const StructuredNotes = () => {
   };
 
   const handleOpenCreateDialog = (asset: MissingAsset) => {
+    const underlyingsLabel = (asset.underlyings_label || '').trim();
+    const product = (asset.product || '').trim();
+    const combinedDescription = [underlyingsLabel, product].filter(Boolean).join(' / ');
     setCreatingIsin(asset.isin);
     setAssetDraft({
       ...defaultAssetFormState,
       isin: asset.isin,
-      description: asset.product || asset.underlyings_label || '',
+      description: combinedDescription,
       issuer: asset.issuer || '',
       symbol: asset.isin, // Use ISIN as default symbol
       class_id: assetClasses.length > 0 ? String(assetClasses[0].class_id) : '',
@@ -456,17 +586,155 @@ const StructuredNotes = () => {
     }
   };
 
-  // ── Filter notes ──
+  // ── Toggle column visibility ──
+  const toggleColumn = (key: string) => {
+    setVisibleKeys(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // ── Visible columns (in definition order) ──
+  const visibleColumns = useMemo(() =>
+    ALL_COLUMNS.filter(c => visibleKeys.includes(c.key)),
+    [visibleKeys]
+  );
+
+  // ── Unique issuers for filter dropdown ──
+  const uniqueIssuers = useMemo(() => {
+    const set = new Set(notes.map(n => n.issuer).filter(Boolean) as string[]);
+    return Array.from(set).sort();
+  }, [notes]);
+
+  // ── Sorting ──
+  const handleSort = (key: string) => {
+    if (sortColumn === key) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(key);
+      setSortDirection('asc');
+    }
+  };
+
+  // ── Filter and sort notes ──
   const filteredNotes = useMemo(() => {
-    if (!searchQuery) return notes;
-    const query = searchQuery.toLowerCase();
-    return notes.filter(note =>
-      note.isin.toLowerCase().includes(query) ||
-      (note.issuer || '').toLowerCase().includes(query) ||
-      (note.product || '').toLowerCase().includes(query) ||
-      (note.underlyings_label || '').toLowerCase().includes(query)
-    );
-  }, [searchQuery, notes]);
+    let result = notes;
+
+    // Text search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(note =>
+        note.isin.toLowerCase().includes(query) ||
+        (note.issuer || '').toLowerCase().includes(query) ||
+        (note.product_type || '').toLowerCase().includes(query) ||
+        (note.underlyings || []).some(u => u.ticker.toLowerCase().includes(query)) ||
+        (note.code || '').toLowerCase().includes(query)
+      );
+    }
+
+    if (issuerFilter) {
+      result = result.filter((note) => note.issuer === issuerFilter);
+    }
+
+    // Sort
+    if (sortColumn) {
+      result = [...result].sort((a, b) => {
+        const aVal = (a as any)[sortColumn];
+        const bVal = (b as any)[sortColumn];
+        if (aVal == null && bVal == null) return 0;
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+        const cmp = typeof aVal === 'string'
+          ? aVal.localeCompare(bVal as string)
+          : Number(aVal) - Number(bVal);
+        return sortDirection === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [searchQuery, notes, issuerFilter, sortColumn, sortDirection]);
+
+  // ── Cell renderer ──
+  const renderCell = (note: StructuredNote, col: ColumnDef) => {
+    // Virtual columns for Underlyings data
+    if (col.type === 'underlyings-data') {
+      if (!note.underlyings || note.underlyings.length === 0) return '-';
+
+      const parts = note.underlyings.map(u => {
+        const key = col.key as keyof Underlying;
+        let val = u[key];
+        let formatted = '-';
+        if (typeof val === 'number') {
+          if (key === 'perf') formatted = formatPercent(val);
+          else formatted = val.toFixed(2);
+        }
+        return `${u.ticker}: ${formatted}`;
+      });
+
+      return (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {parts.join(' / ')}
+        </span>
+      );
+    }
+
+    const val = (note as any)[col.key];
+
+    if (col.type === 'underlyings') {
+      if (!note.underlyings || note.underlyings.length === 0) return '-';
+      return (
+        <div className="flex flex-wrap gap-1">
+          {note.underlyings.map(u => (
+            <Badge key={u.ticker} variant="secondary" className="text-xs font-mono">
+              {u.ticker}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
+
+    if (col.type === 'link') {
+      if (!val) return '-';
+      const url = note.termsheet_url;
+      return url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {val as string} <ExternalLink className="h-3 w-3" />
+        </a>
+      ) : (
+        <span className="text-muted-foreground">{val as string}</span>
+      );
+    }
+
+    if (col.type === 'badge') {
+      return (
+        <Badge variant={val === 'Vigente' || val === 'Active' ? 'default' : 'secondary'}>
+          {val as string}
+        </Badge>
+      );
+    }
+
+    if (val == null || val === '') return '-';
+
+    switch (col.type) {
+      case 'pct':
+        return formatPercent(Number(val));
+      case 'amount':
+        return formatCurrency(Number(val));
+      case 'number':
+        return String(Number(val));
+      case 'date':
+        return String(val).split('T')[0];
+      default:
+        return String(val);
+    }
+  };
 
   // ── Expand/collapse row ──
   const toggleExpand = (isin: string) => {
@@ -484,8 +752,9 @@ const StructuredNotes = () => {
     const params = new URLSearchParams();
     if (searchQuery) params.set('q', searchQuery);
     if (selectedDate) params.set('date', selectedDate);
+    if (statusFilter) params.set('status', statusFilter);
     return params.toString();
-  }, [searchQuery, selectedDate]);
+  }, [searchQuery, selectedDate, statusFilter]);
 
   const isRefreshing = refreshStep === 'exporting' || refreshStep === 'importing';
 
@@ -493,7 +762,7 @@ const StructuredNotes = () => {
     <AppLayout title="Structured Notes" subtitle="Manage and track structured products">
       {/* Filters Row */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -520,8 +789,66 @@ const StructuredNotes = () => {
               </select>
             </div>
           )}
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-muted/50 border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="Vigente">Vigente</option>
+              <option value="Call">Call</option>
+              <option value="Vencida">Vencida</option>
+              <option value="Vendida">Vendida</option>
+              <option value="All">All Statuses</option>
+            </select>
+          </div>
+
+          {/* Issuer Filter */}
+          {uniqueIssuers.length > 0 && (
+            <select
+              value={issuerFilter}
+              onChange={(e) => setIssuerFilter(e.target.value)}
+              className="bg-muted/50 border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="">All Issuers</option>
+              {uniqueIssuers.map((iss) => (
+                <option key={iss} value={iss}>{iss}</option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Column Selector Toggle */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-border"
+              onClick={() => setShowColumnSelector(!showColumnSelector)}
+            >
+              <Columns3 className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Columns</span>
+            </Button>
+            {showColumnSelector && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg p-3 w-64 max-h-80 overflow-y-auto">
+                <div className="text-xs font-medium text-muted-foreground mb-2">Visible Columns</div>
+                {ALL_COLUMNS.map(col => (
+                  <label key={col.key} className="flex items-center gap-2 py-1 text-sm cursor-pointer hover:text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={visibleKeys.includes(col.key)}
+                      onChange={() => toggleColumn(col.key)}
+                      className="rounded border-border"
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           <SaveFilterButton
             currentPath={location.pathname}
             currentFilters={currentFilters}
@@ -552,7 +879,8 @@ const StructuredNotes = () => {
                 <div className="flex-1 min-w-0">
                   <span className="font-mono text-sm text-primary">{ma.isin}</span>
                   {ma.issuer && <span className="ml-2 text-xs text-muted-foreground">— {ma.issuer}</span>}
-                  {ma.product && <span className="ml-1 text-xs text-muted-foreground/70">({ma.product})</span>}
+                  {ma.underlyings_label && <span className="ml-2 text-xs text-muted-foreground/80">{ma.underlyings_label}</span>}
+                  {ma.product && <span className="ml-1 text-xs text-muted-foreground/70">/ {ma.product}</span>}
                 </div>
                 <Button
                   size="sm"
@@ -678,7 +1006,7 @@ const StructuredNotes = () => {
             <div className="p-8 text-center text-muted-foreground">
               {notes.length === 0
                 ? 'No structured notes data. Click Refresh to download from AIS.'
-                : 'No notes match your search.'}
+                : 'No notes match your filters.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -686,15 +1014,30 @@ const StructuredNotes = () => {
                 <thead>
                   <tr>
                     <th className="w-8"></th>
-                    <th>ISIN</th>
-                    <th>Issuer</th>
-                    <th className="text-right">Bid</th>
-                    <th className="text-right">Ask</th>
-                    <th>Underlying</th>
-                    <th className="text-right">Protection</th>
-                    <th className="text-right">Performance</th>
-                    <th>Next Coupon</th>
-                    <th>Coupon Freq</th>
+                    {visibleColumns.map(col => (
+                      <th
+                        key={col.key}
+                        className={cn(
+                          'cursor-pointer select-none whitespace-nowrap',
+                          ['number', 'pct', 'amount'].includes(col.type) && 'text-right'
+                        )}
+                        onClick={() => handleSort(col.key)}
+                      >
+                        <div className={cn(
+                          'flex items-center gap-1',
+                          ['number', 'pct', 'amount'].includes(col.type) && 'justify-end'
+                        )}>
+                          {col.label}
+                          {sortColumn === col.key ? (
+                            sortDirection === 'asc'
+                              ? <ArrowUp className="h-3 w-3" />
+                              : <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-muted-foreground/40" />
+                          )}
+                        </div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -716,37 +1059,25 @@ const StructuredNotes = () => {
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
                             )}
                           </td>
-                          <td>
-                            <span className="font-medium text-primary">{note.isin}</span>
-                          </td>
-                          <td>{note.issuer || note.issuer_pcs || '-'}</td>
-                          <td className="text-right mono">
-                            {note.bid != null ? `${(Number(note.bid) * 100).toFixed(2)}%` : '-'}
-                          </td>
-                          <td className="text-right mono">
-                            {note.ask != null ? `${(Number(note.ask) * 100).toFixed(2)}%` : '-'}
-                          </td>
-                          <td className="max-w-[250px] truncate text-muted-foreground">
-                            {note.underlyings_label || '-'}
-                          </td>
-                          <td className="text-right mono">
-                            {note.protection != null ? `${(Number(note.protection) * 100).toFixed(2)}%` : '-'}
-                          </td>
-                          <td className="text-right mono">
-                            {note.performance != null ? `${(Number(note.performance) * 100).toFixed(2)}%` : '-'}
-                          </td>
-                          <td className="text-sm text-muted-foreground">
-                            {note.next_coupon_payment_date || '-'}
-                          </td>
-                          <td className="text-sm text-muted-foreground">
-                            {note.coupon_frequency || '-'}
-                          </td>
+                          {visibleColumns.map(col => (
+                            <td
+                              key={col.key}
+                              className={cn(
+                                ['number', 'pct', 'amount'].includes(col.type) && 'text-right mono',
+                                col.key === 'isin' && 'font-medium text-primary',
+                                col.type === 'date' && 'text-sm text-muted-foreground',
+                                col.type === 'text' && col.key !== 'isin' && 'text-sm',
+                              )}
+                            >
+                              {renderCell(note, col)}
+                            </td>
+                          ))}
                         </tr>
 
                         {/* Expanded Holders Panel */}
                         {isExpanded && (
                           <tr key={`${note.isin}-holders`} className="bg-muted/20">
-                            <td colSpan={10} className="p-4">
+                            <td colSpan={visibleColumns.length + 1} className="p-4">
                               <div className="flex items-center gap-2 mb-3">
                                 <Users className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm font-medium">
@@ -790,14 +1121,14 @@ const StructuredNotes = () => {
                                             <td className="px-4 py-2 font-medium">{holder.full_name}</td>
                                             <td className="px-4 py-2 text-muted-foreground">{holder.portfolio_name}</td>
                                             <td className="px-4 py-2 text-right mono">
-                                              {formatCurrency(holder.quantity, note.currency || 'USD')}
+                                              {formatCurrency(holder.quantity, 'USD')}
                                             </td>
                                             <td className="px-4 py-2 text-right mono">
                                               {markPriceDisplay}
                                             </td>
                                             <td className="px-4 py-2 text-right mono font-medium">
                                               {currentValue != null
-                                                ? formatCurrency(currentValue, note.currency || 'USD')
+                                                ? formatCurrency(currentValue, 'USD')
                                                 : '-'}
                                             </td>
                                           </tr>

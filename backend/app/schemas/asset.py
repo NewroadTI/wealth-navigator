@@ -521,50 +521,57 @@ class StructuredNoteRead(BaseModel):
     isin: str
     upload_date: date
 
-    bid: Optional[Decimal] = None
-    ask: Optional[Decimal] = None
+    # Inception fields
+    dealer: Optional[str] = None
+    code: Optional[str] = None
+    status: Optional[str] = None
+    product_type: Optional[str] = None
+    issuer: Optional[str] = None
+    custodian: Optional[str] = None
+    advisor: Optional[str] = None
+    nominal: Optional[Decimal] = None
+    size: Optional[float] = None
 
     underlyings: Optional[List[Dict[str, Any]]] = None
-    underlyings_label: Optional[str] = None
 
-    final_fixing_date: Optional[date] = None
-    initial_fixing_date: Optional[date] = None
-    next_autocall_date: Optional[date] = None
-    next_coupon_date: Optional[date] = None
-    next_observation: Optional[date] = None
+    # Dates
+    maturity_date: Optional[date] = None
     issue_date: Optional[date] = None
-    redemption_date: Optional[date] = None
-    next_coupon_payment_date: Optional[date] = None
+    strike_date: Optional[date] = None
+    last_autocall_obs: Optional[date] = None
+    next_autocall_obs: Optional[date] = None
+    next_coupon_obs: Optional[date] = None
+    next_payment_date: Optional[date] = None
 
-    issuer_pcs: Optional[str] = None
-    reference_underlying: Optional[str] = None
-    final_client: Optional[str] = None
-    status: Optional[str] = None
-    payoff: Optional[str] = None
-    store_observations: Optional[str] = None
-    coupon_frequency: Optional[str] = None
-    callability_frequency: Optional[str] = None
-    issuer: Optional[str] = None
-    product: Optional[str] = None
-    currency: Optional[str] = None
+    # Coupon data
+    coupon_annual_pct: Optional[Decimal] = None
+    coupon_periodic_pct: Optional[Decimal] = None
+    coupon_annual_amount: Optional[Decimal] = None
+    coupon_periodic_amount: Optional[Decimal] = None
+    coupon_type: Optional[str] = None
 
-    coupon_trigger: Optional[Decimal] = None
-    capital_barrier: Optional[Decimal] = None
+    # Barriers & Triggers
+    cap_pct: Optional[Decimal] = None
+    capital_protected_pct: Optional[Decimal] = None
     autocall_trigger: Optional[Decimal] = None
-    coupon_pa: Optional[Decimal] = None
-    put_strike: Optional[Decimal] = None
-    next_autocall_trigger: Optional[Decimal] = None
-    next_autocall_value: Optional[Decimal] = None
-    ref_underlying_initial_fixing: Optional[Decimal] = None
-    ref_underlying_last_close: Optional[Decimal] = None
-    strike_level: Optional[Decimal] = None
-    dist_average: Optional[Decimal] = None
-    paid_coupons: Optional[Decimal] = None
-    size: Optional[Decimal] = None
-    coupon: Optional[Decimal] = None
-    autocall_value: Optional[Decimal] = None
-    protection: Optional[Decimal] = None
-    performance: Optional[Decimal] = None
+    step_down: Optional[Decimal] = None
+    autocall_obs_count: Optional[Decimal] = None
+    protection_barrier: Optional[Decimal] = None
+    coupon_barrier: Optional[Decimal] = None
+
+    # Observation frequency
+    observation_frequency: Optional[str] = None
+
+    # Additional fields
+    termsheet: Optional[str] = None
+    termsheet_url: Optional[str] = None
+    coupons_paid_count: Optional[Decimal] = None
+    coupons_paid_amount: Optional[Decimal] = None
+    gross_yield_pct: Optional[Decimal] = None
+
+    # AIS-only fields
+    bid: Optional[Decimal] = None
+    ask: Optional[Decimal] = None
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

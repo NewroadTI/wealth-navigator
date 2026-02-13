@@ -1,5 +1,5 @@
 import sqlalchemy
-from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Numeric, CHAR, Text, BigInteger
+from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Numeric, CHAR, Text, BigInteger, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy import event, DDL
@@ -546,8 +546,10 @@ class ETLSyncStatus(Base):
 
 class StructuredNote(Base):
     """
-    Daily snapshot of structured note data from AIS scraper.
-    Unique constraint on (isin, upload_date) enables daily upsert.
+    Structured note data with snapshot support.
+    Inception data comes from CSV (Spanish headers).
+    AIS scraper updates market data (bid/ask, dates, triggers).
+    Unique constraint on (isin, upload_date) enables daily snapshots.
     """
     __tablename__ = "structured_notes"
 
@@ -556,57 +558,60 @@ class StructuredNote(Base):
     isin = Column(String, nullable=False, index=True)
     upload_date = Column(Date, nullable=False, index=True)
 
-    # Market Data
+    # --- Inception fields (from CSV) ---
+    dealer = Column(String, nullable=True)              # Dealer (e.g. Privatam)
+    code = Column(String, nullable=True)                # Code (e.g. Privatam-001)
+    status = Column(String, nullable=True, index=True)  # Status (Active, Call, Matured)
+    product_type = Column(String, nullable=True)        # Tipo de producto
+    issuer = Column(String, nullable=True)              # Emisor
+    custodian = Column(String, nullable=True)           # Custodio
+    advisor = Column(String, nullable=True)             # Asesor
+    nominal = Column(Numeric, nullable=True)            # Nominal (float)
+    size = Column(Float, nullable=True)                 # Size from AIS export
+
+    # Underlyings: [{ticker, strike, spot, perf}, ...]
+    underlyings = Column(JSONB, nullable=True)
+
+    # --- Dates ---
+    maturity_date = Column(Date, nullable=True)         # Vencimiento
+    issue_date = Column(Date, nullable=True)            # Fecha de emision
+    strike_date = Column(Date, nullable=True)           # Fecha de Strike
+    last_autocall_obs = Column(Date, nullable=True)     # Ult. Obs. Autocall
+    next_autocall_obs = Column(Date, nullable=True)     # Sgt. Obs. Autocall
+    next_coupon_obs = Column(Date, nullable=True)       # Sgt Obs Cupon
+    next_payment_date = Column(Date, nullable=True)     # Sgt. Fecha de Pago
+
+    # --- Coupon data ---
+    coupon_annual_pct = Column(Numeric, nullable=True)      # Cupon Anual (%)
+    coupon_periodic_pct = Column(Numeric, nullable=True)    # Cupon Tri/Men (%)
+    coupon_annual_amount = Column(Numeric, nullable=True)   # Cupon Anual ($)
+    coupon_periodic_amount = Column(Numeric, nullable=True) # Cupon Tri/Men ($)
+    coupon_type = Column(String, nullable=True)             # Tipo de cupon (Garantizado, Memoria)
+
+    # --- Barriers & Triggers ---
+    cap_pct = Column(Numeric, nullable=True)                # %Cap
+    capital_protected_pct = Column(Numeric, nullable=True)  # %Capital Protegido
+    autocall_trigger = Column(Numeric, nullable=True)       # Autocall Trigger
+    step_down = Column(Numeric, nullable=True)              # Step Down
+    autocall_obs_count = Column(Numeric, nullable=True)     # # Obs autocall
+    protection_barrier = Column(Numeric, nullable=True)     # Barrera de Proteccion
+    coupon_barrier = Column(Numeric, nullable=True)         # Barrera Cupon
+
+    # --- Observation frequency (same concept as coupon_frequency) ---
+    observation_frequency = Column(String, nullable=True)   # Frecuencia de Obs (Trimestral, etc.)
+
+    # --- Additional fields ---
+    termsheet = Column(String, nullable=True)               # Termsheet (link/label)
+    termsheet_url = Column(String, nullable=True)           # Termsheet URL (clickable link)
+    coupons_paid_count = Column(Numeric, nullable=True)     # # cupones entregados
+    coupons_paid_amount = Column(Numeric, nullable=True)    # Cupones entregados ($)
+    gross_yield_pct = Column(Numeric, nullable=True)        # Yield Bruto(%)
+
+    # --- AIS-only fields (updated by scraper) ---
     bid = Column(Numeric, nullable=True)
     ask = Column(Numeric, nullable=True)
 
-    # Underlyings (dynamic JSONB array)
-    underlyings = Column(JSONB, nullable=True)
-    underlyings_label = Column(String, nullable=True)
-
-    # Dates
-    final_fixing_date = Column(Date, nullable=True)
-    initial_fixing_date = Column(Date, nullable=True)
-    next_autocall_date = Column(Date, nullable=True)
-    next_coupon_date = Column(Date, nullable=True)
-    next_observation = Column(Date, nullable=True)
-    issue_date = Column(Date, nullable=True)
-    redemption_date = Column(Date, nullable=True)
-    next_coupon_payment_date = Column(Date, nullable=True)
-
-    # Identifiers & Labels
-    issuer_pcs = Column(String, nullable=True)
-    reference_underlying = Column(String, nullable=True)
-    final_client = Column(String, nullable=True)
-    status = Column(String, nullable=True)
-    payoff = Column(String, nullable=True)
-    store_observations = Column(String, nullable=True)
-    coupon_frequency = Column(String, nullable=True)
-    callability_frequency = Column(String, nullable=True)
-    issuer = Column(String, nullable=True)
-    product = Column(String, nullable=True)
-    currency = Column(String(3), nullable=True)
-
-    # Numeric Values (percentages stored as decimals)
-    coupon_trigger = Column(Numeric, nullable=True)
-    capital_barrier = Column(Numeric, nullable=True)
-    autocall_trigger = Column(Numeric, nullable=True)
-    coupon_pa = Column(Numeric, nullable=True)
-    put_strike = Column(Numeric, nullable=True)
-    next_autocall_trigger = Column(Numeric, nullable=True)
-    next_autocall_value = Column(Numeric, nullable=True)
-    ref_underlying_initial_fixing = Column(Numeric, nullable=True)
-    ref_underlying_last_close = Column(Numeric, nullable=True)
-    strike_level = Column(Numeric, nullable=True)
-    dist_average = Column(Numeric, nullable=True)
-    paid_coupons = Column(Numeric, nullable=True)
-    size = Column(Numeric, nullable=True)
-    coupon = Column(Numeric, nullable=True)
-    autocall_value = Column(Numeric, nullable=True)
-    protection = Column(Numeric, nullable=True)
-    performance = Column(Numeric, nullable=True)
-
-    # Timestamps
+    # --- Timestamps ---
     created_at = Column(DateTime, nullable=True, server_default=func.now())
     updated_at = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now())
 
