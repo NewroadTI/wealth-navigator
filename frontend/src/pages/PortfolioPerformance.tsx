@@ -162,15 +162,26 @@ const PortfolioPerformance = () => {
           const twrData = await twrRes.json();
           setTwrSummary(twrData);
 
-          // Fetch positions and check if report_date matches last_date
-          if (twrData.last_date) {
-            const posRes = await fetch(
-              `${apiBaseUrl}/api/v1/analytics/positions-report?portfolio_id=${id}&report_date=${twrData.last_date}`
-            );
-            if (posRes.ok) {
-              const posData = await posRes.json();
-              setRealPositions(posData);
-              setPositionsReportDate(twrData.last_date);
+          // Get available positions dates
+          const datesRes = await fetch(`${apiBaseUrl}/api/v1/analytics/filter-options`);
+          if (datesRes.ok) {
+            const datesData = await datesRes.json();
+            const availableDates = datesData.available_dates || [];
+            
+            if (availableDates.length > 0) {
+              // Use the most recent available date
+              const latestDate = availableDates[0]; // Already sorted desc
+              
+              const posRes = await fetch(
+                `${apiBaseUrl}/api/v1/analytics/positions-report?portfolio_id=${id}&report_date=${latestDate}`
+              );
+              if (posRes.ok) {
+                const posData = await posRes.json();
+                if (posData && posData.length > 0) {
+                  setRealPositions(posData);
+                  setPositionsReportDate(latestDate);
+                }
+              }
             }
           }
         }
@@ -181,10 +192,8 @@ const PortfolioPerformance = () => {
     loadSummaryAndPositions();
   }, [id, apiBaseUrl]);
 
-  // Calculate positions count (only if dates match)
-  const positionsCount = twrSummary?.last_date && positionsReportDate === twrSummary.last_date 
-    ? realPositions.length 
-    : null;
+  // Calculate positions count (only show if we have data)
+  const positionsCount = realPositions.length > 0 ? realPositions.length : null;
 
   const isPositive = (twrSummary?.day_change ?? 0) >= 0;
 
