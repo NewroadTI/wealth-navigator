@@ -53,6 +53,7 @@ const Portfolios = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<'lastUpdate' | 'totalValue' | 'lastTwr' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'IBKR' | 'Pershing' | 'both'>('all');
   const { toast } = useToast();
 
   // API data states
@@ -245,6 +246,15 @@ const Portfolios = () => {
     }
   };
 
+  // Helper to get unique institutions for a portfolio
+  const getPortfolioSources = (portfolio: PortfolioApi): string[] => {
+    const institutions = new Set<string>();
+    (portfolio.accounts || []).forEach((acc: any) => {
+      if (acc.institution) institutions.add(acc.institution);
+    });
+    return Array.from(institutions);
+  };
+
   // Filter and sort portfolios
   const filteredPortfolios = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -255,6 +265,17 @@ const Portfolios = () => {
         p.name.toLowerCase().includes(query) ||
         p.interface_code.toLowerCase().includes(query)
       );
+    }
+
+    // Apply source filter
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(p => {
+        const sources = getPortfolioSources(p);
+        if (sourceFilter === 'both') return sources.includes('IBKR') && sources.includes('Pershing');
+        if (sourceFilter === 'IBKR') return sources.includes('IBKR');
+        if (sourceFilter === 'Pershing') return sources.includes('Pershing');
+        return true;
+      });
     }
 
     // Apply sorting
@@ -284,7 +305,7 @@ const Portfolios = () => {
     }
 
     return filtered;
-  }, [portfolios, searchQuery, sortColumn, sortDirection, twrSummaryMap]);
+  }, [portfolios, searchQuery, sortColumn, sortDirection, twrSummaryMap, sourceFilter]);
 
   // Handle sort column click
   const handleSort = (column: 'lastUpdate' | 'totalValue' | 'lastTwr') => {
@@ -341,6 +362,18 @@ const Portfolios = () => {
           <Button variant="outline" size="icon" className="border-border">
             <Filter className="h-4 w-4" />
           </Button>
+          {/* Source Filter */}
+          <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as any)}>
+            <SelectTrigger className="w-[130px] bg-muted/50 border-border text-sm">
+              <SelectValue placeholder="Source" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sources</SelectItem>
+              <SelectItem value="IBKR">IBKR</SelectItem>
+              <SelectItem value="Pershing">Pershing</SelectItem>
+              <SelectItem value="both">Both</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-3">
           {/* View Toggle */}
@@ -540,6 +573,7 @@ const Portfolios = () => {
             const twrPct = twrSummary?.last_twr_pct ?? null;
             const lastDate = twrSummary?.last_date;
             const isDayPositive = dayChange >= 0;
+            const sources = getPortfolioSources(portfolio);
 
             return (
               <Link
@@ -554,9 +588,15 @@ const Portfolios = () => {
                       <h3 className="font-semibold text-foreground">{portfolio.name}</h3>
                       <p className="text-xs text-muted-foreground">{portfolio.interface_code}</p>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {investorType}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      {sources.map(src => (
+                        <span key={src} className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          src === 'IBKR' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                        }`}>
+                          {src}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Value and Day Change */}
@@ -631,9 +671,10 @@ const Portfolios = () => {
           <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-muted/30 border-b border-border text-sm font-medium text-muted-foreground">
             <div className="col-span-3">Portfolio</div>
             <div className="col-span-2">Investor</div>
+            <div className="col-span-1 text-center">Source</div>
             <button 
               onClick={() => handleSort('lastUpdate')} 
-              className="col-span-2 flex items-center hover:text-foreground transition-colors cursor-pointer"
+              className="col-span-1 flex items-center hover:text-foreground transition-colors cursor-pointer"
             >
               Last Update
               {getSortIcon('lastUpdate')}
@@ -661,6 +702,7 @@ const Portfolios = () => {
             const twrSummary = twrSummaryMap.get(portfolio.portfolio_id);
             const totalNav = twrSummary?.total_nav ?? 0;
             const twrPct = twrSummary?.last_twr_pct ?? null;
+            const sources = getPortfolioSources(portfolio);
             return (
               <Link
                 key={portfolio.portfolio_id}
@@ -674,7 +716,16 @@ const Portfolios = () => {
                 <div className="col-span-2">
                   <p className="text-sm text-foreground">{getInvestorName(portfolio.owner_user_id)}</p>
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 flex items-center justify-center gap-1">
+                  {sources.map(src => (
+                    <span key={src} className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      src === 'IBKR' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                    }`}>
+                      {src}
+                    </span>
+                  ))}
+                </div>
+                <div className="col-span-1">
                   <span className="text-sm text-muted-foreground">
                     {twrSummary?.last_date ? new Date(twrSummary.last_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
                   </span>

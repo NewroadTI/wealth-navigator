@@ -471,50 +471,73 @@ const PortfolioDetail = () => {
     return map;
   }, [twrSummary]);
 
-  // Load available report dates and set the latest one
+  // Load available report dates and positions from last 2 days (IBKR + Pershing)
   useEffect(() => {
-    const loadFilterOptions = async () => {
+    const loadFilterOptionsAndPositions = async () => {
+      if (!portfolio) return;
+      
       try {
         const response = await fetch(`${apiBaseUrl}/api/v1/analytics/filter-options`);
         if (!response.ok) return;
         const data = await response.json();
+        
         if (data.available_dates && data.available_dates.length > 0) {
-          // Set the latest date as default
-          setReportDate(data.available_dates[0]);
+          // Take the last 2 available dates (for IBKR yesterday + Pershing today)
+          const dates = data.available_dates.slice(0, 2);
+          
+          setPositionsLoading(true);
+          const allPositions: any[] = [];
+          let latestDateWithData: string | null = null;
+          
+          // Load positions from both dates and combine them
+          for (const date of dates) {
+            try {
+              const params = new URLSearchParams({
+                report_date: date,
+                portfolio_id: portfolio.portfolio_id.toString(),
+              });
+
+              const posRes = await fetch(`${apiBaseUrl}/api/v1/analytics/positions-report?${params}`);
+              if (posRes.ok) {
+                const posData = await posRes.json();
+                if (posData && posData.length > 0) {
+                  // Add report_date to each position and combine
+                  const positionsWithDate = posData.map((pos: any) => ({
+                    ...pos,
+                    report_date: date
+                  }));
+                  allPositions.push(...positionsWithDate);
+                  
+                  // Track the latest date that has data
+                  if (!latestDateWithData) {
+                    latestDateWithData = date;
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(`Error loading positions for ${date}:`, err);
+            }
+          }
+          
+          // Set combined positions and latest date
+          if (allPositions.length > 0) {
+            setPortfolioPositions(allPositions);
+            setReportDate(latestDateWithData || dates[0]);
+          } else if (dates.length > 0) {
+            // No positions found in any date
+            setReportDate(dates[0]);
+            setPortfolioPositions([]);
+          }
+          
+          setPositionsLoading(false);
         }
       } catch (err) {
         console.error('Error loading filter options:', err);
-      }
-    };
-    loadFilterOptions();
-  }, [apiBaseUrl]);
-
-  // Load positions for this portfolio
-  useEffect(() => {
-    if (!portfolio || !reportDate) return;
-
-    const loadPositions = async () => {
-      setPositionsLoading(true);
-      try {
-        const params = new URLSearchParams({
-          report_date: reportDate,
-          portfolio_id: portfolio.portfolio_id.toString(),
-        });
-
-        const response = await fetch(`${apiBaseUrl}/api/v1/analytics/positions-report?${params}`);
-        if (!response.ok) throw new Error('Failed to load positions');
-        const data = await response.json();
-        setPortfolioPositions(data);
-      } catch (err) {
-        console.error('Error loading positions:', err);
-        setPortfolioPositions([]);
-      } finally {
         setPositionsLoading(false);
       }
     };
-
-    loadPositions();
-  }, [portfolio, reportDate, apiBaseUrl]);
+    loadFilterOptionsAndPositions();
+  }, [portfolio, apiBaseUrl]);
 
   // Create a map of account_id -> balance for quick lookups
   const accountBalanceMap = useMemo(() => {
@@ -953,8 +976,8 @@ const PortfolioDetail = () => {
                     </div>
                     <div className="flex justify-between items-baseline">
                       <span className="text-[10px] text-muted-foreground">TWR:</span>
-                      <span className={cn('text-xs font-mono font-medium', getChangeColor(account.twr_pct))}>
-                        {account.twr_pct >= 0 ? '+' : ''}{account.twr_pct.toFixed(2)}%
+                      <span className={cn('text-xs font-mono font-medium', getChangeColor(account.twr_pct ?? 0))}>
+                        {account.twr_pct != null ? `${account.twr_pct >= 0 ? '+' : ''}${account.twr_pct.toFixed(2)}%` : 'N/A'}
                       </span>
                     </div>
                     <div className="flex justify-between items-baseline pt-1 border-t border-border/50">
@@ -1154,6 +1177,7 @@ const PortfolioDetail = () => {
                     <thead>
                       <tr className="bg-muted/30 border-b border-border">
                         <th className="text-left p-3">Symbol</th>
+                        <th className="text-center p-3">Source</th>
                         <th className="text-right p-3">Quantity</th>
                         <th className="text-right p-3">Avg Cost</th>
                         <th className="text-right p-3">Market Price</th>
@@ -1168,9 +1192,23 @@ const PortfolioDetail = () => {
                         const pnlClass = position.total_pnl_unrealized > 0 ? 'text-gain' : position.total_pnl_unrealized < 0 ? 'text-loss' : 'text-muted-foreground';
                         const percentOfNav = position.percent_of_nav || 0;
                         
+                        // Determine source from institutions field
+                        const institutions: string[] = (position.institutions || []).map((inst: any) => inst.institution);
+                        const uniqueInstitutions = [...new Set(institutions)];
+                        const source = uniqueInstitutions.length > 0 ? uniqueInstitutions.join('/') : 'Unknown';
+                        
                         return (
-                          <tr key={position.asset_id} className="border-b border-border hover:bg-muted/20">
+                          <tr key={`${position.asset_id}-${position.report_date || reportDate}`} className="border-b border-border hover:bg-muted/20">
                             <td className="p-3 font-medium">{position.asset_symbol}</td>
+                            <td className="p-3 text-center">
+                              {uniqueInstitutions.map((inst: string) => (
+                                <span key={inst} className={`px-2 py-0.5 rounded text-xs font-medium mr-1 ${
+                                  inst === 'IBKR' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                                }`}>
+                                  {inst}
+                                </span>
+                              ))}
+                            </td>
                             <td className="p-3 text-right font-mono">{position.total_quantity.toFixed(2)}</td>
                             <td className="p-3 text-right font-mono">${position.avg_cost_price.toFixed(2)}</td>
                             <td className="p-3 text-right font-mono">${position.current_mark_price.toFixed(2)}</td>
@@ -1182,7 +1220,7 @@ const PortfolioDetail = () => {
                               {percentOfNav.toFixed(2)}%
                             </td>
                             <td className="p-3 text-center text-muted-foreground">
-                              {reportDate}
+                              {position.report_date || reportDate}
                             </td>
                           </tr>
                         );
