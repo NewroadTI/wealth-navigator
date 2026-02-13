@@ -67,8 +67,11 @@ interface ETLJobDetails {
     }>;
     failed_records: Array<{
         row_index?: number;
-        row_data: Record<string, any>;
-        error: string;
+        row_data?: Record<string, any>;
+        reason: string;
+        account_code?: string;
+        date?: string;
+        [key: string]: any;
     }>;
     missing_assets: Array<{
         symbol: string;
@@ -147,8 +150,11 @@ const RecordDetailsCard = ({
     const jsonBorder = 'border-slate-800';
     const jsonText = 'text-slate-300';
 
-    const reason = isSkipped ? record.reason : record.error;
+    const reason = record.reason;
     const rowIndex = record.row_index !== undefined ? record.row_index : index;
+    
+    // Clean up account_code: remove _USD suffix for display
+    const accountCode = record.account_code?.replace(/_USD$/, '');
 
     // Enhanced details for better error context
     const clientName = record.client_name || record.row_data?.cliente || record.row_data?.client_name;
@@ -175,11 +181,13 @@ const RecordDetailsCard = ({
                         <p className={`text-xs mt-1 truncate ${reasonColor}`}>
                             {reason}
                         </p>
-                        {/* New: Display Client Name or Asset Description in the header summary if available */}
-                        {(clientName || assetDesc) && (
+                        {/* New: Display Client Name, Asset Description, or Account Code in the header summary if available */}
+                        {(clientName || assetDesc || accountCode || record.date) && (
                             <div className="flex flex-wrap gap-2 mt-1">
                                 {clientName && <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">Client: {clientName}</span>}
                                 {assetDesc && <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">Asset: {assetDesc}</span>}
+                                {accountCode && <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">Account: {accountCode}</span>}
+                                {record.date && <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">Date: {record.date}</span>}
                             </div>
                         )}
                     </div>
@@ -193,23 +201,34 @@ const RecordDetailsCard = ({
                         </h4>
                         <div className={`p-3 rounded border ${contentBg} space-y-2`}>
                             <p className="text-sm font-medium">{reason}</p>
-                            {(clientName || assetDesc) && (
-                                <div className="text-xs space-y-1 pt-2 border-t border-amber-900/30">
-                                    {clientName && <div className="flex gap-2"><span className="text-amber-500/70 w-20">Client:</span> <span className="text-amber-100">{clientName}</span></div>}
-                                    {assetDesc && <div className="flex gap-2"><span className="text-amber-500/70 w-20">Asset:</span> <span className="text-amber-100">{assetDesc}</span></div>}
+                            {(clientName || assetDesc || accountCode || record.date) && (
+                                <div className={`text-xs space-y-1 pt-2 border-t ${isSkipped ? 'border-amber-900/30' : 'border-red-900/30'}`}>
+                                    {clientName && <div className="flex gap-2"><span className={`${isSkipped ? 'text-amber-500/70' : 'text-red-500/70'} w-20`}>Client:</span> <span className={`${isSkipped ? 'text-amber-100' : 'text-red-100'}`}>{clientName}</span></div>}
+                                    {assetDesc && <div className="flex gap-2"><span className={`${isSkipped ? 'text-amber-500/70' : 'text-red-500/70'} w-20`}>Asset:</span> <span className={`${isSkipped ? 'text-amber-100' : 'text-red-100'}`}>{assetDesc}</span></div>}
+                                    {accountCode && <div className="flex gap-2"><span className={`${isSkipped ? 'text-amber-500/70' : 'text-red-500/70'} w-20`}>Account:</span> <span className={`${isSkipped ? 'text-amber-100' : 'text-red-100'}`}>{accountCode}</span></div>}
+                                    {record.date && <div className="flex gap-2"><span className={`${isSkipped ? 'text-amber-500/70' : 'text-red-500/70'} w-20`}>Date:</span> <span className={`${isSkipped ? 'text-amber-100' : 'text-red-100'}`}>{record.date}</span></div>}
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div>
-                        <h4 className="text-xs font-semibold mb-2 uppercase tracking-wider text-slate-400">Record Data</h4>
-                        <div className={`p-3 rounded border ${jsonBg} ${jsonBorder} max-h-96 overflow-auto`}>
-                            <pre className={`text-xs font-mono whitespace-pre-wrap break-all ${jsonText}`}>
-                                {JSON.stringify(record.row_data, null, 2)}
-                            </pre>
+                    {(record.row_data || accountCode || record.date) && (
+                        <div>
+                            <h4 className="text-xs font-semibold mb-2 uppercase tracking-wider text-slate-400">Record Data</h4>
+                            <div className={`p-3 rounded border ${jsonBg} ${jsonBorder} max-h-96 overflow-auto`}>
+                                {record.row_data ? (
+                                    <pre className={`text-xs font-mono whitespace-pre-wrap break-all ${jsonText}`}>
+                                        {JSON.stringify(record.row_data, null, 2)}
+                                    </pre>
+                                ) : (
+                                    <div className="text-xs space-y-1">
+                                        {accountCode && <div className="flex gap-2"><span className="text-slate-500 w-24">Account:</span> <span className="text-slate-300">{accountCode}</span></div>}
+                                        {record.date && <div className="flex gap-2"><span className="text-slate-500 w-24">Date:</span> <span className="text-slate-300">{record.date}</span></div>}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </AccordionContent>
         </AccordionItem>
@@ -460,6 +479,9 @@ const MissingAccountCard = ({
     const apiBaseUrl = getApiBaseUrl();
     const { toast } = useToast();
 
+    // Clean account_code for display (remove _USD suffix)
+    const displayAccountCode = account.account_code?.replace(/_USD$/, '');
+
     // Sync isDone with prop when data refreshes
     useEffect(() => {
         setIsDone(account.done || false);
@@ -606,7 +628,7 @@ const MissingAccountCard = ({
                 <CardContent className="pt-4 pb-3">
                     <div className="flex justify-between items-center">
                         <div>
-                            <p className="font-semibold text-green-400">{account.account_code}</p>
+                            <p className="font-semibold text-green-400">{displayAccountCode}</p>
                             <p className="text-xs text-gray-400">{account.reason}</p>
                         </div>
                         <Badge className="bg-green-600 text-white border-green-500">
@@ -625,7 +647,7 @@ const MissingAccountCard = ({
                 <div className="space-y-2">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="font-semibold text-blue-400">{account.account_code}</p>
+                            <p className="font-semibold text-blue-400">{displayAccountCode}</p>
                             <p className="text-xs text-gray-400">{account.reason}</p>
                             {parsedName && (
                                 <p className="text-xs text-gray-500 mt-1">
@@ -655,7 +677,7 @@ const MissingAccountCard = ({
                                 </div>
                             ) : showCreateForm ? (
                                 <CreateInvestorForm
-                                    initialName={parsedName || account.account_code}
+                                    initialName={parsedName || displayAccountCode}
                                     accountCode={account.account_code}
                                     onSuccess={handleFormSuccess}
                                     onCancel={() => setShowCreateForm(false)}

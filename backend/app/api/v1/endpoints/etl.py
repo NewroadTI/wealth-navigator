@@ -650,6 +650,22 @@ def _run_single_etl_job(job_id: int, report_type: str):
                 "failed_records": result.get("failed_records", []),
             }
         
+        elif report_type == "NLV_HISTORY":
+            from app.jobs.processors.nlv_history import NLVHistoryProcessor
+            from app.jobs.api_client import get_api_client
+
+            api_client = get_api_client()
+            processor = NLVHistoryProcessor(api_client=api_client)
+            result = processor.process_file(file_path)
+
+            # Normalise keys so the generic job-log update below works
+            result.setdefault("status", "success")
+            result.setdefault("records_processed", result.get("records_processed", 0))
+            result.setdefault("records_created", result.get("records_created", 0))
+            result.setdefault("records_updated", result.get("records_updated", 0))
+            result.setdefault("records_skipped", result.get("records_skipped", 0))
+            result.setdefault("records_failed", result.get("records_failed", 0))
+
         # TODO: Add other report type processors here
         else:
             logger.warning(f"No processor implemented for {report_type}")
@@ -687,15 +703,16 @@ def _run_single_etl_job(job_id: int, report_type: str):
         else:
             job.created_assets = None # Clear if not present
         
-        # Store missing assets/accounts in extra_data for frontend to display
+        # Store missing assets/accounts/records in extra_data for frontend to display
         extra_data = {}
         if result.get("missing_assets"):
             extra_data["missing_assets"] = result.get("missing_assets")
         if result.get("missing_accounts"):
             extra_data["missing_accounts"] = result.get("missing_accounts")
-        if result.get("skipped_records"):
+        # Always store skipped/failed records if key exists (even if empty array)
+        if "skipped_records" in result:
             extra_data["skipped_records"] = result.get("skipped_records", [])
-        if result.get("failed_records"):
+        if "failed_records" in result:
             extra_data["failed_records"] = result.get("failed_records", [])
         if extra_data:
             job.extra_data = extra_data
@@ -705,10 +722,28 @@ def _run_single_etl_job(job_id: int, report_type: str):
         if job.started_at and job.completed_at:
             job.execution_time_seconds = Decimal(str((job.completed_at - job.started_at).total_seconds()))
         
+        # Log result arrays for debugging
+        logger.info(
+            f"ETL result arrays — "
+            f"skipped_records: {len(result.get('skipped_records', []))}, "
+            f"failed_records: {len(result.get('failed_records', []))}, "
+            f"errors: {len(result.get('errors', []))}"
+        )
+        
         db.commit()
         db.refresh(job)
         
         logger.info(f"ETL job {job_id} completed: {result}")
+        
+        # 4. Clean up CSV file after successful processing (to save disk space)
+        from app.jobs.config import AUTO_DELETE_PROCESSED_CSV
+        if AUTO_DELETE_PROCESSED_CSV and job.status == "success" and file_path and file_path.exists():
+            try:
+                file_path.unlink()  # Delete the CSV file
+                logger.info(f"✅ Cleaned up CSV file: {file_path.name}")
+            except Exception as e:
+                logger.warning(f"Failed to delete CSV file {file_path.name}: {e}")
+                # Don't fail the job if cleanup fails
         
     except Exception as e:
         import traceback

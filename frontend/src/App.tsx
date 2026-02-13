@@ -27,6 +27,7 @@ import StructuredNotes from "./pages/StructuredNotes";
 import IBKRDashboard from "./pages/IBKRDashboard";
 import PershingDashboard from "./pages/PershingDashboard";
 import ETLJobDetails from "./pages/ETLJobDetails";
+import PerformanceConfiguration from "./pages/PerformanceConfiguration.tsx";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
                 <Route path="/portfolios/:id" element={<ProtectedRoute><PortfolioDetail /></ProtectedRoute>} />
                 <Route path="/portfolios/:portfolioId/accounts/:accountId" element={<ProtectedRoute><PortfolioAccounts /></ProtectedRoute>} />
                 <Route path="/portfolios/:id/performance" element={<ProtectedRoute><PortfolioPerformance /></ProtectedRoute>} />
+                <Route path="/portfolios/:id/performance-configuration" element={<ProtectedRoute><PerformanceConfiguration /></ProtectedRoute>} />
                 <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
                 <Route path="/structured-notes" element={<ProtectedRoute><StructuredNotes /></ProtectedRoute>} />
                 <Route path="/positions" element={<ProtectedRoute><Positions /></ProtectedRoute>} />
