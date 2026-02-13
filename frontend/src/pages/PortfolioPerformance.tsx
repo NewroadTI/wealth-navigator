@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { portfolios, positions, performanceData } from '@/lib/mockData';
+import { portfolios, positions } from '@/lib/mockData';
 import { formatCurrency, formatPercent, getChangeColor } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,8 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getApiBaseUrl } from '@/lib/config';
 import {
-  ArrowUpRight,
-  ArrowDownRight,
   ArrowLeft,
   TrendingUp,
   TrendingDown,
@@ -76,6 +74,18 @@ interface TWRSeriesPoint {
   nav: number;
 }
 
+interface TWRChartPoint {
+  date: string;
+  twr: number;
+  nav: number;
+  benchmark?: number;
+}
+
+interface BenchmarkPoint {
+  date: string;
+  benchmark: number;
+}
+
 interface TWRStatusResponse {
   is_synced: boolean;
   last_complete_date: string | null;
@@ -98,16 +108,38 @@ interface USDAccount {
 interface AccountTWRData {
   account: USDAccount;
   series: TWRSeriesPoint[];
+  benchmarkSeries: BenchmarkPoint[];
+  chartData: TWRChartPoint[];
+}
+
+interface TWRAccountSummary {
+  account_id: number;
+  account_code: string;
+  nav: number;
+  last_date: string | null;
+  day_change: number;
+  twr_pct: number;
+  cutoff_date: string | null;
+}
+
+interface TWRPortfolioSummary {
+  portfolio_id: number;
+  total_nav: number;
+  last_date: string | null;
+  day_change: number;
+  last_twr_pct: number;
+  accounts: TWRAccountSummary[];
 }
 
 const PortfolioPerformance = () => {
   const { id } = useParams();
   const apiBaseUrl = getApiBaseUrl();
   const portfolio = portfolios.find((p) => p.id === id) || portfolios[0];
-  const portfolioPositions = positions.filter((p) => p.portfolioId === portfolio.id);
-  const isPositive = portfolio.dayChange >= 0;
 
   // API Data States
+  const [twrSummary, setTwrSummary] = useState<TWRPortfolioSummary | null>(null);
+  const [realPositions, setRealPositions] = useState<any[]>([]);
+  const [positionsReportDate, setPositionsReportDate] = useState<string | null>(null);
   const [topMovers, setTopMovers] = useState<TopMoversResponse | null>(null);
   const [assetAllocation, setAssetAllocation] = useState<AllocationResponse | null>(null);
   const [sectorAllocation, setSectorAllocation] = useState<AllocationResponse | null>(null);
@@ -118,6 +150,43 @@ const PortfolioPerformance = () => {
   const [accountsTWR, setAccountsTWR] = useState<AccountTWRData[]>([]);
   const [twrStatus, setTwrStatus] = useState<TWRStatusResponse | null>(null);
   const [twrLoading, setTwrLoading] = useState(true);
+
+  // Load TWR summary and positions
+  useEffect(() => {
+    const loadSummaryAndPositions = async () => {
+      if (!id) return;
+      try {
+        // Fetch TWR summary
+        const twrRes = await fetch(`${apiBaseUrl}/api/v1/twr/portfolio/${id}/summary`);
+        if (twrRes.ok) {
+          const twrData = await twrRes.json();
+          setTwrSummary(twrData);
+
+          // Fetch positions and check if report_date matches last_date
+          if (twrData.last_date) {
+            const posRes = await fetch(
+              `${apiBaseUrl}/api/v1/analytics/positions-report?portfolio_id=${id}&report_date=${twrData.last_date}`
+            );
+            if (posRes.ok) {
+              const posData = await posRes.json();
+              setRealPositions(posData);
+              setPositionsReportDate(twrData.last_date);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading TWR summary and positions:', error);
+      }
+    };
+    loadSummaryAndPositions();
+  }, [id, apiBaseUrl]);
+
+  // Calculate positions count (only if dates match)
+  const positionsCount = twrSummary?.last_date && positionsReportDate === twrSummary.last_date 
+    ? realPositions.length 
+    : null;
+
+  const isPositive = (twrSummary?.day_change ?? 0) >= 0;
 
   // Load performance data
   useEffect(() => {
@@ -182,24 +251,40 @@ const PortfolioPerformance = () => {
           const accountsData = await accountsRes.json();
           const accounts: USDAccount[] = accountsData.accounts || [];
 
-          // Fetch series for each account
+          // Fetch series + benchmark for each account
           const accountsWithSeries = await Promise.all(
             accounts.map(async (account) => {
+              let series: TWRSeriesPoint[] = [];
+              let benchmarkSeries: BenchmarkPoint[] = [];
               try {
-                const seriesRes = await fetch(`${apiBaseUrl}/api/v1/twr/account/${account.account_id}/series`);
+                const [seriesRes, benchmarkRes] = await Promise.all([
+                  fetch(`${apiBaseUrl}/api/v1/twr/account/${account.account_id}/series`),
+                  fetch(`${apiBaseUrl}/api/v1/twr/account/${account.account_id}/benchmark`),
+                ]);
                 if (seriesRes.ok) {
                   const seriesData = await seriesRes.json();
-                  return {
-                    account,
-                    series: seriesData.data || [],
-                  };
+                  series = seriesData.data || [];
+                }
+                if (benchmarkRes.ok) {
+                  const benchmarkData = await benchmarkRes.json();
+                  benchmarkSeries = benchmarkData.data || [];
                 }
               } catch (error) {
-                console.error(`Error loading TWR for account ${account.account_code}:`, error);
+                console.error(`Error loading TWR/benchmark for account ${account.account_code}:`, error);
               }
+
+              // Merge benchmark into TWR series for chart
+              const benchmarkMap = new Map(benchmarkSeries.map(b => [b.date, b.benchmark]));
+              const chartData: TWRChartPoint[] = series.map(point => ({
+                ...point,
+                benchmark: benchmarkMap.get(point.date),
+              }));
+
               return {
                 account,
-                series: [],
+                series,
+                benchmarkSeries,
+                chartData,
               };
             })
           );
@@ -397,102 +482,43 @@ const PortfolioPerformance = () => {
           <div>
             <p className="text-xs md:text-sm text-muted-foreground mb-1">Total Value</p>
             <p className="text-lg md:text-2xl font-bold mono text-foreground">
-              {formatCurrency(portfolio.totalValue)}
+              {formatCurrency(twrSummary?.total_nav ?? 0)}
             </p>
+            {twrSummary?.last_date && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                as of {new Date(twrSummary.last_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xs md:text-sm text-muted-foreground mb-1">Day Change</p>
-            <div className="flex items-center gap-1.5">
-              {isPositive ? (
-                <ArrowUpRight className="h-4 w-4 md:h-5 md:w-5 text-gain" />
-              ) : (
-                <ArrowDownRight className="h-4 w-4 md:h-5 md:w-5 text-loss" />
-              )}
-              <div>
-                <p className={cn('text-sm md:text-lg font-semibold mono', getChangeColor(portfolio.dayChange))}>
-                  {isPositive ? '+' : ''}{formatCurrency(portfolio.dayChange)}
-                </p>
-                <p className={cn('text-xs mono', getChangeColor(portfolio.dayChangePercent))}>
-                  ({isPositive ? '+' : ''}{formatPercent(portfolio.dayChangePercent)})
-                </p>
-              </div>
+            <div>
+              <p className={cn('text-sm md:text-lg font-semibold mono', getChangeColor(twrSummary?.day_change ?? 0))}>
+                {(twrSummary?.day_change ?? 0) >= 0 ? '+' : ''}{formatCurrency(twrSummary?.day_change ?? 0)}
+              </p>
             </div>
           </div>
           <div>
-            <p className="text-xs md:text-sm text-muted-foreground mb-1">YTD Return</p>
-            <p className={cn('text-lg md:text-2xl font-bold mono', getChangeColor(portfolio.ytdReturn))}>
-              {portfolio.ytdReturn > 0 ? '+' : ''}{formatPercent(portfolio.ytdReturn)}
-            </p>
+            <p className="text-xs md:text-sm text-muted-foreground mb-1">Last TWR</p>
+            {twrSummary?.last_twr_pct != null ? (
+              <p className={cn('text-lg md:text-2xl font-bold mono', getChangeColor(twrSummary.last_twr_pct))}>
+                {twrSummary.last_twr_pct >= 0 ? '+' : ''}{twrSummary.last_twr_pct.toFixed(2)}%
+              </p>
+            ) : (
+              <p className="text-lg md:text-2xl font-bold mono text-muted-foreground">N/A</p>
+            )}
           </div>
           <div>
             <p className="text-xs md:text-sm text-muted-foreground mb-1">Positions</p>
-            <p className="text-lg md:text-2xl font-bold text-foreground">
-              {portfolioPositions.length}
-            </p>
+            {positionsCount !== null ? (
+              <p className="text-lg md:text-2xl font-bold text-foreground">
+                {positionsCount}
+              </p>
+            ) : (
+              <p className="text-lg md:text-2xl font-bold text-muted-foreground">—</p>
+            )}
           </div>
         </div>
-      </div>
-
-      {/* Performance Chart */}
-      <div className="bg-card border border-border rounded-xl p-4 md:p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm md:text-base font-semibold text-foreground">Portfolio Evolution</h3>
-          <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-primary" />
-              <span className="text-muted-foreground">Portfolio</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-accent" />
-              <span className="text-muted-foreground">{portfolio.benchmark}</span>
-            </div>
-          </div>
-        </div>
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={performanceData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 35%, 18%)" />
-            <XAxis
-              dataKey="month"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: 11, fill: 'hsl(38, 20%, 55%)' }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: 11, fill: 'hsl(38, 20%, 55%)' }}
-              tickFormatter={(value) => `${value}%`}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'hsl(222, 47%, 13%)',
-                border: '1px solid hsl(222, 35%, 22%)',
-                borderRadius: '8px',
-                padding: '8px 12px',
-              }}
-              labelStyle={{ color: 'hsl(38, 30%, 95%)', marginBottom: '4px' }}
-              formatter={(value: number) => [`${value.toFixed(2)}%`, '']}
-            />
-            <Line
-              type="monotone"
-              dataKey="portfolio"
-              stroke="hsl(220, 82%, 44%)"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: 'hsl(220, 82%, 44%)' }}
-              name="Portfolio"
-            />
-            <Line
-              type="monotone"
-              dataKey="benchmark"
-              stroke="hsl(38, 70%, 55%)"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: 'hsl(38, 70%, 55%)' }}
-              name="Benchmark"
-            />
-          </LineChart>
-        </ResponsiveContainer>
       </div>
 
       {/* TWR (Time-Weighted Return) - Per-Account Charts */}
@@ -533,7 +559,7 @@ const PortfolioPerformance = () => {
             <p className="text-sm text-muted-foreground">No TWR data available yet.</p>
           </div>
         ) : (
-          accountsTWR.map(({ account, series }) => (
+          accountsTWR.map(({ account, series, chartData }) => (
             <div key={account.account_id} className="bg-card border border-border rounded-xl p-4 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -586,8 +612,22 @@ const PortfolioPerformance = () => {
                     </div>
                   </div>
 
+                  {/* Chart legend */}
+                  <div className="flex items-center gap-4 mb-2 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2 w-6 rounded" style={{ backgroundColor: 'hsl(142, 70%, 45%)' }} />
+                      <span className="text-muted-foreground">Portfolio TWR</span>
+                    </div>
+                    {chartData.some(d => d.benchmark !== undefined) && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-2 w-6 rounded" style={{ backgroundColor: 'hsl(38, 70%, 55%)' }} />
+                        <span className="text-muted-foreground">S&P 500 (SPY)</span>
+                      </div>
+                    )}
+                  </div>
+
                   <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={series}>
+                    <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 35%, 18%)" />
                       <XAxis
                         dataKey="date"
@@ -615,7 +655,8 @@ const PortfolioPerformance = () => {
                         }}
                         labelStyle={{ color: 'hsl(38, 30%, 95%)', marginBottom: '4px' }}
                         formatter={(value: number, name: string) => {
-                          if (name === 'twr') return [`${value.toFixed(2)}%`, 'TWR'];
+                          if (name === 'twr') return [`${value.toFixed(2)}%`, 'Portfolio TWR'];
+                          if (name === 'S&P 500 (SPY)') return null; // Hide benchmark value but keep line visible
                           return [`$${value.toLocaleString()}`, 'NAV'];
                         }}
                       />
@@ -627,6 +668,17 @@ const PortfolioPerformance = () => {
                         dot={false}
                         activeDot={{ r: 4, fill: 'hsl(142, 70%, 45%)' }}
                         name="twr"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="benchmark"
+                        stroke="hsl(38, 70%, 55%)"
+                        strokeWidth={2}
+                        dot={false}
+                        strokeDasharray="5 3"
+                        activeDot={{ r: 4, fill: 'hsl(38, 70%, 55%)' }}
+                        name="S&P 500 (SPY)"
+                        connectNulls
                       />
                     </LineChart>
                   </ResponsiveContainer>

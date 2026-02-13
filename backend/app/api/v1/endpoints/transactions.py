@@ -242,13 +242,14 @@ class BulkResponse(BaseModel):
 def read_trades(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = Query(100, le=50000, description="Maximum 50000 records per request"),
     account_id: Optional[int] = None,
     symbol: Optional[str] = None
 ):
     """
     Obtener lista de Trades. 
     Opcional: filtrar por cuenta o asset symbol.
+    Límite máximo: 50000 registros por request.
     """
     query = db.query(Trades)
     
@@ -280,12 +281,13 @@ def read_trade_by_id(trade_id: int, db: Session = Depends(deps.get_db)):
 def read_cash_journal(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = Query(100, le=50000, description="Maximum 50000 records per request"),
     account_id: Optional[int] = None,
     type: Optional[str] = None
 ):
     """
     Obtener movimientos de caja (Dividendos, Intereses, Fees).
+    Límite máximo: 50000 registros por request.
     """
     query = db.query(CashJournal)
     
@@ -446,12 +448,13 @@ def create_cash_journal_bulk(
 def read_fx_transactions(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = Query(100, le=50000, description="Maximum 50000 records per request"),
     account_id: Optional[int] = None
 ):
     """
     Obtener transacciones de Forex.
     Si se pasa account_id, busca tanto en source como en target.
+    Límite máximo: 50000 registros por request.
     """
     query = db.query(FXTransaction)
     
@@ -475,11 +478,12 @@ def read_fx_transactions(
 def read_corporate_actions(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = Query(100, le=50000, description="Maximum 50000 records per request"),
     account_id: Optional[int] = None
 ):
     """
     Obtener acciones corporativas (Splits, Spinoffs, Mergers).
+    Límite máximo: 50000 registros por request.
     """
     query = db.query(CorporateAction)
     

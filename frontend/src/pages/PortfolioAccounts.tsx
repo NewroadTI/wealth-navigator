@@ -267,7 +267,7 @@ const PortfolioAccounts = () => {
         const loadPositions = async () => {
             try {
                 setPositionsLoading(true);
-                const data = await positionsApi.getPositions(Number(accountId), 0, 1000);
+                const data = await positionsApi.getPositions(Number(accountId), 0, 10000);
                 setPositions(data);
             } catch (error) {
                 console.error('Error loading positions:', error);
@@ -328,7 +328,7 @@ const PortfolioAccounts = () => {
 
                 const [trades, cashJournal, fxTx, corpActions] = await Promise.all([
                     transactionsApi.getTrades(0, 500, accountIdNum),
-                    transactionsApi.getCashJournal(0, 500, accountIdNum),
+                    transactionsApi.getCashJournal(0, 10000, accountIdNum),
                     transactionsApi.getFxTransactions(0, 500, accountIdNum),
                     transactionsApi.getCorporateActions(0, 500, accountIdNum),
                 ]);

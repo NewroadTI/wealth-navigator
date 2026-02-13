@@ -330,10 +330,10 @@ const Transactions = () => {
         setError(null);
 
         const [trades, cashJournal, fxTransactions, corporateActions, accountsData, usersData, portfoliosData] = await Promise.all([
-          transactionsApi.getTrades(0, 1000),
-          transactionsApi.getCashJournal(0, 1000),
-          transactionsApi.getFxTransactions(0, 1000),
-          transactionsApi.getCorporateActions(0, 1000),
+          transactionsApi.getTrades(0, 10000),
+          transactionsApi.getCashJournal(0, 10000),
+          transactionsApi.getFxTransactions(0, 10000),
+          transactionsApi.getCorporateActions(0, 10000),
           accountsApi.getAccounts({ limit: 10000 }),  // Cargar todas las cuentas
           usersApi.getUsers(),  // Cargar todos los usuarios
           portfoliosApi.getPortfolios(),

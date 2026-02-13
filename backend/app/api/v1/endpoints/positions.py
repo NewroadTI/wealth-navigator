@@ -17,12 +17,13 @@ router = APIRouter()
 def get_positions(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = Query(100, le=50000, description="Maximum 50000 records per request"),
     account_id: Optional[int] = None
 ):
     """
     Obtener lista de posiciones.
     Filtro opcional: account_id.
+    Límite máximo: 50000 registros por request.
     """
     query = db.query(Position)
     

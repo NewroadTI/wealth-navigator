@@ -580,6 +580,69 @@ class StructuredNoteRead(BaseModel):
         from_attributes = True
 
 
+class StructuredNoteUnderlyingInput(BaseModel):
+    ticker: str
+    strike: Optional[Decimal] = None
+    initial_fixing_level: Optional[Decimal] = None
+    spot: Optional[Decimal] = None
+    perf: Optional[Decimal] = None
+
+
+class StructuredNoteUpsertBase(BaseModel):
+    upload_date: Optional[date] = None
+
+    dealer: Optional[str] = None
+    code: Optional[str] = None
+    status: Optional[str] = None
+    product_type: Optional[str] = None
+    issuer: Optional[str] = None
+    custodian: Optional[str] = None
+    advisor: Optional[str] = None
+    nominal: Optional[Decimal] = None
+    size: Optional[float] = None
+
+    underlyings: Optional[List[StructuredNoteUnderlyingInput]] = None
+
+    maturity_date: Optional[date] = None
+    issue_date: Optional[date] = None
+    strike_date: Optional[date] = None
+    last_autocall_obs: Optional[date] = None
+    next_autocall_obs: Optional[date] = None
+    next_coupon_obs: Optional[date] = None
+    next_payment_date: Optional[date] = None
+
+    coupon_annual_pct: Optional[Decimal] = None
+    coupon_periodic_pct: Optional[Decimal] = None
+    coupon_annual_amount: Optional[Decimal] = None
+    coupon_periodic_amount: Optional[Decimal] = None
+    coupon_type: Optional[str] = None
+
+    cap_pct: Optional[Decimal] = None
+    capital_protected_pct: Optional[Decimal] = None
+    autocall_trigger: Optional[Decimal] = None
+    step_down: Optional[Decimal] = None
+    autocall_obs_count: Optional[Decimal] = None
+    protection_barrier: Optional[Decimal] = None
+    coupon_barrier: Optional[Decimal] = None
+
+    observation_frequency: Optional[str] = None
+    termsheet: Optional[str] = None
+    termsheet_url: Optional[str] = None
+    coupons_paid_count: Optional[Decimal] = None
+    coupons_paid_amount: Optional[Decimal] = None
+    gross_yield_pct: Optional[Decimal] = None
+    bid: Optional[Decimal] = None
+    ask: Optional[Decimal] = None
+
+
+class StructuredNoteCreateRequest(StructuredNoteUpsertBase):
+    isin: str
+
+
+class StructuredNoteUpdateRequest(StructuredNoteUpsertBase):
+    pass
+
+
 class StructuredNoteHolderRead(BaseModel):
     """Schema for showing who holds a structured note (from positions)."""
     full_name: str
