@@ -29,6 +29,8 @@ from app.schemas.asset import (
     StructuredNoteRead,
     StructuredNoteHolderRead,
     StructuredNoteImportResponse,
+    StructuredNoteCreateRequest,
+    StructuredNoteUpdateRequest,
 )
 
 router = APIRouter()
@@ -154,13 +156,74 @@ def safe_string(value) -> Optional[str]:
     return s if s and s != "-" else None
 
 
-def normalize_ais_status(value: Optional[str]) -> Optional[str]:
-    """Normalize AIS status labels to internal status labels."""
-    if not value:
-        return value
+def extract_root_ticker(value: Optional[str]) -> Optional[str]:
+    """Extract root ticker from AIS label, e.g. 'XYZ UN Equity' -> 'XYZ'."""
+    cleaned = clean_optional_string(value)
+    if not cleaned:
+        return None
+    return cleaned.split()[0]
+
+
+def normalize_ais_status(value) -> Optional[str]:
+    """Normalize AIS status labels to internal status labels.
+    Handles non-string types (e.g. float NaN from pandas)."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        if pd.isna(value):
+            return None
+        value = str(value)
     if value.strip().lower() == "live":
         return "Active"
-    return value
+    return value.strip()
+
+
+def clean_optional_string(value) -> Optional[str]:
+    """Normalize optional strings: trim and convert empty/dash to None.
+    Handles non-string types (e.g. float NaN from pandas)."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        if pd.isna(value):
+            return None
+        value = str(value)
+    cleaned = value.strip()
+    return cleaned if cleaned and cleaned != "-" else None
+
+
+def compute_underlying_perf(spot_value, strike_value) -> float:
+    """Compute performance as spot/strike. Returns 0.0 when invalid."""
+    try:
+        if spot_value is None or strike_value is None:
+            return 0.0
+        spot_dec = Decimal(str(spot_value))
+        strike_dec = Decimal(str(strike_value))
+        if strike_dec == 0:
+            return 0.0
+        return float(spot_dec / strike_dec)
+    except (InvalidOperation, ValueError, TypeError, ZeroDivisionError):
+        return 0.0
+
+
+def normalize_underlyings_payload(underlyings) -> Optional[list]:
+    """Convert underlyings payload to JSON-serializable list used by JSONB."""
+    if underlyings is None:
+        return None
+    normalized = []
+    for u in underlyings:
+        ticker = extract_root_ticker(u.ticker)
+        if not ticker:
+            continue
+        strike_value = float(u.strike) if u.strike is not None else 0.0
+        spot_value = float(u.spot) if u.spot is not None else 0.0
+        normalized.append({
+            "ticker": ticker,
+            "strike": strike_value,
+            "initial_fixing_level": float(u.initial_fixing_level) if u.initial_fixing_level is not None else 0.0,
+            "spot": spot_value,
+            "perf": compute_underlying_perf(spot_value, strike_value),
+        })
+    return normalized
 
 
 def build_underlyings(row: pd.Series) -> list:
@@ -174,21 +237,24 @@ def build_underlyings(row: pd.Series) -> list:
         strike_col = f"Strike {i}"
         ifl_col = f"Initial Fixing Level {i}"
         spot_col = f"Spot {i}"
-        perf_col = f"Performance {i}"
 
         if underlying_col not in row.index:
             break
 
-        ticker = safe_string(row.get(underlying_col))
+        ticker = extract_root_ticker(row.get(underlying_col))
         if not ticker:
             continue  # Skip empty underlyings
 
+        strike_value = safe_decimal(row.get(strike_col))
+        initial_fixing_level = safe_decimal(row.get(ifl_col))
+        spot_value = safe_decimal(row.get(spot_col))
+
         entry = {
             "ticker": ticker,
-            "strike": float(safe_decimal(row.get(strike_col)) or 0),
-            "initial_fixing_level": float(safe_decimal(row.get(ifl_col)) or 0),
-            "spot": float(safe_decimal(row.get(spot_col)) or 0),
-            "perf": float(safe_decimal(row.get(perf_col)) or 0),
+            "strike": float(strike_value or 0),
+            "initial_fixing_level": float(initial_fixing_level or 0),
+            "spot": float(spot_value or 0),
+            "perf": compute_underlying_perf(spot_value, strike_value),
         }
         underlyings.append(entry)
 
@@ -623,7 +689,7 @@ def import_structured_notes(db: Session = Depends(deps.get_db)):
 
 @router.get("/notes", response_model=List[StructuredNoteRead])
 def get_structured_notes(
-    upload_date: Optional[date] = Query(None, description="Filter by date (default: latest)"),
+    upload_date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD), or 'all' for full history"),
     status: Optional[str] = Query(None, description="Filter by status (default: Active)"),
     issuer: Optional[str] = Query(None, description="Filter by issuer"),
     db: Session = Depends(deps.get_db),
@@ -633,15 +699,25 @@ def get_structured_notes(
     Defaults to latest upload_date and status='Active'.
     Pass status='all' to see all statuses.
     """
-    if upload_date is None:
+    query = db.query(StructuredNote)
+
+    parsed_date: Optional[date] = None
+    if upload_date:
+        if upload_date.lower() == "all":
+            parsed_date = None
+        else:
+            try:
+                parsed_date = date.fromisoformat(upload_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid upload_date format. Use YYYY-MM-DD or 'all'.")
+    else:
         latest = db.query(sa_func.max(StructuredNote.upload_date)).scalar()
         if latest is None:
             return []
-        upload_date = latest
+        parsed_date = latest
 
-    query = db.query(StructuredNote).filter(
-        StructuredNote.upload_date == upload_date
-    )
+    if parsed_date is not None:
+        query = query.filter(StructuredNote.upload_date == parsed_date)
 
     # Default to Active filter unless 'all' is passed
     if status and status.lower() != "all":
@@ -652,9 +728,93 @@ def get_structured_notes(
     if issuer:
         query = query.filter(StructuredNote.issuer == issuer)
 
-    notes = query.order_by(StructuredNote.isin).all()
+    notes = query.order_by(StructuredNote.upload_date.desc(), StructuredNote.isin).all()
 
     return notes
+
+
+@router.post("/notes", response_model=StructuredNoteRead)
+def create_structured_note(
+    payload: StructuredNoteCreateRequest,
+    db: Session = Depends(deps.get_db),
+):
+    """Create a structured note snapshot for an ISIN and date."""
+    isin = payload.isin.strip()
+    if not isin:
+        raise HTTPException(status_code=400, detail="ISIN is required")
+
+    asset = db.query(Asset).filter(Asset.isin == isin).first()
+    if not asset:
+        raise HTTPException(status_code=400, detail=f"No asset found for ISIN {isin}")
+
+    target_upload_date = payload.upload_date or date.today()
+
+    exists = db.query(StructuredNote).filter(
+        and_(
+            StructuredNote.isin == isin,
+            StructuredNote.upload_date == target_upload_date,
+        )
+    ).first()
+    if exists:
+        raise HTTPException(status_code=409, detail=f"A structured note for ISIN {isin} and upload_date {target_upload_date} already exists")
+
+    data = payload.model_dump(exclude_unset=True)
+    data.pop("isin", None)
+    underlyings = data.pop("underlyings", None)
+
+    string_fields = {
+        "dealer", "code", "status", "product_type", "issuer", "custodian", "advisor",
+        "coupon_type", "observation_frequency", "termsheet", "termsheet_url"
+    }
+    for key in string_fields:
+        if key in data:
+            data[key] = clean_optional_string(data.get(key))
+
+    data["underlyings"] = normalize_underlyings_payload(underlyings)
+
+    note = StructuredNote(
+        asset_id=asset.asset_id,
+        isin=isin,
+        upload_date=target_upload_date,
+        **data,
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return note
+
+
+@router.put("/notes/{note_id}", response_model=StructuredNoteRead)
+def update_structured_note(
+    note_id: int,
+    payload: StructuredNoteUpdateRequest,
+    db: Session = Depends(deps.get_db),
+):
+    """Update an existing structured note snapshot by note_id."""
+    note = db.query(StructuredNote).filter(StructuredNote.note_id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Structured note not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    underlyings = data.pop("underlyings", None)
+
+    string_fields = {
+        "dealer", "code", "status", "product_type", "issuer", "custodian", "advisor",
+        "coupon_type", "observation_frequency", "termsheet", "termsheet_url"
+    }
+    for key in string_fields:
+        if key in data:
+            data[key] = clean_optional_string(data.get(key))
+
+    for key, value in data.items():
+        setattr(note, key, value)
+
+    if underlyings is not None:
+        note.underlyings = normalize_underlyings_payload(underlyings)
+
+    db.commit()
+    db.refresh(note)
+    return note
 
 
 @router.get("/notes/dates", response_model=List[date])

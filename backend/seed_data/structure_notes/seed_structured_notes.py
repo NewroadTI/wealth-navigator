@@ -80,6 +80,48 @@ def safe_string(val):
     return s if s and s != "-" and s != "nan" else None
 
 
+def extract_root_ticker(val):
+    """Extract root ticker, e.g. 'XYZ UN Equity' -> 'XYZ'."""
+    raw = safe_string(val)
+    if not raw:
+        return None
+    return raw.split()[0]
+
+
+def compute_underlying_perf(spot_value, strike_value):
+    """Compute performance as spot/strike, returning 0.0 when invalid."""
+    if spot_value is None or strike_value in (None, Decimal("0")):
+        return 0.0
+    try:
+        if strike_value == 0:
+            return 0.0
+        return float(spot_value / strike_value)
+    except (InvalidOperation, ValueError, TypeError, ZeroDivisionError):
+        return 0.0
+
+
+def normalize_status_to_english(val):
+    """Normalize status labels to a consistent English taxonomy."""
+    raw = safe_string(val)
+    if not raw:
+        return None
+    key = raw.lower()
+    mapping = {
+        "vigente": "Active",
+        "active": "Active",
+        "live": "Active",
+        "call": "Call",
+        "called": "Call",
+        "vencida": "Matured",
+        "vencido": "Matured",
+        "matured": "Matured",
+        "vendida": "Sold",
+        "vendido": "Sold",
+        "sold": "Sold",
+    }
+    return mapping.get(key, raw)
+
+
 def is_empty_row(row):
     """Check if a row is essentially empty (all blank or NaN)."""
     for val in row:
@@ -105,17 +147,18 @@ def build_underlyings_from_csv(row):
         ticker_col = f"Subyacentes{suffix}"
         strike_col = f"Strike{suffix}"
         spot_col = f"Spot{suffix}"
-        perf_col = f"Perf (%){suffix}"
-        
-        ticker = safe_string(row.get(ticker_col))
+        ticker = extract_root_ticker(row.get(ticker_col))
         if not ticker:
             continue
 
+        strike_value = parse_decimal(row.get(strike_col))
+        spot_value = parse_decimal(row.get(spot_col))
+
         entry = {
             "ticker": ticker,
-            "strike": float(parse_decimal(row.get(strike_col)) or 0),
-            "spot": float(parse_decimal(row.get(spot_col)) or 0),
-            "perf": float(parse_decimal(row.get(perf_col)) or 0),
+            "strike": float(strike_value or 0),
+            "spot": float(spot_value or 0),
+            "perf": compute_underlying_perf(spot_value, strike_value),
         }
         underlyings.append(entry)
 
@@ -188,7 +231,7 @@ def main():
 
                 dealer=safe_string(row.get("Dealer")),
                 code=safe_string(row.get("Code")),
-                status=safe_string(row.get("Status")),
+                status=normalize_status_to_english(row.get("Status")),
                 product_type=safe_string(row.get("Tipo de producto")),
                 issuer=safe_string(row.get("Emisor")),
                 custodian=safe_string(row.get("Custodio")),
