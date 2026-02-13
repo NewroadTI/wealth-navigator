@@ -146,10 +146,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // Initial fetch
   useEffect(() => {
     fetchETLNotifications();
-
-    // Poll every 30 seconds
-    const interval = setInterval(fetchETLNotifications, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const markAsRead = useCallback((id: string) => {

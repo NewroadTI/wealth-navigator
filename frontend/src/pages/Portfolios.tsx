@@ -8,12 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Filter, Download, LayoutGrid, List, User, Building2, Calendar, TrendingUp } from 'lucide-react';
-import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { Plus, Search, Filter, Download, LayoutGrid, List, User, Building2, Calendar, TrendingUp, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { formatCurrency } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { positionsApi, AccountBalance } from '@/lib/api';
 
 // Types
 type UserApi = {
@@ -52,6 +51,8 @@ const Portfolios = () => {
   const [isNewPortfolioOpen, setIsNewPortfolioOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortColumn, setSortColumn] = useState<'lastUpdate' | 'totalValue' | 'lastTwr' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
 
   // API data states
@@ -138,59 +139,47 @@ const Portfolios = () => {
     loadCountries();
   }, [apiBaseUrl]);
 
-  // Account balances state
-  const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
+  // TWR summaries state
+  type TWRAccountSummary = {
+    account_id: number;
+    account_code: string;
+    nav: number;
+    last_date: string | null;
+    day_change: number;
+    twr_pct: number;
+    cutoff_date: string | null;
+  };
+  type TWRPortfolioSummary = {
+    portfolio_id: number;
+    total_nav: number;
+    last_date: string | null;
+    day_change: number;
+    last_twr_pct: number;
+    accounts: TWRAccountSummary[];
+  };
+  const [twrSummaries, setTwrSummaries] = useState<TWRPortfolioSummary[]>([]);
 
-  // Load account balances for all portfolios
+  // Load TWR summaries for all portfolios
   useEffect(() => {
-    if (!portfolios || portfolios.length === 0) return;
-
-    const loadBalances = async () => {
+    const loadTwrSummaries = async () => {
       try {
-        // Get all account IDs from all portfolios
-        const allAccountIds: number[] = [];
-        portfolios.forEach(p => {
-          if (p.accounts) {
-            p.accounts.forEach((a: any) => allAccountIds.push(a.account_id));
-          }
-        });
-
-        if (allAccountIds.length === 0) return;
-
-        const balances = await positionsApi.getAccountBalances(allAccountIds);
-        setAccountBalances(balances);
+        const response = await fetch(`${apiBaseUrl}/api/v1/twr/portfolios/summaries`);
+        if (!response.ok) throw new Error('Failed to load TWR summaries');
+        const data = await response.json();
+        setTwrSummaries(data);
       } catch (error) {
-        console.error('Error loading account balances:', error);
+        console.error('Error loading TWR summaries:', error);
       }
     };
+    loadTwrSummaries();
+  }, [apiBaseUrl]);
 
-    loadBalances();
-  }, [portfolios]);
-
-  // Create a map of account_id -> balance
-  const accountBalanceMap = useMemo(() => {
-    const map = new Map<number, number>();
-    accountBalances.forEach(b => {
-      map.set(b.account_id, parseFloat(b.balance) || 0);
-    });
+  // Create a map of portfolio_id -> TWR summary
+  const twrSummaryMap = useMemo(() => {
+    const map = new Map<number, TWRPortfolioSummary>();
+    twrSummaries.forEach(s => map.set(s.portfolio_id, s));
     return map;
-  }, [accountBalances]);
-
-  // Create a map of portfolio_id -> total value (sum of all account balances)
-  const portfolioTotalValues = useMemo(() => {
-    const map = new Map<number, number>();
-    portfolios.forEach(p => {
-      let total = 0;
-      if (p.accounts) {
-        p.accounts.forEach((a: any) => {
-          const balance = accountBalanceMap.get(a.account_id) || 0;
-          total += balance;
-        });
-      }
-      map.set(p.portfolio_id, total);
-    });
-    return map;
-  }, [portfolios, accountBalanceMap]);
+  }, [twrSummaries]);
 
   // Handle investor selection - auto-complete portfolio name
   const handleInvestorChange = (userId: string) => {
@@ -256,15 +245,72 @@ const Portfolios = () => {
     }
   };
 
-  // Filter portfolios
+  // Filter and sort portfolios
   const filteredPortfolios = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return portfolios;
-    return portfolios.filter(p =>
-      p.name.toLowerCase().includes(query) ||
-      p.interface_code.toLowerCase().includes(query)
-    );
-  }, [portfolios, searchQuery]);
+    let filtered = portfolios;
+    
+    if (query) {
+      filtered = portfolios.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.interface_code.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    if (sortColumn) {
+      filtered = [...filtered].sort((a, b) => {
+        const twrA = twrSummaryMap.get(a.portfolio_id);
+        const twrB = twrSummaryMap.get(b.portfolio_id);
+
+        let compareValue = 0;
+
+        if (sortColumn === 'lastUpdate') {
+          const dateA = twrA?.last_date ? new Date(twrA.last_date).getTime() : 0;
+          const dateB = twrB?.last_date ? new Date(twrB.last_date).getTime() : 0;
+          compareValue = dateA - dateB;
+        } else if (sortColumn === 'totalValue') {
+          const navA = twrA?.total_nav ?? 0;
+          const navB = twrB?.total_nav ?? 0;
+          compareValue = navA - navB;
+        } else if (sortColumn === 'lastTwr') {
+          const twrPctA = twrA?.last_twr_pct ?? -Infinity;
+          const twrPctB = twrB?.last_twr_pct ?? -Infinity;
+          compareValue = twrPctA - twrPctB;
+        }
+
+        return sortDirection === 'asc' ? compareValue : -compareValue;
+      });
+    }
+
+    return filtered;
+  }, [portfolios, searchQuery, sortColumn, sortDirection, twrSummaryMap]);
+
+  // Handle sort column click
+  const handleSort = (column: 'lastUpdate' | 'totalValue' | 'lastTwr') => {
+    if (sortColumn === column) {
+      // Toggle direction or clear sort
+      if (sortDirection === 'desc') {
+        setSortDirection('asc');
+      } else {
+        setSortColumn(null);
+        setSortDirection('desc');
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Get sort icon for header
+  const getSortIcon = (column: 'lastUpdate' | 'totalValue' | 'lastTwr') => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-3.5 w-3.5 ml-1 opacity-40" />;
+    }
+    return sortDirection === 'desc' 
+      ? <ChevronDown className="h-3.5 w-3.5 ml-1" />
+      : <ChevronUp className="h-3.5 w-3.5 ml-1" />;
+  };
 
   // Get investor name by id
   const getInvestorName = (userId: number) => {
@@ -488,7 +534,12 @@ const Portfolios = () => {
           {filteredPortfolios.map((portfolio) => {
             const investorName = getInvestorName(portfolio.owner_user_id);
             const investorType = getInvestorType(portfolio.owner_user_id);
-            const totalValue = portfolioTotalValues.get(portfolio.portfolio_id) || 0;
+            const twrSummary = twrSummaryMap.get(portfolio.portfolio_id);
+            const totalNav = twrSummary?.total_nav ?? 0;
+            const dayChange = twrSummary?.day_change ?? 0;
+            const twrPct = twrSummary?.last_twr_pct ?? null;
+            const lastDate = twrSummary?.last_date;
+            const isDayPositive = dayChange >= 0;
 
             return (
               <Link
@@ -511,37 +562,44 @@ const Portfolios = () => {
                   {/* Value and Day Change */}
                   <div className="flex items-baseline gap-3 mb-4">
                     <span className="text-2xl font-bold mono text-foreground">
-                      {formatCurrency(totalValue)}
+                      {formatCurrency(totalNav)}
                     </span>
-                    <span className="text-sm font-medium text-success">
-                      ↗ +0.44%
+                    <span className={`text-sm font-medium ${isDayPositive ? 'text-success' : 'text-destructive'}`}>
+                      {isDayPositive ? '+' : ''}{formatCurrency(dayChange)}
                     </span>
                   </div>
 
-                  {/* Investor and Advisor Row */}
+                  {/* Investor Row */}
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <User className="h-3.5 w-3.5" />
                       <span className="text-foreground truncate">{investorName}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Building2 className="h-3.5 w-3.5" />
-                      <span className="text-foreground truncate">Sarah Chen</span>
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span className="text-foreground text-xs">
+                        {lastDate ? new Date(lastDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Inception Date and YTD Row */}
+                  {/* YTD Row */}
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-3.5 w-3.5" />
+                      <Building2 className="h-3.5 w-3.5" />
                       <span className="text-foreground">
                         {portfolio.inception_date ? new Date(portfolio.inception_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="mono text-success">YTD: +8.72%</span>
-                      <span className="text-[9px] bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded-full font-medium">Mock</span>
+                      {twrPct !== null ? (
+                        <span className={`mono ${twrPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          Last TWR: {twrPct >= 0 ? '+' : ''}{twrPct.toFixed(2)}%
+                        </span>
+                      ) : (
+                        <span className="mono text-muted-foreground">Last TWR: N/A</span>
+                      )}
                     </div>
                   </div>
 
@@ -573,16 +631,36 @@ const Portfolios = () => {
           <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-muted/30 border-b border-border text-sm font-medium text-muted-foreground">
             <div className="col-span-3">Portfolio</div>
             <div className="col-span-2">Investor</div>
-            <div className="col-span-2">Advisor</div>
-            <div className="col-span-2 text-right">Total Value</div>
-            <div className="col-span-1 text-right">YTD</div>
+            <button 
+              onClick={() => handleSort('lastUpdate')} 
+              className="col-span-2 flex items-center hover:text-foreground transition-colors cursor-pointer"
+            >
+              Last Update
+              {getSortIcon('lastUpdate')}
+            </button>
+            <button 
+              onClick={() => handleSort('totalValue')} 
+              className="col-span-2 flex items-center justify-end hover:text-foreground transition-colors cursor-pointer"
+            >
+              Total Value
+              {getSortIcon('totalValue')}
+            </button>
+            <button 
+              onClick={() => handleSort('lastTwr')} 
+              className="col-span-1 flex items-center justify-end hover:text-foreground transition-colors cursor-pointer"
+            >
+              Last TWR
+              {getSortIcon('lastTwr')}
+            </button>
             <div className="col-span-1 text-center">Status</div>
             <div className="col-span-1 text-center">Type</div>
           </div>
 
           {/* List Rows */}
           {filteredPortfolios.map((portfolio) => {
-            const totalValue = portfolioTotalValues.get(portfolio.portfolio_id) || 0;
+            const twrSummary = twrSummaryMap.get(portfolio.portfolio_id);
+            const totalNav = twrSummary?.total_nav ?? 0;
+            const twrPct = twrSummary?.last_twr_pct ?? null;
             return (
               <Link
                 key={portfolio.portfolio_id}
@@ -597,17 +675,23 @@ const Portfolios = () => {
                   <p className="text-sm text-foreground">{getInvestorName(portfolio.owner_user_id)}</p>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-sm text-foreground">Sarah Chen</span>
+                  <span className="text-sm text-muted-foreground">
+                    {twrSummary?.last_date ? new Date(twrSummary.last_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
+                  </span>
                 </div>
                 <div className="col-span-2 text-right">
                   <p className="font-mono font-medium text-foreground">
-                    {formatCurrency(totalValue)}
+                    {formatCurrency(totalNav)}
                   </p>
                 </div>
                 <div className="col-span-1 text-right">
-                  <span className="font-mono text-success">
-                    {formatPercent(0.0845)}
-                  </span>
+                  {twrPct !== null ? (
+                    <span className={`font-mono ${twrPct >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {twrPct >= 0 ? '+' : ''}{twrPct.toFixed(2)}%
+                    </span>
+                  ) : (
+                    <span className="font-mono text-muted-foreground">N/A</span>
+                  )}
                 </div>
                 <div className="col-span-1 text-center">
                   <Badge

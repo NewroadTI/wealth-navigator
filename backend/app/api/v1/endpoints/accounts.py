@@ -55,13 +55,14 @@ def create_account(
 def read_accounts(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = Query(100, le=50000, description="Maximum 50000 records per request"),
     portfolio_id: Optional[int] = None,
     currency: Optional[str] = None
 ):
     """
     Obtener lista de cuentas.
     Filtros opcionales: portfolio_id, currency.
+    Límite máximo: 50000 registros por request.
     """
     query = db.query(Account)
     

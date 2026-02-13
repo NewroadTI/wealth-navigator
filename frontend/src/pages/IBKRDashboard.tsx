@@ -418,8 +418,8 @@ const IBKRDashboard = () => {
         description: `ETL job for ${reportType} has been started (ID: ${result.job_id})`,
       });
 
-      // Refresh after a short delay
-      setTimeout(() => fetchDashboard(true), 1000);
+      // Refresh after job has had time to complete
+      setTimeout(() => fetchDashboard(true), 10000);
 
     } catch (error) {
       console.error('Error triggering job:', error);
@@ -435,10 +435,6 @@ const IBKRDashboard = () => {
 
   useEffect(() => {
     fetchDashboard();
-
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => fetchDashboard(), 30000);
-    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

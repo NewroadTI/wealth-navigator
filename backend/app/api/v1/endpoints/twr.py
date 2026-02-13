@@ -21,6 +21,7 @@ from app.schemas.twr import (
     TWRNavUpsertBatch,
     TWRNavUpsertResponse,
     TWRFillAndCalculateResponse,
+    BenchmarkSeriesResponse,
 )
 from app.services.twr_service import (
     get_twr_sync_status,
@@ -31,6 +32,9 @@ from app.services.twr_service import (
     get_twr_table,
     upsert_nav_batch,
     fill_cash_and_calculate,
+    get_benchmark_series,
+    get_portfolio_twr_summary,
+    get_all_portfolios_twr_summary,
 )
 from app.models.portfolio import TWRDaily
 
@@ -66,6 +70,29 @@ def portfolio_accounts(
     """Get all USD accounts for a portfolio with their TWR info."""
     accounts = get_portfolio_usd_accounts(db, portfolio_id)
     return {"accounts": accounts}
+
+
+@router.get("/portfolio/{portfolio_id}/summary")
+def portfolio_twr_summary(
+    portfolio_id: int,
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Get TWR summary for a portfolio: total NAV, day change, TWR %, cutoff/last dates.
+    Uses data from twr_daily table (no mock data).
+    """
+    return get_portfolio_twr_summary(db, portfolio_id)
+
+
+@router.get("/portfolios/summaries")
+def all_portfolios_twr_summaries(
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Get TWR summaries for ALL portfolios at once.
+    Used by portfolio list/cards to show real NAV and TWR data.
+    """
+    return get_all_portfolios_twr_summary(db)
 
 
 @router.get("/{portfolio_id}/status", response_model=TWRStatusResponse)
@@ -189,3 +216,23 @@ def twr_fill_and_calculate_endpoint(
         cash_journal_filled=result["cash_journal_filled"],
         twr_calculated=result["twr_calculated"],
     )
+
+
+@router.get("/account/{account_id}/benchmark", response_model=BenchmarkSeriesResponse)
+def twr_benchmark(
+    account_id: int,
+    ticker: str = Query("SPY", description="Benchmark ticker symbol"),
+    start_date: Optional[date] = Query(None, description="Override start date"),
+    end_date: Optional[date] = Query(None, description="Override end date"),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Get normalized benchmark returns aligned to the TWR dates of an account.
+    Downloads market data on the fly (not stored in DB).
+    The benchmark is normalized from the cutoff date so it starts at 0%
+    and shows cumulative % change, directly comparable to the TWR line.
+    """
+    result = get_benchmark_series(db, account_id, ticker=ticker, start_date=start_date, end_date=end_date)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result

@@ -20,8 +20,6 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { transactionsApi, assetsApi, positionsApi, Trade, CashJournal, FxTransaction, CorporateAction, AccountBalance } from '@/lib/api';
 import {
-  ArrowUpRight,
-  ArrowDownRight,
   Download,
   RefreshCw,
   Settings,
@@ -237,6 +235,26 @@ const PortfolioDetail = () => {
   const [accountBalances, setAccountBalances] = useState<AccountBalance[]>([]);
   const [showAllAccounts, setShowAllAccounts] = useState(false);
 
+  // TWR summary state
+  type TWRAccountSummary = {
+    account_id: number;
+    account_code: string;
+    nav: number;
+    last_date: string | null;
+    day_change: number;
+    twr_pct: number;
+    cutoff_date: string | null;
+  };
+  type TWRPortfolioSummary = {
+    portfolio_id: number;
+    total_nav: number;
+    last_date: string | null;
+    day_change: number;
+    last_twr_pct: number;
+    accounts: TWRAccountSummary[];
+  };
+  const [twrSummary, setTwrSummary] = useState<TWRPortfolioSummary | null>(null);
+
   // Positions state
   const [portfolioPositions, setPortfolioPositions] = useState<any[]>([]);
   const [positionsLoading, setPositionsLoading] = useState(false);
@@ -354,10 +372,10 @@ const PortfolioDetail = () => {
 
         // Fetch all transaction types for all accounts
         const allPromises = accountIds.flatMap(accountId => [
-          transactionsApi.getTrades(0, 500, accountId),
-          transactionsApi.getCashJournal(0, 500, accountId),
-          transactionsApi.getFxTransactions(0, 500, accountId),
-          transactionsApi.getCorporateActions(0, 500, accountId),
+          transactionsApi.getTrades(0, 10000, accountId),
+          transactionsApi.getCashJournal(0, 10000, accountId),
+          transactionsApi.getFxTransactions(0, 10000, accountId),
+          transactionsApi.getCorporateActions(0, 10000, accountId),
         ]);
 
         const results = await Promise.all(allPromises);
@@ -428,6 +446,30 @@ const PortfolioDetail = () => {
 
     loadBalances();
   }, [portfolio?.accounts]);
+
+  // Load TWR summary for this portfolio
+  useEffect(() => {
+    if (!id) return;
+    const loadTwrSummary = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v1/twr/portfolio/${id}/summary`);
+        if (response.ok) {
+          const data = await response.json();
+          setTwrSummary(data);
+        }
+      } catch (error) {
+        console.error('Error loading TWR summary:', error);
+      }
+    };
+    loadTwrSummary();
+  }, [id, apiBaseUrl]);
+
+  // Create TWR account nav map for account table
+  const twrAccountNavMap = useMemo(() => {
+    const map = new Map<number, TWRAccountSummary>();
+    twrSummary?.accounts?.forEach(a => map.set(a.account_id, a));
+    return map;
+  }, [twrSummary]);
 
   // Load available report dates and set the latest one
   useEffect(() => {
@@ -780,11 +822,8 @@ const PortfolioDetail = () => {
     );
   }
 
-  const isPositive = true; // Mockup
-
   return (
     <AppLayout title={portfolio.name} subtitle={`Portfolio ${portfolio.interface_code}`}>
-      <DevelopmentBanner feature="Análisis de Performance del Portfolio" className="mb-4 md:mb-6" />
       {/* Header Section */}
       <div className="bg-card border border-border rounded-xl p-4 md:p-6 mb-4 md:mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -852,45 +891,84 @@ const PortfolioDetail = () => {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-4 md:mt-6 pt-4 md:pt-6 border-t border-border">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mt-4 md:mt-6 pt-4 md:pt-6 border-t border-border">
           <div>
             <p className="text-xs md:text-sm text-muted-foreground mb-1">Total Value</p>
             <p className="text-lg md:text-2xl font-bold mono text-foreground">
-              {formatCurrency(totalPortfolioValue)}
+              {formatCurrency(twrSummary?.total_nav ?? totalPortfolioValue)}
             </p>
+            {twrSummary?.last_date && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                as of {new Date(twrSummary.last_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xs md:text-sm text-muted-foreground mb-1">Day Change</p>
-            <div className="flex items-center gap-1.5 md:gap-2">
-              {isPositive ? (
-                <ArrowUpRight className="h-4 w-4 md:h-5 md:w-5 text-gain" />
-              ) : (
-                <ArrowDownRight className="h-4 w-4 md:h-5 md:w-5 text-loss" />
-              )}
-              <div>
-                <p className={cn('text-sm md:text-lg font-semibold mono', getChangeColor(12500))}>
-                  +{formatCurrency(12500)}
-                </p>
-                <p className={cn('text-xs mono', getChangeColor(0.44))}>
-                  (+{formatPercent(0.0044)})
-                </p>
-              </div>
+            <div>
+              <p className={cn('text-sm md:text-lg font-semibold mono', getChangeColor(twrSummary?.day_change ?? 0))}>
+                {(twrSummary?.day_change ?? 0) >= 0 ? '+' : ''}{formatCurrency(twrSummary?.day_change ?? 0)}
+              </p>
             </div>
           </div>
           <div>
-            <p className="text-xs md:text-sm text-muted-foreground mb-1">YTD Return</p>
-            <p className={cn('text-lg md:text-2xl font-bold mono', getChangeColor(0.0872))}>
-              +{formatPercent(0.0872)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs md:text-sm text-muted-foreground mb-1">Inception</p>
-            <p className="text-sm md:text-lg font-semibold text-foreground">
-              {portfolio.inception_date ? formatDate(portfolio.inception_date) : 'N/A'}
-            </p>
-            <p className="text-xs text-muted-foreground">Benchmark: S&P 500</p>
+            <p className="text-xs md:text-sm text-muted-foreground mb-1">Last TWR</p>
+            {twrSummary?.last_twr_pct != null ? (
+              <p className={cn('text-lg md:text-2xl font-bold mono', getChangeColor(twrSummary.last_twr_pct))}>
+                {twrSummary.last_twr_pct >= 0 ? '+' : ''}{twrSummary.last_twr_pct.toFixed(2)}%
+              </p>
+            ) : (
+              <p className="text-lg md:text-2xl font-bold mono text-muted-foreground">N/A</p>
+            )}
           </div>
         </div>
+
+        {/* Account Details Summary */}
+        {twrSummary && twrSummary.accounts && twrSummary.accounts.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-xs text-muted-foreground mb-3">Account Details</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {twrSummary.accounts.map((account) => (
+                <div key={account.account_id} className="bg-muted/20 rounded-lg p-3 border border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-foreground truncate" title={account.account_code}>
+                      {account.account_code}
+                    </p>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      USD
+                    </Badge>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] text-muted-foreground">NAV:</span>
+                      <span className="text-xs font-mono font-semibold text-foreground">
+                        {formatCurrency(account.nav)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] text-muted-foreground">Day Change:</span>
+                      <span className={cn('text-xs font-mono font-medium', getChangeColor(account.day_change))}>
+                        {account.day_change >= 0 ? '+' : ''}{formatCurrency(account.day_change)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] text-muted-foreground">TWR:</span>
+                      <span className={cn('text-xs font-mono font-medium', getChangeColor(account.twr_pct))}>
+                        {account.twr_pct >= 0 ? '+' : ''}{account.twr_pct.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline pt-1 border-t border-border/50">
+                      <span className="text-[10px] text-muted-foreground">Last Update:</span>
+                      <span className="text-[10px] text-foreground">
+                        {account.last_date ? new Date(account.last_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Investor Info Card */}
@@ -977,6 +1055,8 @@ const PortfolioDetail = () => {
                     s => s.strategy_id === account.investment_strategy_id
                   );
                   const balance = accountBalanceMap.get(account.account_id) || 0;
+                  const twrAcct = twrAccountNavMap.get(account.account_id);
+                  const displayNav = twrAcct?.nav ?? balance;
                   return (
                     <tr key={account.account_id}>
                       <td className="font-medium text-foreground text-xs md:text-sm">{account.institution}</td>
@@ -993,7 +1073,7 @@ const PortfolioDetail = () => {
                       <td className="text-muted-foreground text-xs hidden md:table-cell">{account.currency}</td>
                       <td className="text-muted-foreground text-xs hidden lg:table-cell">{strategy?.name || '-'}</td>
                       <td className="font-medium mono text-foreground text-xs md:text-sm text-right">
-                        {formatCurrency(balance)}
+                        {formatCurrency(displayNav)}
                       </td>
                     </tr>
                   );
@@ -1001,8 +1081,19 @@ const PortfolioDetail = () => {
             </tbody>
           </table>
         </div>
-        {/* Show All Accounts Button */}
-        {!showAllAccounts && portfolio.accounts.filter(acc => {
+        {/* Show/Hide All Accounts Button */}
+        {showAllAccounts ? (
+          <div className="p-3 border-t border-border text-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAllAccounts(false)}
+              className="text-xs"
+            >
+              Hide Zero-Balance Accounts
+            </Button>
+          </div>
+        ) : portfolio.accounts.filter(acc => {
           const balance = accountBalanceMap.get(acc.account_id) || 0;
           return balance === 0 && acc.currency !== 'USD';
         }).length > 0 && (
