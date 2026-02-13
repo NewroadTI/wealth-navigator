@@ -5,6 +5,7 @@ import { portfolios, positions, performanceData } from '@/lib/mockData';
 import { formatCurrency, formatPercent, getChangeColor } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getApiBaseUrl } from '@/lib/config';
 import {
@@ -18,6 +19,9 @@ import {
   Globe,
   Building2,
   Loader2,
+  CheckCircle2,
+  XCircle,
+  Settings2,
 } from 'lucide-react';
 import {
   LineChart,
@@ -65,6 +69,37 @@ interface AllocationResponse {
   report_date: string;
 }
 
+// TWR Types
+interface TWRSeriesPoint {
+  date: string;
+  twr: number;
+  nav: number;
+}
+
+interface TWRStatusResponse {
+  is_synced: boolean;
+  last_complete_date: string | null;
+  expected_date: string;
+  missing_etl_jobs: string[];
+  cutoff_date: string | null;
+}
+
+interface USDAccount {
+  account_id: number;
+  account_code: string;
+  account_alias: string | null;
+  currency: string;
+  twr_cutoff_date: string | null;
+  last_twr_date: string | null;
+  last_twr_value: number | null;
+  last_nav: number | null;
+}
+
+interface AccountTWRData {
+  account: USDAccount;
+  series: TWRSeriesPoint[];
+}
+
 const PortfolioPerformance = () => {
   const { id } = useParams();
   const apiBaseUrl = getApiBaseUrl();
@@ -78,6 +113,11 @@ const PortfolioPerformance = () => {
   const [sectorAllocation, setSectorAllocation] = useState<AllocationResponse | null>(null);
   const [countryAllocation, setCountryAllocation] = useState<AllocationResponse | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // TWR State
+  const [accountsTWR, setAccountsTWR] = useState<AccountTWRData[]>([]);
+  const [twrStatus, setTwrStatus] = useState<TWRStatusResponse | null>(null);
+  const [twrLoading, setTwrLoading] = useState(true);
 
   // Load performance data
   useEffect(() => {
@@ -120,6 +160,59 @@ const PortfolioPerformance = () => {
     };
 
     loadPerformanceData();
+  }, [id, apiBaseUrl]);
+
+  // Load TWR data - fetch per-account series
+  useEffect(() => {
+    const loadTwrData = async () => {
+      if (!id) return;
+      setTwrLoading(true);
+      try {
+        // Fetch accounts list and status
+        const [accountsRes, statusRes] = await Promise.all([
+          fetch(`${apiBaseUrl}/api/v1/twr/portfolio/${id}/accounts`),
+          fetch(`${apiBaseUrl}/api/v1/twr/${id}/status`),
+        ]);
+
+        if (statusRes.ok) {
+          setTwrStatus(await statusRes.json());
+        }
+
+        if (accountsRes.ok) {
+          const accountsData = await accountsRes.json();
+          const accounts: USDAccount[] = accountsData.accounts || [];
+
+          // Fetch series for each account
+          const accountsWithSeries = await Promise.all(
+            accounts.map(async (account) => {
+              try {
+                const seriesRes = await fetch(`${apiBaseUrl}/api/v1/twr/account/${account.account_id}/series`);
+                if (seriesRes.ok) {
+                  const seriesData = await seriesRes.json();
+                  return {
+                    account,
+                    series: seriesData.data || [],
+                  };
+                }
+              } catch (error) {
+                console.error(`Error loading TWR for account ${account.account_code}:`, error);
+              }
+              return {
+                account,
+                series: [],
+              };
+            })
+          );
+
+          setAccountsTWR(accountsWithSeries);
+        }
+      } catch (error) {
+        console.error('Error loading TWR data:', error);
+      } finally {
+        setTwrLoading(false);
+      }
+    };
+    loadTwrData();
   }, [id, apiBaseUrl]);
 
   const AllocationPieChart = ({ 
@@ -290,7 +383,7 @@ const PortfolioPerformance = () => {
     <AppLayout title={`${portfolio.name} - Performance`} subtitle={`Detailed analytics for ${portfolio.interfaceCode}`}>
       {/* Back to Portfolio Link */}
       <div className="mb-4">
-        <Link to={`/portfolios/${portfolio.id}`}>
+        <Link to={`/portfolios/${id}`}>
           <Button variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Portfolio
@@ -400,6 +493,148 @@ const PortfolioPerformance = () => {
             />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* TWR (Time-Weighted Return) - Per-Account Charts */}
+      <div className="space-y-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <h3 className="text-base md:text-lg font-semibold text-foreground">
+              Time-Weighted Return (TWR)
+            </h3>
+            {twrStatus && (
+              <Badge
+                variant={twrStatus.is_synced ? 'default' : 'destructive'}
+                className={cn(
+                  'text-xs gap-1',
+                  twrStatus.is_synced
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : ''
+                )}
+              >
+                {twrStatus.is_synced ? (
+                  <CheckCircle2 className="h-3 w-3" />
+                ) : (
+                  <XCircle className="h-3 w-3" />
+                )}
+                {twrStatus.is_synced ? 'Synced' : 'Needs Update'}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {twrLoading ? (
+          <div className="bg-card border border-border rounded-xl p-6 flex items-center justify-center h-48">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : accountsTWR.length === 0 ? (
+          <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center h-48 gap-2">
+            <p className="text-sm text-muted-foreground">No TWR data available yet.</p>
+          </div>
+        ) : (
+          accountsTWR.map(({ account, series }) => (
+            <div key={account.account_id} className="bg-card border border-border rounded-xl p-4 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-sm md:text-base font-semibold text-foreground mono">
+                    {account.account_code}
+                  </h4>
+                  {account.account_alias && (
+                    <p className="text-xs text-muted-foreground">{account.account_alias}</p>
+                  )}
+                </div>
+                <Link to={`/portfolios/${id}/performance-configuration?account=${account.account_id}`}>
+                  <Button variant="outline" size="sm" className="gap-1 text-xs">
+                    <Settings2 className="h-3 w-3" />
+                    Configure
+                  </Button>
+                </Link>
+              </div>
+
+              {series.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 gap-2">
+                  <p className="text-sm text-muted-foreground">No data for this account yet.</p>
+                </div>
+              ) : (
+                <>
+                  {/* TWR summary */}
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Current TWR</p>
+                      <p
+                        className={cn(
+                          'text-lg font-bold mono',
+                          series[series.length - 1].twr >= 0 ? 'text-emerald-400' : 'text-red-400'
+                        )}
+                      >
+                        {series[series.length - 1].twr >= 0 ? '+' : ''}
+                        {series[series.length - 1].twr.toFixed(2)}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Latest NAV</p>
+                      <p className="text-lg font-bold mono text-foreground">
+                        ${series[series.length - 1].nav.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Since</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {account.twr_cutoff_date || series[0]?.date || '—'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={series}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 35%, 18%)" />
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: 'hsl(38, 20%, 55%)' }}
+                        tickFormatter={(val) => {
+                          const d = new Date(val);
+                          return `${d.getMonth() + 1}/${d.getDate()}`;
+                        }}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: 'hsl(38, 20%, 55%)' }}
+                        tickFormatter={(value) => `${value}%`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(222, 47%, 13%)',
+                          border: '1px solid hsl(222, 35%, 22%)',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                        }}
+                        labelStyle={{ color: 'hsl(38, 30%, 95%)', marginBottom: '4px' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'twr') return [`${value.toFixed(2)}%`, 'TWR'];
+                          return [`$${value.toLocaleString()}`, 'NAV'];
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="twr"
+                        stroke="hsl(142, 70%, 45%)"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4, fill: 'hsl(142, 70%, 45%)' }}
+                        name="twr"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       {/* Gainers/Losers Tabs */}

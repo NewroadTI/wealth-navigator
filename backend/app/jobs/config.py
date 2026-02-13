@@ -28,7 +28,9 @@ FLEX_QUERIES = {
     "STATEMENTFUNDS": "1126598",
     "TRADES": "1126535",
     "TRANSACCIONES": "1126335",
-    "TRANSFERS": "1126559"
+    "TRANSFERS": "1126559",
+    "NLV_HISTORY": "1399474"
+
 }
 
 # IBKR API URLs
@@ -39,6 +41,11 @@ IBKR_DOWNLOAD_URL = "https://www.interactivebrokers.com/Universal/servlet/FlexSt
 # --- TIMING ---
 WAIT_FOR_GENERATION = 3  # seconds to wait for report generation
 WAIT_BETWEEN_FILES = 2   # seconds between file downloads
+
+# --- FILE MANAGEMENT ---
+# Auto-delete CSV files after successful processing to save disk space
+# Set to False if you want to keep historical CSVs for auditing
+AUTO_DELETE_PROCESSED_CSV = os.getenv("AUTO_DELETE_PROCESSED_CSV", "true").lower() == "true"
 
 # --- SUPPORTED CURRENCIES ---
 MONEDAS_SUPPORTED = [

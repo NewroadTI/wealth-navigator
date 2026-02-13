@@ -36,6 +36,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Settings2,
 } from 'lucide-react';
 
 // Types
@@ -218,6 +219,9 @@ const PortfolioDetail = () => {
   const [txAssetCache, setTxAssetCache] = useState<Map<number, string>>(new Map());
   const [txSelectedAccount, setTxSelectedAccount] = useState<string>('all');
   const [txSelectedAsset, setTxSelectedAsset] = useState<string>('');
+
+  // TWR Status
+  const [twrSynced, setTwrSynced] = useState<boolean | null>(null);
   const [txAssetSearchInput, setTxAssetSearchInput] = useState('');
   const [txAssetDropdownOpen, setTxAssetDropdownOpen] = useState(false);
   const [txSelectedTypes, setTxSelectedTypes] = useState<string[]>(txTypeFilters);
@@ -274,6 +278,21 @@ const PortfolioDetail = () => {
     if (id) {
       loadPortfolio();
     }
+  }, [id, apiBaseUrl]);
+
+  // Load TWR sync status
+  useEffect(() => {
+    const loadTwrStatus = async () => {
+      if (!id) return;
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/v1/twr/${id}/status`);
+        if (res.ok) {
+          const data = await res.json();
+          setTwrSynced(data.is_synced);
+        }
+      } catch { /* ignore */ }
+    };
+    loadTwrStatus();
   }, [id, apiBaseUrl]);
 
   // Load countries
@@ -796,6 +815,18 @@ const PortfolioDetail = () => {
               <Button variant="default" size="sm" className="bg-primary text-primary-foreground text-xs md:text-sm">
                 <LineChart className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
                 Performance
+                {twrSynced !== null && (
+                  <span className={cn(
+                    'ml-1.5 h-2 w-2 rounded-full inline-block',
+                    twrSynced ? 'bg-emerald-400' : 'bg-yellow-400'
+                  )} title={twrSynced ? 'TWR synced' : 'TWR needs update'} />
+                )}
+              </Button>
+            </Link>
+            <Link to={`/portfolios/${portfolio.portfolio_id}/performance-configuration`}>
+              <Button variant="outline" size="sm" className="border-border text-xs md:text-sm">
+                <Settings2 className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
+                Configure TWR
               </Button>
             </Link>
             <Button variant="outline" size="sm" className="border-border text-xs md:text-sm">

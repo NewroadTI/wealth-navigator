@@ -68,64 +68,45 @@ class AISExportResponse(BaseModel):
 # HELPER FUNCTIONS
 # ==========================================================================
 
-# Column mapping: CSV column name → DB column name
+# Column mapping: AIS Excel column name → DB column name
+# Only columns that AIS provides are mapped here.
+# Inception-only columns (dealer, custodian, advisor, coupon_type, termsheet, etc.)
+# are NOT updated by AIS imports.
 CSV_TO_DB_MAP = {
     "ISIN": "isin",
     "Bid": "bid",
     "Ask": "ask",
-    "Underlyings": "underlyings_label",
-    "Final Fixing Date": "final_fixing_date",
-    "Initial Fixing Date": "initial_fixing_date",
-    "Next Autocall Date": "next_autocall_date",
-    "Next Coupon Date": "next_coupon_date",
-    "Issuer PCS": "issuer_pcs",
-    "Next Observation": "next_observation",
-    "Coupon Trigger": "coupon_trigger",
-    "Capital Barrier": "capital_barrier",
-    "Autocall Trigger": "autocall_trigger",
-    "Coupon p.a.": "coupon_pa",
-    "Reference Underlying": "reference_underlying",
-    "Put Strike": "put_strike",
-    "Issue Date": "issue_date",
-    "Redemption Date": "redemption_date",
-    "Next Autocall Trigger": "next_autocall_trigger",
-    "Next Autocall Value": "next_autocall_value",
-    "Reference Underlying Initial Fixing Level": "ref_underlying_initial_fixing",
-    "Reference Underlying Last Close": "ref_underlying_last_close",
-    "Final Client": "final_client",
-    "Next Coupon Payment Date": "next_coupon_payment_date",
-    "Strike Level": "strike_level",
-    "Dist Average": "dist_average",
     "Status": "status",
-    "Payoff": "payoff",
-    "Paid coupons": "paid_coupons",
-    "Store Observations": "store_observations",
-    "Coupon Frequency": "coupon_frequency",
-    "Callability Frequency": "callability_frequency",
+    "Product": "product_type",
     "Issuer": "issuer",
-    "Product": "product",
+    "Coupon p.a.": "coupon_annual_pct",
+    "Autocall Trigger": "autocall_trigger",
+    "Capital Barrier": "protection_barrier",
+    "Coupon Trigger": "coupon_barrier",
+    "Coupon Frequency": "observation_frequency",
+    "Next Coupon Payment Date": "next_payment_date",
+    "Issue Date": "issue_date",
+    "Initial Fixing Date": "strike_date",
+    "Paid coupons": "coupons_paid_count",
+    "Final Fixing Date": "maturity_date",
+    "Redemption Date": "maturity_date",
+    "Next Autocall Date": "next_autocall_obs",
+    "Next Observation": "next_coupon_obs",
     "Size": "size",
-    "Currency": "currency",
-    "Coupon": "coupon",
-    "Autocall": "autocall_value",
-    "Protection": "protection",
-    "Performance": "performance",
+    "Protection": "capital_protected_pct",
 }
 
 # Columns that should be parsed as dates
 DATE_COLUMNS = {
-    "final_fixing_date", "initial_fixing_date", "next_autocall_date",
-    "next_coupon_date", "next_observation", "issue_date", "redemption_date",
-    "next_coupon_payment_date",
+    "issue_date", "strike_date", "maturity_date",
+    "next_autocall_obs", "next_coupon_obs", "next_payment_date",
 }
 
 # Columns that should be parsed as numerics
 NUMERIC_COLUMNS = {
-    "bid", "ask", "coupon_trigger", "capital_barrier", "autocall_trigger",
-    "coupon_pa", "put_strike", "next_autocall_trigger", "next_autocall_value",
-    "ref_underlying_initial_fixing", "ref_underlying_last_close",
-    "strike_level", "dist_average", "paid_coupons", "size", "coupon",
-    "autocall_value", "protection", "performance",
+    "bid", "ask", "coupon_annual_pct", "autocall_trigger",
+    "protection_barrier", "coupon_barrier", "coupons_paid_count",
+    "nominal", "capital_protected_pct",
 }
 
 
@@ -159,6 +140,12 @@ def safe_date(value) -> Optional[date]:
         return None
 
 
+def safe_float(value) -> Optional[float]:
+    """Convert a value to float, return None for empty/invalid."""
+    dec = safe_decimal(value)
+    return float(dec) if dec is not None else None
+
+
 def safe_string(value) -> Optional[str]:
     """Clean a string value, return None for empty."""
     if pd.isna(value):
@@ -167,10 +154,19 @@ def safe_string(value) -> Optional[str]:
     return s if s and s != "-" else None
 
 
+def normalize_ais_status(value: Optional[str]) -> Optional[str]:
+    """Normalize AIS status labels to internal status labels."""
+    if not value:
+        return value
+    if value.strip().lower() == "live":
+        return "Active"
+    return value
+
+
 def build_underlyings(row: pd.Series) -> list:
     """
-    Build JSONB underlyings array from CSV row columns.
-    Handles dynamic Underlying 1..N, Strike N, Initial Fixing Level N, Spot N.
+    Build JSONB underlyings array from AIS Excel row columns.
+    Handles dynamic Underlying 1..N, Strike N, Initial Fixing Level N, Spot N, Performance N.
     """
     underlyings = []
     for i in range(1, 10):  # Support up to 9 underlyings
@@ -178,6 +174,7 @@ def build_underlyings(row: pd.Series) -> list:
         strike_col = f"Strike {i}"
         ifl_col = f"Initial Fixing Level {i}"
         spot_col = f"Spot {i}"
+        perf_col = f"Performance {i}"
 
         if underlying_col not in row.index:
             break
@@ -191,6 +188,7 @@ def build_underlyings(row: pd.Series) -> list:
             "strike": float(safe_decimal(row.get(strike_col)) or 0),
             "initial_fixing_level": float(safe_decimal(row.get(ifl_col)) or 0),
             "spot": float(safe_decimal(row.get(spot_col)) or 0),
+            "perf": float(safe_decimal(row.get(perf_col)) or 0),
         }
         underlyings.append(entry)
 
@@ -485,14 +483,10 @@ def import_structured_notes(db: Session = Depends(deps.get_db)):
                 skipped += 1
                 continue
 
-            # ── Build record data ──
-            record_data = {
-                "asset_id": asset_id,
-                "isin": isin,
-                "upload_date": today,
-            }
+            # ── Build AIS update data (only AIS-mapped columns) ──
+            ais_data = {}
 
-            # Map CSV columns to DB columns
+            # Map AIS CSV columns to DB columns
             for csv_col, db_col in CSV_TO_DB_MAP.items():
                 if csv_col == "ISIN":
                     continue  # Already handled
@@ -500,36 +494,65 @@ def import_structured_notes(db: Session = Depends(deps.get_db)):
                 raw_value = row.get(csv_col)
 
                 if db_col in DATE_COLUMNS:
-                    record_data[db_col] = safe_date(raw_value)
+                    ais_data[db_col] = safe_date(raw_value)
+                elif db_col == "size":
+                    ais_data[db_col] = safe_float(raw_value)
                 elif db_col in NUMERIC_COLUMNS:
-                    record_data[db_col] = safe_decimal(raw_value)
+                    ais_data[db_col] = safe_decimal(raw_value)
+                elif db_col == "status":
+                    ais_data[db_col] = normalize_ais_status(safe_string(raw_value))
                 else:
-                    record_data[db_col] = safe_string(raw_value)
-
-            # ── Validate currency ──
-            if valid_currencies and record_data.get("currency"):
-                if record_data["currency"] not in valid_currencies:
-                    logger.warning(f"⚠️ Row {idx}: Unknown currency '{record_data['currency']}' for ISIN {isin}")
+                    ais_data[db_col] = safe_string(raw_value)
 
             # ── Build underlyings JSONB ──
-            record_data["underlyings"] = build_underlyings(row)
+            ais_data["underlyings"] = build_underlyings(row)
 
-            # ── Upsert: same ISIN + same day = update ──
+            # ── Snapshot upsert logic ──
+            # 1. If row already exists for today → update AIS columns only
+            # 2. If row exists from a previous date → copy it to today, then apply AIS updates
+            # 3. If new ISIN → create fresh row with AIS data only
             try:
-                existing = db.query(StructuredNote).filter(
+                existing_today = db.query(StructuredNote).filter(
                     and_(
                         StructuredNote.isin == isin,
                         StructuredNote.upload_date == today,
                     )
                 ).first()
 
-                if existing:
-                    for key, value in record_data.items():
-                        if key != "isin" and key != "upload_date":
-                            setattr(existing, key, value)
+                if existing_today:
+                    # Update only AIS-provided columns (if they have values)
+                    for key, value in ais_data.items():
+                        if value is not None:
+                            setattr(existing_today, key, value)
                     updated += 1
                 else:
-                    new_note = StructuredNote(**record_data)
+                    # Check for previous snapshot to copy inception data
+                    prev = db.query(StructuredNote).filter(
+                        StructuredNote.isin == isin
+                    ).order_by(StructuredNote.upload_date.desc()).first()
+
+                    if prev:
+                        # Copy all fields from previous snapshot
+                        record_data = {}
+                        for col in StructuredNote.__table__.columns:
+                            if col.name in ("note_id", "created_at", "updated_at"):
+                                continue
+                            record_data[col.name] = getattr(prev, col.name)
+                        record_data["upload_date"] = today
+                        record_data["asset_id"] = asset_id
+                        # Apply AIS updates on top
+                        for key, value in ais_data.items():
+                            if value is not None:
+                                record_data[key] = value
+                        new_note = StructuredNote(**record_data)
+                    else:
+                        # Brand new ISIN (no inception data)
+                        new_note = StructuredNote(
+                            asset_id=asset_id,
+                            isin=isin,
+                            upload_date=today,
+                            **ais_data,
+                        )
                     db.add(new_note)
                     created += 1
 
@@ -601,22 +624,35 @@ def import_structured_notes(db: Session = Depends(deps.get_db)):
 @router.get("/notes", response_model=List[StructuredNoteRead])
 def get_structured_notes(
     upload_date: Optional[date] = Query(None, description="Filter by date (default: latest)"),
+    status: Optional[str] = Query(None, description="Filter by status (default: Active)"),
+    issuer: Optional[str] = Query(None, description="Filter by issuer"),
     db: Session = Depends(deps.get_db),
 ):
     """
     Get structured notes for a specific date.
-    Defaults to latest available upload_date.
+    Defaults to latest upload_date and status='Active'.
+    Pass status='all' to see all statuses.
     """
     if upload_date is None:
-        # Get the most recent upload_date
         latest = db.query(sa_func.max(StructuredNote.upload_date)).scalar()
         if latest is None:
             return []
         upload_date = latest
 
-    notes = db.query(StructuredNote).filter(
+    query = db.query(StructuredNote).filter(
         StructuredNote.upload_date == upload_date
-    ).order_by(StructuredNote.isin).all()
+    )
+
+    # Default to Active filter unless 'all' is passed
+    if status and status.lower() != "all":
+        query = query.filter(StructuredNote.status == status)
+    elif status is None:
+        query = query.filter(StructuredNote.status == "Active")
+
+    if issuer:
+        query = query.filter(StructuredNote.issuer == issuer)
+
+    notes = query.order_by(StructuredNote.isin).all()
 
     return notes
 
@@ -696,5 +732,4 @@ def get_note_holders(
         ))
 
     return holders
-
 

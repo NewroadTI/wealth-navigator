@@ -11,6 +11,7 @@ from app.jobs.processors.corporate_actions import (
 from app.jobs.processors.open_positions import OpenPositionsProcessor
 from app.jobs.processors.cash_journal import CashJournalProcessor
 from app.jobs.processors.trades import TradesProcessor, process_trades_report
+from app.jobs.processors.nlv_history import NLVHistoryProcessor, process_nlv_history
 
 __all__ = [
     "CorporateActionsProcessor",
@@ -19,4 +20,6 @@ __all__ = [
     "CashJournalProcessor",
     "TradesProcessor",
     "process_trades_report",
+    "NLVHistoryProcessor",
+    "process_nlv_history",
 ]

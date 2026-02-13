@@ -66,11 +66,13 @@ class PortfolioUpdate(BaseModel):
     residence_country: Optional[str] = None
     active_status: Optional[bool] = None
     inception_date: Optional[date] = None
+    twr_cutoff_date: Optional[date] = None
 
 class PortfolioRead(PortfolioBase):
     portfolio_id: int
     owner_user_id: int
     inception_date: Optional[date] = None
+    twr_cutoff_date: Optional[date] = None
     
     accounts: List[AccountRead] = []
     advisors: List[PortfolioAdvisorRead] = []

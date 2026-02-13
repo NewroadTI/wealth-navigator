@@ -14,7 +14,7 @@ from app.models.asset import (
     StockExchange, Industry, AssetClass, AssetSubClass, Asset,
     Trades, CashJournal, FXTransaction, PerformanceAttribution,
     CorporateAction, Position, MarketPrice, MarketIndex,
-    Currency, Country, CorporateAction
+    Currency, Country, CorporateAction, StructuredNote
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 
 def run_migration():
     logger.info("--- 🔄 Iniciando Actualización de Esquema de Base de Datos ---")
+    
+    # 0. DROP structured_notes to recreate with new schema
+    with engine.connect() as connection:
+        logger.info("0. Dropping structured_notes table for schema rebuild...")
+        connection.execute(text("DROP TABLE IF EXISTS structured_notes CASCADE"))
+        connection.commit()
     
     # 1. CREAR LAS TABLAS NUEVAS (Si faltara alguna)
     Base.metadata.create_all(bind=engine)
