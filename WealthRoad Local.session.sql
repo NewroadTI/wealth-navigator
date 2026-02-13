@@ -1,1 +1,1 @@
-SELECT * from twr_daily ;
+SELECT * from assets ;
