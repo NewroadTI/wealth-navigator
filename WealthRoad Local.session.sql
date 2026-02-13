@@ -1,0 +1,1 @@
+SELECT * from twr_daily ;

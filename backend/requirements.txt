@@ -18,3 +18,4 @@ pandas
 ib_async
 ib_insync
 playwright
+yfinance

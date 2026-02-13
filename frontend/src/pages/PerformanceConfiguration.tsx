@@ -269,6 +269,7 @@ const PerformanceConfiguration = () => {
         )}
 
         {/* Missing ETL Jobs Warning */}
+        {/*
         {status && status.missing_etl_jobs.length > 0 && (
           <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
             <div className="flex items-center gap-2 mb-2">
@@ -286,7 +287,7 @@ const PerformanceConfiguration = () => {
               </Button>
             </Link>
           </div>
-        )}
+        )}*/}
       </div>
 
       {/* Account Selector */}

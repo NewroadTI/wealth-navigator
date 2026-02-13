@@ -429,6 +429,146 @@ def get_portfolio_usd_accounts(db: Session, portfolio_id: int) -> List[Dict[str,
     return result
 
 
+def get_portfolio_twr_summary(db: Session, portfolio_id: int) -> Dict[str, Any]:
+    """
+    Get TWR summary for a portfolio: total NAV (sum of USD accounts),
+    day change (last HP), last TWR %, cutoff dates, last update date.
+    Used by portfolio cards and detail header to show real data from twr_daily.
+    """
+    accounts = (
+        db.query(Account)
+        .filter(
+            Account.portfolio_id == portfolio_id,
+            Account.account_code.like('%_USD'),
+        )
+        .order_by(Account.account_code.asc())
+        .all()
+    )
+
+    if not accounts:
+        return {
+            "portfolio_id": portfolio_id,
+            "total_nav": 0,
+            "last_date": None,
+            "day_change": 0,
+            "last_twr_pct": None,
+            "accounts": [],
+        }
+
+    total_nav = 0
+    total_day_change = 0
+    overall_last_date = None
+    account_details = []
+
+    for acc in accounts:
+        # Get last 2 TWR rows to compute day change
+        last_two = (
+            db.query(TWRDaily)
+            .filter(
+                TWRDaily.account_id == acc.account_id,
+                TWRDaily.twr.isnot(None),
+                TWRDaily.nav.isnot(None),
+            )
+            .order_by(TWRDaily.date.desc())
+            .limit(2)
+            .all()
+        )
+
+        if not last_two:
+            account_details.append({
+                "account_id": acc.account_id,
+                "account_code": acc.account_code,
+                "nav": 0,
+                "last_date": None,
+                "day_change": 0,
+                "twr_pct": None,
+                "cutoff_date": str(acc.twr_cutoff_date) if acc.twr_cutoff_date else None,
+            })
+            continue
+
+        last_row = last_two[0]
+        prev_row = last_two[1] if len(last_two) > 1 else None
+
+        nav = float(last_row.nav) if last_row.nav else 0
+        twr_pct = round(float(last_row.twr) * 100, 4) if last_row.twr else None
+        last_date = str(last_row.date)
+
+        # Day change = last NAV - previous NAV (adjusted for cash flows)
+        day_change = 0
+        if prev_row and prev_row.nav and last_row.nav:
+            # HP already represents the single-day return before cash flows
+            # day_change in $ = last_nav - prev_nav - cash_flow_of_last_day
+            cash_flow = float(last_row.sum_cash_journal or 0)
+            day_change = round(float(last_row.nav) - float(prev_row.nav) - cash_flow, 2)
+
+        total_nav += nav
+        total_day_change += day_change
+        if overall_last_date is None or last_date > overall_last_date:
+            overall_last_date = last_date
+
+        # Get first TWR date for this account (for cutoff fallback)
+        first_twr_row = (
+            db.query(TWRDaily.date)
+            .filter(
+                TWRDaily.account_id == acc.account_id,
+                TWRDaily.twr.isnot(None),
+            )
+            .order_by(TWRDaily.date.asc())
+            .first()
+        )
+        cutoff = acc.twr_cutoff_date or (first_twr_row.date if first_twr_row else None)
+
+        account_details.append({
+            "account_id": acc.account_id,
+            "account_code": acc.account_code,
+            "nav": round(nav, 2),
+            "last_date": last_date,
+            "day_change": day_change,
+            "twr_pct": twr_pct,
+            "cutoff_date": str(cutoff) if cutoff else None,
+        })
+
+    # For the portfolio-level TWR, if there's only one USD account, use its TWR
+    # If multiple, we'd need a combined TWR calculation. For now, use the first account's TWR.
+    last_twr_pct = None
+    if len(account_details) == 1:
+        last_twr_pct = account_details[0]["twr_pct"]
+    elif len(account_details) > 1:
+        # For multiple accounts, report each separately
+        last_twr_pct = account_details[0]["twr_pct"]
+
+    return {
+        "portfolio_id": portfolio_id,
+        "total_nav": round(total_nav, 2),
+        "last_date": overall_last_date,
+        "day_change": round(total_day_change, 2),
+        "last_twr_pct": last_twr_pct,
+        "accounts": account_details,
+    }
+
+
+def get_all_portfolios_twr_summary(db: Session) -> List[Dict[str, Any]]:
+    """
+    Get TWR summary for ALL portfolios at once (efficient bulk query).
+    Returns a list of portfolio summaries.
+    """
+    from sqlalchemy import distinct
+    
+    # Get all portfolios that have USD accounts
+    portfolio_ids = [
+        pid for (pid,) in db.query(distinct(Account.portfolio_id))
+        .filter(Account.account_code.like('%_USD'))
+        .all()
+    ]
+
+    results = []
+    for pid in portfolio_ids:
+        summary = get_portfolio_twr_summary(db, pid)
+        results.append(summary)
+
+    return results
+
+
 def recalculate_twr(db: Session, account_id: int, debug: bool = False) -> Dict[str, Any]:
     """
     Recalculate TWR for a single account.
@@ -580,4 +720,140 @@ def get_twr_table(
             }
             for r in rows
         ],
+    }
+
+
+def get_benchmark_series(
+    db: Session,
+    account_id: int,
+    ticker: str = "SPY",
+    start_date: date = None,
+    end_date: date = None,
+) -> Dict[str, Any]:
+    """
+    Get normalized benchmark (e.g. SPY) returns aligned to the TWR dates of an account.
+    
+    The benchmark is normalized from the account's cutoff_date (or start_date override).
+    If no cutoff_date is set, uses the first available TWR date for the account.
+    
+    Returns:
+        Dict with account_id, ticker, cutoff_date, and data list of {date, benchmark}.
+    """
+    account = db.query(Account).filter(Account.account_id == account_id).first()
+    if not account:
+        return {"error": "Account not found"}
+
+    # Get TWR dates for this account (both to determine cutoff if needed and to align benchmark)
+    base_query = (
+        db.query(TWRDaily.date)
+        .filter(
+            TWRDaily.account_id == account_id,
+            TWRDaily.twr.isnot(None),
+        )
+    )
+    if end_date:
+        base_query = base_query.filter(TWRDaily.date <= end_date)
+    
+    all_twr_dates = sorted([row.date for row in base_query.all()])
+    if not all_twr_dates:
+        return {
+            "account_id": account_id,
+            "ticker": ticker,
+            "cutoff_date": None,
+            "data": [],
+        }
+
+    # Determine the cutoff date: use start_date override, or account's cutoff, or first TWR date
+    cutoff = start_date or account.twr_cutoff_date or all_twr_dates[0]
+
+    # Filter TWR dates from cutoff onwards
+    twr_dates = [d for d in all_twr_dates if d >= cutoff]
+    if not twr_dates:
+        return {
+            "account_id": account_id,
+            "ticker": ticker,
+            "cutoff_date": str(cutoff),
+            "data": [],
+        }
+
+    # Download benchmark data from yfinance
+    # Fetch from 1 day before first TWR date to ensure we have the cutoff day price
+    download_start = twr_dates[0] - timedelta(days=5)
+    download_end = twr_dates[-1] + timedelta(days=1)
+
+    try:
+        import yfinance as yf
+        df = yf.download(
+            ticker,
+            start=download_start.strftime("%Y-%m-%d"),
+            end=download_end.strftime("%Y-%m-%d"),
+            progress=False,
+            auto_adjust=True,
+        )
+        if df.empty:
+            logger.warning(f"No yfinance data for {ticker} between {download_start} and {download_end}")
+            return {
+                "account_id": account_id,
+                "ticker": ticker,
+                "cutoff_date": str(cutoff) if cutoff else None,
+                "data": [],
+            }
+
+        # Handle MultiIndex columns from yfinance (e.g. ('Close', 'SPY'))
+        if hasattr(df.columns, 'nlevels') and df.columns.nlevels > 1:
+            df.columns = df.columns.get_level_values(0)
+
+        close_prices = df["Close"].dropna()
+
+        # Build a date→price lookup (convert index to date objects)
+        price_map = {}
+        for idx, val in close_prices.items():
+            d = idx.date() if hasattr(idx, 'date') else idx
+            price_map[d] = float(val)
+
+    except Exception as e:
+        logger.error(f"Error downloading {ticker} data: {e}")
+        return {
+            "account_id": account_id,
+            "ticker": ticker,
+            "cutoff_date": str(cutoff) if cutoff else None,
+            "data": [],
+        }
+
+    # Find the base price (the price on or closest before the first TWR date)
+    base_price = None
+    first_date = twr_dates[0]
+    for offset in range(6):  # Look back up to 5 days for weekends/holidays
+        check_date = first_date - timedelta(days=offset)
+        if check_date in price_map:
+            base_price = price_map[check_date]
+            break
+
+    if base_price is None or base_price == 0:
+        logger.warning(f"Could not find base price for {ticker} near {first_date}")
+        return {
+            "account_id": account_id,
+            "ticker": ticker,
+            "cutoff_date": str(cutoff) if cutoff else None,
+            "data": [],
+        }
+
+    # Normalize: for each TWR date, compute (price / base_price - 1) * 100
+    series = []
+    last_known_price = base_price
+    for d in twr_dates:
+        if d in price_map:
+            last_known_price = price_map[d]
+        # Use last known price for holidays/missing days
+        normalized = round((last_known_price / base_price - 1) * 100, 4)
+        series.append({
+            "date": str(d),
+            "benchmark": normalized,
+        })
+
+    return {
+        "account_id": account_id,
+        "ticker": ticker,
+        "cutoff_date": str(cutoff) if cutoff else None,
+        "data": series,
     }

@@ -110,3 +110,16 @@ class TWRFillAndCalculateResponse(BaseModel):
     message: str
     cash_journal_filled: int
     twr_calculated: int
+
+
+# --- Benchmark ---
+class BenchmarkPoint(BaseModel):
+    date: str
+    benchmark: float = Field(description="Normalized benchmark return as percentage from cutoff date")
+
+
+class BenchmarkSeriesResponse(BaseModel):
+    account_id: int
+    ticker: str
+    cutoff_date: Optional[str] = None
+    data: List[BenchmarkPoint]

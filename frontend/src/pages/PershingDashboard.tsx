@@ -617,9 +617,6 @@ const PershingDashboard = () => {
     // Auto-fetch jobs on mount
     useEffect(() => {
         fetchJobs();
-        // Refresh every 30 seconds
-        const interval = setInterval(fetchJobs, 30000);
-        return () => clearInterval(interval);
     }, []);
 
     // ========================================================================
