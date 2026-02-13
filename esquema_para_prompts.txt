@@ -1,0 +1,436 @@
+TABLE: account_return_series
+	- series_id (integer NOT NULL)
+	- account_id (integer NOT NULL)
+	- period_type (character varying NOT NULL)
+	- period_label (character varying NOT NULL)
+	- end_date (date NOT NULL)
+	- return_pct (numeric NOT NULL)
+	- starting_nav (numeric)
+	- ending_nav (numeric)
+
+TABLE: accounts
+	- account_id (integer NOT NULL)
+	- portfolio_id (integer)
+	- institution (character varying NOT NULL)
+	- account_code (character varying NOT NULL)
+	- account_alias (character varying)
+	- account_type (character varying)
+	- currency (character)
+	- investment_strategy_id (integer)
+
+TABLE: asset_classes
+	- class_id (integer NOT NULL)
+	- code (character varying NOT NULL)
+	- name (character varying NOT NULL)
+
+TABLE: asset_sub_classes
+	- sub_class_id (integer NOT NULL)
+	- class_id (integer NOT NULL)
+	- code (character varying)
+	- name (character varying NOT NULL)
+
+TABLE: assets
+	- asset_id (integer NOT NULL)
+	- class_id (integer NOT NULL)
+	- sub_class_id (integer)
+	- symbol (character varying NOT NULL)
+	- description (character varying)
+	- isin (character varying)
+	- figi (character varying)
+	- cusip (character varying)
+	- ib_conid (integer)
+	- industry_code (character varying)
+	- country_code (character)
+	- currency (character)
+	- multiplier (numeric)
+	- contract_size (numeric)
+	- underlying_symbol (character varying)
+	- strike_price (numeric)
+	- expiry_date (date)
+	- put_call (character varying)
+	- maturity_date (date)
+	- coupon_rate (numeric)
+	- issuer (character varying)
+	- product_category (character varying)
+	- initial_fixing_date (date)
+	- next_autocall_date (date)
+	- next_coupon_payment_date (date)
+	- autocall_trigger (numeric)
+	- coupon_trigger (numeric)
+	- capital_barrier (numeric)
+	- protection_level (numeric)
+	- payment_frequency (character varying)
+	- structured_note_details (jsonb)
+	- inviu_code (character varying)
+	- is_active (boolean)
+
+TABLE: audit_logs
+	- log_id (integer NOT NULL)
+	- user_id (integer)
+	- action (character varying)
+	- table_name (character varying)
+	- record_id (character varying)
+	- old_value (jsonb)
+	- new_value (jsonb)
+	- timestamp (timestamp with time zone)
+
+TABLE: cash_journal
+	- journal_id (integer NOT NULL)
+	- account_id (integer)
+	- asset_id (integer)
+	- date (date NOT NULL)
+	- ex_date (date)
+	- type (character varying NOT NULL)
+	- amount (numeric NOT NULL)
+	- currency (character)
+	- quantity (numeric)
+	- rate_per_share (numeric)
+	- description (text)
+	- reference_code (character varying)
+	- extra_details (jsonb)
+	- transfer_account_id (integer)
+	- external_transaction_id (character varying)
+	- action_id (character varying)
+
+TABLE: corporate_actions
+	- action_id (integer NOT NULL)
+	- ib_action_id (character varying)
+	- transaction_id (character varying)
+	- account_id (integer NOT NULL)
+	- asset_id (integer)
+	- action_type (character varying)
+	- report_date (date)
+	- execution_date (date)
+	- description (text)
+	- ratio_old (numeric)
+	- ratio_new (numeric)
+	- quantity_adjustment (numeric)
+	- symbol (character varying)
+	- isin (character varying)
+	- cusip (character varying)
+	- security_id (character varying)
+	- security_id_type (character varying)
+	- amount (numeric)
+	- proceeds (numeric)
+	- value (numeric)
+	- fifo_pnl_realized (numeric)
+	- mtm_pnl (numeric)
+	- currency (character varying)
+
+TABLE: countries
+	- iso_code (character NOT NULL)
+	- name (character varying)
+
+TABLE: currencies
+	- code (character NOT NULL)
+	- name (character varying)
+
+TABLE: etl_job_logs
+	- job_id (integer NOT NULL)
+	- job_type (character varying NOT NULL)
+	- job_name (character varying)
+	- status (character varying NOT NULL)
+	- done (boolean NOT NULL)
+	- started_at (timestamp without time zone NOT NULL)
+	- completed_at (timestamp without time zone)
+	- records_processed (integer)
+	- records_created (integer)
+	- records_updated (integer)
+	- records_skipped (integer)
+	- records_failed (integer)
+	- file_name (character varying)
+	- file_size_bytes (integer)
+	- error_message (text)
+	- error_details (jsonb)
+	- execution_time_seconds (numeric)
+	- created_assets (jsonb)
+	- extra_data (jsonb)
+
+TABLE: etl_sync_status
+	- status_id (integer NOT NULL)
+	- report_type (character varying NOT NULL)
+	- last_success_at (timestamp without time zone)
+	- last_success_records (integer)
+	- last_run_at (timestamp without time zone)
+	- last_run_status (character varying)
+	- last_run_job_id (integer)
+	- total_runs_today (integer)
+	- total_records_today (integer)
+	- success_rate_today (numeric)
+	- last_data_date (date)
+	- is_enabled (boolean)
+	- auto_sync_enabled (boolean)
+
+TABLE: fx_transactions
+	- fx_id (integer NOT NULL)
+	- trade_date (date)
+	- account_id (integer NOT NULL)
+	- target_account_id (integer)
+	- source_currency (character)
+	- source_amount (numeric)
+	- target_currency (character)
+	- target_amount (numeric)
+	- side (character varying)
+	- exchange_rate (numeric)
+	- commission (numeric)
+	- commission_currency (character)
+	- ib_transaction_id (character varying)
+	- ib_exec_id (character varying)
+	- ib_order_id (character varying)
+	- exchange (character varying)
+	- transaction_type (character varying)
+	- notes (character varying)
+	- external_id (character varying)
+
+TABLE: income_projections
+	- projection_id (integer NOT NULL)
+	- account_id (integer NOT NULL)
+	- asset_id (integer)
+	- report_date (date NOT NULL)
+	- symbol (character varying)
+	- description (character varying)
+	- quantity (numeric)
+	- price (numeric)
+	- market_value (numeric)
+	- yield_pct (numeric)
+	- estimated_annual_income (numeric)
+	- estimated_remaining_income (numeric)
+	- frequency (integer)
+	- currency (character)
+
+TABLE: industries
+	- industry_code (character varying NOT NULL)
+	- name (character varying NOT NULL)
+	- sector (character varying)
+
+TABLE: investment_strategies
+	- strategy_id (integer NOT NULL)
+	- name (character varying NOT NULL)
+	- description (text)
+
+TABLE: market_indices
+	- index_code (character varying NOT NULL)
+	- name (character varying NOT NULL)
+	- exchange_code (character varying)
+	- country_code (character)
+
+TABLE: market_prices
+	- asset_id (integer NOT NULL)
+	- time (date NOT NULL)
+	- price_close (numeric)
+	- prior_mtm_pnl (numeric)
+	- source (character varying)
+
+TABLE: performance_attribution
+	- attribution_id (bigint NOT NULL)
+	- account_id (integer NOT NULL)
+	- asset_id (integer)
+	- category_label (character varying)
+	- avg_weight (numeric)
+	- return_pct (numeric)
+	- contribution_pct (numeric)
+	- realized_pnl (numeric)
+	- unrealized_pnl (numeric)
+	- is_open_position (boolean)
+	- sector_snapshot (character varying)
+
+TABLE: permissions
+	- permission_id (integer NOT NULL)
+	- slug (character varying NOT NULL)
+	- description (text)
+
+TABLE: portfolio_advisors
+	- assignment_id (integer NOT NULL)
+	- portfolio_id (integer)
+	- advisor_user_id (integer)
+	- role (character varying NOT NULL)
+	- start_date (date NOT NULL)
+	- end_date (date)
+
+TABLE: portfolios
+	- portfolio_id (integer NOT NULL)
+	- owner_user_id (integer)
+	- interface_code (character varying NOT NULL)
+	- name (character varying NOT NULL)
+	- main_currency (character)
+	- residence_country (character)
+	- inception_date (date)
+	- active_status (boolean)
+	- twr_cutoff_date (date)
+
+TABLE: twr_daily
+	- twr_daily_id (integer NOT NULL)
+	- account_id (integer NOT NULL, FK → accounts)
+	- date (date NOT NULL)
+	- nav (numeric)
+	- sum_cash_journal (numeric DEFAULT 0)
+	- twr (numeric)
+	- hp (numeric)
+	- initial_hp_date (date)
+	- created_at (timestamp with time zone)
+	- updated_at (timestamp with time zone)
+	- UNIQUE(account_id, date)
+
+TABLE: positions
+	- position_id (integer NOT NULL)
+	- account_id (integer NOT NULL)
+	- asset_id (integer NOT NULL)
+	- report_date (date NOT NULL)
+	- quantity (numeric NOT NULL)
+	- mark_price (numeric)
+	- position_value (numeric)
+	- cost_basis_money (numeric)
+	- cost_basis_price (numeric)
+	- open_price (numeric)
+	- fifo_pnl_unrealized (numeric)
+	- percent_of_nav (numeric)
+	- side (character varying)
+	- level_of_detail (character varying)
+	- open_date_time (timestamp without time zone)
+	- vesting_date (date)
+	- accrued_interest (numeric)
+	- fx_rate_to_base (numeric)
+	- currency (character)
+
+TABLE: role_permissions
+	- role_id (integer NOT NULL)
+	- permission_id (integer NOT NULL)
+
+TABLE: roles
+	- role_id (integer NOT NULL)
+	- name (character varying NOT NULL)
+	- description (text)
+
+TABLE: stock_exchanges
+	- exchange_code (character varying NOT NULL)
+	- name (character varying NOT NULL)
+	- country_code (character)
+
+TABLE: structured_notes
+	- note_id (integer NOT NULL)
+	- asset_id (integer NOT NULL)
+	- isin (character varying NOT NULL)
+	- upload_date (date NOT NULL)
+	- bid (numeric)
+	- ask (numeric)
+	- underlyings (jsonb)
+	- underlyings_label (character varying)
+	- final_fixing_date (date)
+	- initial_fixing_date (date)
+	- next_autocall_date (date)
+	- next_coupon_date (date)
+	- next_observation (date)
+	- issue_date (date)
+	- redemption_date (date)
+	- next_coupon_payment_date (date)
+	- issuer_pcs (character varying)
+	- reference_underlying (character varying)
+	- final_client (character varying)
+	- status (character varying)
+	- payoff (character varying)
+	- store_observations (character varying)
+	- coupon_frequency (character varying)
+	- callability_frequency (character varying)
+	- issuer (character varying)
+	- product (character varying)
+	- currency (character varying)
+	- coupon_trigger (numeric)
+	- capital_barrier (numeric)
+	- autocall_trigger (numeric)
+	- coupon_pa (numeric)
+	- put_strike (numeric)
+	- next_autocall_trigger (numeric)
+	- next_autocall_value (numeric)
+	- ref_underlying_initial_fixing (numeric)
+	- ref_underlying_last_close (numeric)
+	- strike_level (numeric)
+	- dist_average (numeric)
+	- paid_coupons (numeric)
+	- size (numeric)
+	- coupon (numeric)
+	- autocall_value (numeric)
+	- protection (numeric)
+	- performance (numeric)
+	- created_at (timestamp without time zone)
+	- updated_at (timestamp without time zone)
+
+TABLE: trades
+	- transaction_id (integer NOT NULL)
+	- account_id (integer)
+	- asset_id (integer)
+	- ib_transaction_id (character varying)
+	- ib_exec_id (character varying)
+	- ib_trade_id (character varying)
+	- ib_order_id (character varying)
+	- trade_date (date NOT NULL)
+	- settlement_date (date)
+	- report_date (date)
+	- transaction_type (character varying)
+	- side (character varying)
+	- exchange (character varying)
+	- quantity (numeric NOT NULL)
+	- price (numeric NOT NULL)
+	- gross_amount (numeric)
+	- net_amount (numeric)
+	- proceeds (numeric)
+	- commission (numeric)
+	- tax (numeric)
+	- cost_basis (numeric)
+	- realized_pnl (numeric)
+	- mtm_pnl (numeric)
+	- multiplier (numeric)
+	- strike (numeric)
+	- expiry (date)
+	- put_call (character varying)
+	- currency (character)
+	- description (text)
+	- notes (text)
+
+TABLE: users
+	- user_id (integer NOT NULL)
+	- username (character varying NOT NULL)
+	- email (character varying)
+	- password_hash (character varying NOT NULL)
+	- full_name (character varying)
+	- phone (character varying)
+	- tax_id (character varying)
+	- entity_type (character varying)
+	- is_active (boolean)
+	- created_at (timestamp with time zone)
+	- role_id (integer)
+
+
+
+
+
+
+TABLE: account_return_series\n  - series_id (integer NOT NULL)\n  - account_id (integer NOT NULL)\n  - period_type (character varying NOT NULL)\n  - period_label (character varying NOT NULL)\n  - end_date (date NOT NULL)\n  - return_pct (numeric NOT NULL)\n  - starting_nav (numeric)\n  - ending_nav (numeric)\n
+TABLE: accounts\n  - account_id (integer NOT NULL)\n  - portfolio_id (integer)\n  - institution (character varying NOT NULL)\n  - account_code (character varying NOT NULL)\n  - account_alias (character varying)\n  - account_type (character varying)\n  - currency (character)\n  - investment_strategy_id (integer)\n
+TABLE: asset_classes\n  - class_id (integer NOT NULL)\n  - code (character varying NOT NULL)\n  - name (character varying NOT NULL)\n
+TABLE: asset_sub_classes\n  - sub_class_id (integer NOT NULL)\n  - class_id (integer NOT NULL)\n  - code (character varying)\n  - name (character varying NOT NULL)\n
+TABLE: assets\n  - asset_id (integer NOT NULL)\n  - class_id (integer NOT NULL)\n  - sub_class_id (integer)\n  - symbol (character varying NOT NULL)\n  - description (character varying)\n  - isin (character varying)\n  - figi (character varying)\n  - cusip (character varying)\n  - ib_conid (integer)\n  - industry_code (character varying)\n  - country_code (character)\n  - currency (character)\n  - multiplier (numeric)\n  - contract_size (numeric)\n  - underlying_symbol (character varying)\n  - strike_price (numeric)\n  - expiry_date (date)\n  - put_call (character varying)\n  - maturity_date (date)\n  - coupon_rate (numeric)\n  - issuer (character varying)\n  - product_category (character varying)\n  - initial_fixing_date (date)\n  - next_autocall_date (date)\n  - next_coupon_payment_date (date)\n  - autocall_trigger (numeric)\n  - coupon_trigger (numeric)\n  - capital_barrier (numeric)\n  - protection_level (numeric)\n  - payment_frequency (character varying)\n  - structured_note_details (jsonb)\n  - inviu_code (character varying)\n  - is_active (boolean)\n
+TABLE: audit_logs\n  - log_id (integer NOT NULL)\n  - user_id (integer)\n  - action (character varying)\n  - table_name (character varying)\n  - record_id (character varying)\n  - old_value (jsonb)\n  - new_value (jsonb)\n  - timestamp (timestamp with time zone)\n
+TABLE: cash_journal\n  - journal_id (integer NOT NULL)\n  - account_id (integer)\n  - asset_id (integer)\n  - date (date NOT NULL)\n  - ex_date (date)\n  - type (character varying NOT NULL)\n  - amount (numeric NOT NULL)\n  - currency (character)\n  - quantity (numeric)\n  - rate_per_share (numeric)\n  - description (text)\n  - reference_code (character varying)\n  - extra_details (jsonb)\n  - transfer_account_id (integer)\n  - external_transaction_id (character varying)\n  - action_id (character varying)\n
+TABLE: corporate_actions\n  - action_id (integer NOT NULL)\n  - ib_action_id (character varying)\n  - transaction_id (character varying)\n  - account_id (integer NOT NULL)\n  - asset_id (integer)\n  - action_type (character varying)\n  - report_date (date)\n  - execution_date (date)\n  - description (text)\n  - ratio_old (numeric)\n  - ratio_new (numeric)\n  - quantity_adjustment (numeric)\n  - symbol (character varying)\n  - isin (character varying)\n  - cusip (character varying)\n  - security_id (character varying)\n  - security_id_type (character varying)\n  - amount (numeric)\n  - proceeds (numeric)\n  - value (numeric)\n  - fifo_pnl_realized (numeric)\n  - mtm_pnl (numeric)\n  - currency (character varying)\n
+TABLE: countries\n  - iso_code (character NOT NULL)\n  - name (character varying)\n
+TABLE: currencies\n  - code (character NOT NULL)\n  - name (character varying)\n
+TABLE: etl_job_logs\n  - job_id (integer NOT NULL)\n  - job_type (character varying NOT NULL)\n  - job_name (character varying)\n  - status (character varying NOT NULL)\n  - done (boolean NOT NULL)\n  - started_at (timestamp without time zone NOT NULL)\n  - completed_at (timestamp without time zone)\n  - records_processed (integer)\n  - records_created (integer)\n  - records_updated (integer)\n  - records_skipped (integer)\n  - records_failed (integer)\n  - file_name (character varying)\n  - file_size_bytes (integer)\n  - error_message (text)\n  - error_details (jsonb)\n  - execution_time_seconds (numeric)\n  - created_assets (jsonb)\n  - extra_data (jsonb)\n
+TABLE: etl_sync_status\n  - status_id (integer NOT NULL)\n  - report_type (character varying NOT NULL)\n  - last_success_at (timestamp without time zone)\n  - last_success_records (integer)\n  - last_run_at (timestamp without time zone)\n  - last_run_status (character varying)\n  - last_run_job_id (integer)\n  - total_runs_today (integer)\n  - total_records_today (integer)\n  - success_rate_today (numeric)\n  - last_data_date (date)\n  - is_enabled (boolean)\n  - auto_sync_enabled (boolean)\n
+TABLE: fx_transactions\n  - fx_id (integer NOT NULL)\n  - trade_date (date)\n  - account_id (integer NOT NULL)\n  - target_account_id (integer)\n  - source_currency (character)\n  - source_amount (numeric)\n  - target_currency (character)\n  - target_amount (numeric)\n  - side (character varying)\n  - exchange_rate (numeric)\n  - commission (numeric)\n  - commission_currency (character)\n  - ib_transaction_id (character varying)\n  - ib_exec_id (character varying)\n  - ib_order_id (character varying)\n  - exchange (character varying)\n  - transaction_type (character varying)\n  - notes (character varying)\n  - external_id (character varying)\n
+TABLE: income_projections\n  - projection_id (integer NOT NULL)\n  - account_id (integer NOT NULL)\n  - asset_id (integer)\n  - report_date (date NOT NULL)\n  - symbol (character varying)\n  - description (character varying)\n  - quantity (numeric)\n  - price (numeric)\n  - market_value (numeric)\n  - yield_pct (numeric)\n  - estimated_annual_income (numeric)\n  - estimated_remaining_income (numeric)\n  - frequency (integer)\n  - currency (character)\n
+TABLE: industries\n  - industry_code (character varying NOT NULL)\n  - name (character varying NOT NULL)\n  - sector (character varying)\n
+TABLE: investment_strategies\n  - strategy_id (integer NOT NULL)\n  - name (character varying NOT NULL)\n  - description (text)\n
+TABLE: market_indices\n  - index_code (character varying NOT NULL)\n  - name (character varying NOT NULL)\n  - exchange_code (character varying)\n  - country_code (character)\n
+TABLE: market_prices\n  - asset_id (integer NOT NULL)\n  - time (date NOT NULL)\n  - price_close (numeric)\n  - prior_mtm_pnl (numeric)\n  - source (character varying)\n
+TABLE: performance_attribution\n  - attribution_id (bigint NOT NULL)\n  - account_id (integer NOT NULL)\n  - asset_id (integer)\n  - category_label (character varying)\n  - avg_weight (numeric)\n  - return_pct (numeric)\n  - contribution_pct (numeric)\n  - realized_pnl (numeric)\n  - unrealized_pnl (numeric)\n  - is_open_position (boolean)\n  - sector_snapshot (character varying)\n
+TABLE: permissions\n  - permission_id (integer NOT NULL)\n  - slug (character varying NOT NULL)\n  - description (text)\n
+TABLE: portfolio_advisors\n  - assignment_id (integer NOT NULL)\n  - portfolio_id (integer)\n  - advisor_user_id (integer)\n  - role (character varying NOT NULL)\n  - start_date (date NOT NULL)\n  - end_date (date)\n
+TABLE: portfolios\n  - portfolio_id (integer NOT NULL)\n  - owner_user_id (integer)\n  - interface_code (character varying NOT NULL)\n  - name (character varying NOT NULL)\n  - main_currency (character)\n  - residence_country (character)\n  - inception_date (date)\n  - active_status (boolean)\n  - twr_cutoff_date (date)\n
+TABLE: twr_daily\n  - twr_daily_id (integer NOT NULL)\n  - account_id (integer NOT NULL, FK → accounts)\n  - date (date NOT NULL)\n  - nav (numeric)\n  - sum_cash_journal (numeric DEFAULT 0)\n  - twr (numeric)\n  - hp (numeric)\n  - initial_hp_date (date)\n  - created_at (timestamp with time zone)\n  - updated_at (timestamp with time zone)\n  - UNIQUE(account_id, date)\n
+TABLE: positions\n  - position_id (integer NOT NULL)\n  - account_id (integer NOT NULL)\n  - asset_id (integer NOT NULL)\n  - report_date (date NOT NULL)\n  - quantity (numeric NOT NULL)\n  - mark_price (numeric)\n  - position_value (numeric)\n  - cost_basis_money (numeric)\n  - cost_basis_price (numeric)\n  - open_price (numeric)\n  - fifo_pnl_unrealized (numeric)\n  - percent_of_nav (numeric)\n  - side (character varying)\n  - level_of_detail (character varying)\n  - open_date_time (timestamp without time zone)\n  - vesting_date (date)\n  - accrued_interest (numeric)\n  - fx_rate_to_base (numeric)\n  - currency (character)\n
+TABLE: role_permissions\n  - role_id (integer NOT NULL)\n  - permission_id (integer NOT NULL)\n
+TABLE: roles\n  - role_id (integer NOT NULL)\n  - name (character varying NOT NULL)\n  - description (text)\n
+TABLE: stock_exchanges\n  - exchange_code (character varying NOT NULL)\n  - name (character varying NOT NULL)\n  - country_code (character)\n
+TABLE: structured_notes\n  - note_id (integer NOT NULL)\n  - asset_id (integer NOT NULL)\n  - isin (character varying NOT NULL)\n  - upload_date (date NOT NULL)\n  - bid (numeric)\n  - ask (numeric)\n  - underlyings (jsonb)\n  - underlyings_label (character varying)\n  - final_fixing_date (date)\n  - initial_fixing_date (date)\n  - next_autocall_date (date)\n  - next_coupon_date (date)\n  - next_observation (date)\n  - issue_date (date)\n  - redemption_date (date)\n  - next_coupon_payment_date (date)\n  - issuer_pcs (character varying)\n  - reference_underlying (character varying)\n  - final_client (character varying)\n  - status (character varying)\n  - payoff (character varying)\n  - store_observations (character varying)\n  - coupon_frequency (character varying)\n  - callability_frequency (character varying)\n  - issuer (character varying)\n  - product (character varying)\n  - currency (character varying)\n  - coupon_trigger (numeric)\n  - capital_barrier (numeric)\n  - autocall_trigger (numeric)\n  - coupon_pa (numeric)\n  - put_strike (numeric)\n  - next_autocall_trigger (numeric)\n  - next_autocall_value (numeric)\n  - ref_underlying_initial_fixing (numeric)\n  - ref_underlying_last_close (numeric)\n  - strike_level (numeric)\n  - dist_average (numeric)\n  - paid_coupons (numeric)\n  - size (numeric)\n  - coupon (numeric)\n  - autocall_value (numeric)\n  - protection (numeric)\n  - performance (numeric)\n  - created_at (timestamp without time zone)\n  - updated_at (timestamp without time zone)\n
+TABLE: trades\n  - transaction_id (integer NOT NULL)\n  - account_id (integer)\n  - asset_id (integer)\n  - ib_transaction_id (character varying)\n  - ib_exec_id (character varying)\n  - ib_trade_id (character varying)\n  - ib_order_id (character varying)\n  - trade_date (date NOT NULL)\n  - settlement_date (date)\n  - report_date (date)\n  - transaction_type (character varying)\n  - side (character varying)\n  - exchange (character varying)\n  - quantity (numeric NOT NULL)\n  - price (numeric NOT NULL)\n  - gross_amount (numeric)\n  - net_amount (numeric)\n  - proceeds (numeric)\n  - commission (numeric)\n  - tax (numeric)\n  - cost_basis (numeric)\n  - realized_pnl (numeric)\n  - mtm_pnl (numeric)\n  - multiplier (numeric)\n  - strike (numeric)\n  - expiry (date)\n  - put_call (character varying)\n  - currency (character)\n  - description (text)\n  - notes (text)\n
+TABLE: users\n  - user_id (integer NOT NULL)\n  - username (character varying NOT NULL)\n  - email (character varying)\n  - password_hash (character varying NOT NULL)\n  - full_name (character varying)\n  - phone (character varying)\n  - tax_id (character varying)\n  - entity_type (character varying)\n  - is_active (boolean)\n  - created_at (timestamp with time zone)\n  - role_id (integer)\n

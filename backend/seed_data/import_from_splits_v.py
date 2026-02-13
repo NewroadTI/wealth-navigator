@@ -423,19 +423,16 @@ def setup_dynamic_user_from_csv(db, folder_path):
     
     return acct_map
 # --- ACUMULADORES ---
-inserted_records = {
-    "Trades": [],
-    "CashJournal": [],
-    "CorporateActions": [],
-    "Performance": [],
-    "History": [],
-    "IncomeProjections": []  
+# Solo guardamos errores, no registros exitosos
+error_records = {
+    "Errors": [],     # Errores estructurados
+    "FailedRows": []  # Filas específicas que fallaron con todos sus datos
 }
 
 stats = {"CSV_Rows": 0, "DB_Inserted": 0}
 
-# LISTA PARA GUARDAR ERRORES/SKIPS
-skipped_log = []
+# LISTA DETALLADA DE ERRORES CON LÍNEA EXACTA
+failed_rows_log = []
 
 # --- HELPERS ---
 def parse_decimal(val):
@@ -655,152 +652,169 @@ def import_cash_journal(db, acct_map, folder_path):
         stats["CSV_Rows"] += len(df)
         
         for i, row in df.iterrows():
-            d = parse_date(row.get(d_col))
-            
-            # --- DETECCIÓN DE ERROR DE FECHA ---
-            if not d:
-                skipped_log.append({
-                    "File": fname, 
-                    "Row": i + 2, 
-                    "Reason": f"Fecha inválida o vacía en columna '{d_col}'", 
-                    "Data": row.to_dict()
-                })
-                continue
-
-            desc = str(row.get(desc_col, ""))
-            final_type = t_def
-            
-            # Inicializamos variables opcionales en None para esta fila
-            ex_date = None
-            quantity = None
-            rate_per_share = None
-            asset_id = None  # <--- IMPORTANTE: Inicializar aquí para poder modificarlo en los bloques
-
-            # ==========================================
-            # 1. LÓGICA PARA DIVIDENDOS
-            # ==========================================
-            if fname == "Dividends_0.csv":
-                # Captura de campos adicionales específicos de Dividendos
-                ex_date = parse_date(row.get('Ex-Date'))
-                quantity = parse_decimal(row.get('Quantity'))
-                rate_per_share = parse_decimal(row.get('DividendPerShare'))
-
-
-            # ==========================================
-            # 2. LÓGICA PARA INTERESES
-            # ==========================================
-
-            elif fname == "Interest_Details_0.csv":
-                final_type = "INTEREST"
+            try:
+                d = parse_date(row.get(d_col))
                 
-                # A. CASH / USD
-                if "USD" in desc or "HKD" in desc or "Stock Interest" in desc:
-                    asset_id = usd_asset_id
+                # --- DETECCIÓN DE ERROR DE FECHA ---
+                if not d:
+                    error_entry = {
+                        "File": fname, 
+                        "CSVLine": i + 2,  # Línea exacta del CSV (considerando header)
+                        "ErrorType": "DATE_PARSE_ERROR",
+                        "Reason": f"Fecha inválida o vacía en columna '{d_col}'", 
+                        "RowData": row.to_dict()
+                    }
+                    failed_rows_log.append(error_entry)
+                    log_error("DATE_PARSE_ERROR", f"{fname} línea {i+2}: Fecha inválida", row.to_dict())
+                    continue
+
+                desc = str(row.get(desc_col, ""))
+                final_type = t_def
                 
-                # B. BONOS (Búsqueda inteligente)
-                else:
-                    ignore_words = [
-                        "BOND", "COUPON", "PAYMENT", "ACCRUED", "INTEREST", 
-                        "RECEIVED", "PAID", "FOR", "OF", "WITHHOLDING", "TAX"
-                    ]
+                # Inicializamos variables opcionales en None para esta fila
+                ex_date = None
+                quantity = None
+                rate_per_share = None
+                asset_id = None  # <--- IMPORTANTE: Inicializar aquí para poder modificarlo en los bloques
+
+                # ==========================================
+                # 1. LÓGICA PARA DIVIDENDOS
+                # ==========================================
+                if fname == "Dividends_0.csv":
+                    # Captura de campos adicionales específicos de Dividendos
+                    ex_date = parse_date(row.get('Ex-Date'))
+                    quantity = parse_decimal(row.get('Quantity'))
+                    rate_per_share = parse_decimal(row.get('DividendPerShare'))
+
+                # ==========================================
+                # 2. LÓGICA PARA INTERESES
+                # ==========================================
+                elif fname == "Interest_Details_0.csv":
+                    final_type = "INTEREST"
                     
-                    tokens = desc.split()
-                    for token in tokens:
-                        clean_token = token.strip().upper()
+                    # A. CASH / USD
+                    if "USD" in desc or "HKD" in desc or "Stock Interest" in desc:
+                        asset_id = usd_asset_id
+                    
+                    # B. BONOS (Búsqueda inteligente)
+                    else:
+                        ignore_words = [
+                            "BOND", "COUPON", "PAYMENT", "ACCRUED", "INTEREST", 
+                            "RECEIVED", "PAID", "FOR", "OF", "WITHHOLDING", "TAX"
+                        ]
                         
-                        # Filtros para ignorar basura:
-                        if len(clean_token) < 3: continue          # Ignorar palabras de 1 o 2 letras
-                        if clean_token in ignore_words: continue   # Ignorar palabras clave
-                        # Ignorar si tiene números (ej: "2021", "6.65", "3/8")
-                        if any(char.isdigit() for char in clean_token): continue 
+                        tokens = desc.split()
+                        for token in tokens:
+                            clean_token = token.strip().upper()
+                            
+                            # Filtros para ignorar basura:
+                            if len(clean_token) < 3: continue          # Ignorar palabras de 1 o 2 letras
+                            if clean_token in ignore_words: continue   # Ignorar palabras clave
+                            # Ignorar si tiene números (ej: "2021", "6.65", "3/8")
+                            if any(char.isdigit() for char in clean_token): continue 
 
-                        # 1. Intento Exacto (usando tu cache)
-                        found = get_asset_id(db, clean_token)
+                            # 1. Intento Exacto (usando tu cache)
+                            found = get_asset_id(db, clean_token)
 
-                        # 2. Intento "Empieza con" (Directo a DB)
-                        # Esto encuentra el asset "HNTOIL 6 3/8..." buscando solo "HNTOIL"
-                        if not found:
-                            # Buscamos en la DB un asset que EMPIECE por esta palabra
-                            # Importante: 'Asset' debe estar importado de tus modelos
-                            potential = db.query(Asset).filter(Asset.symbol.ilike(f"{clean_token}%")).first()
-                            if potential:
-                                found = potential.asset_id
-                        
+                            # 2. Intento "Empieza con" (Directo a DB)
+                            # Esto encuentra el asset "HNTOIL 6 3/8..." buscando solo "HNTOIL"
+                            if not found:
+                                # Buscamos en la DB un asset que EMPIECE por esta palabra
+                                # Importante: 'Asset' debe estar importado de tus modelos
+                                potential = db.query(Asset).filter(Asset.symbol.ilike(f"{clean_token}%")).first()
+                                if potential:
+                                    found = potential.asset_id
+                            
+                            if found:
+                                asset_id = found
+                                break
+                
+                # ==========================================
+                # 3. LÓGICA PARA DEPÓSITOS/RETIROS (TRANSFERS)
+                # ==========================================
+                elif fname == "Deposits_And_Withdrawals_0.csv":
+                    raw_t = row.get('Type')
+                    
+                    # Verificamos si es un valor nulo/NA de Pandas o la cadena "NA"
+                    is_na = pd.isna(raw_t) or str(raw_t).strip().upper() in ['NA', 'NAN', '']
+                    
+                    if is_na:
+                        # Si el CSV dice NA, guardamos como NA o ADJUSTMENT según prefieras
+                        final_type = "NA" 
+                    elif raw_t:
+                        final_type = str(raw_t).upper()
+
+                # ==========================================
+                # LÓGICA COMÚN (Moneda, Assets, Amount)
+                # ==========================================
+                
+                # Moneda
+                curr_code = "USD"
+                if "HKD" in desc: curr_code = "HKD"
+                if "GBP" in desc: curr_code = "GBP"
+                if "EUR" in desc: curr_code = "EUR"
+
+                # Búsqueda de Asset ID
+                if 'Symbol' in row and pd.notna(row['Symbol']):
+                    asset_id = get_asset_id(db, row['Symbol'])
+                
+                # Fallback de búsqueda en descripción si no hay Symbol directo
+                if not asset_id and desc:
+                    matches = re.findall(r'\((.*?)\)', desc)
+                    for candidate in matches:
+                        candidate = candidate.strip()
+                        found = get_asset_id(db, candidate)
                         if found:
                             asset_id = found
                             break
-            
-            # ==========================================
-            # 3. LÓGICA PARA DEPÓSITOS/RETIROS (TRANSFERS)
-            # ==========================================
-            elif fname == "Deposits_And_Withdrawals_0.csv":
-                raw_t = row.get('Type')
-                
-                # Verificamos si es un valor nulo/NA de Pandas o la cadena "NA"
-                is_na = pd.isna(raw_t) or str(raw_t).strip().upper() in ['NA', 'NAN', '']
-                
-                if is_na:
-                    # Si el CSV dice NA, guardamos como NA o ADJUSTMENT según prefieras
-                    final_type = "NA" 
-                elif raw_t:
-                    final_type = str(raw_t).upper()
+                        first_word = candidate.split(' ')[0]
+                        if first_word and first_word != candidate:
+                            found = get_asset_id(db, first_word)
+                            if found:
+                                asset_id = found
+                                break
 
-            # ==========================================
-            # LÓGICA COMÚN (Moneda, Assets, Amount)
-            # ==========================================
-            
-            # Moneda
-            curr_code = "USD"
-            if "HKD" in desc: curr_code = "HKD"
-            if "GBP" in desc: curr_code = "GBP"
-            if "EUR" in desc: curr_code = "EUR"
-
-            # Búsqueda de Asset ID
-            asset_id = None
-            if 'Symbol' in row and pd.notna(row['Symbol']):
-                asset_id = get_asset_id(db, row['Symbol'])
-            
-            # Fallback de búsqueda en descripción si no hay Symbol directo
-            if not asset_id and desc:
-                matches = re.findall(r'\((.*?)\)', desc)
-                for candidate in matches:
-                    candidate = candidate.strip()
-                    found = get_asset_id(db, candidate)
-                    if found:
-                        asset_id = found
-                        break
-                    first_word = candidate.split(' ')[0]
-                    if first_word and first_word != candidate:
-                        found = get_asset_id(db, first_word)
-                        if found:
-                            asset_id = found
-                            break
-
-            amount = parse_decimal(row.get(a_col)) or 0
-            
-            # Creación del objeto
-            cj = CashJournal(
-                account_id=acct_map.get(curr_code, acct_map["USD"]),
-                asset_id=asset_id,
-                date=d,
-                type=final_type,
-                amount=amount,
-                currency=curr_code,
-                description=desc,
+                amount = parse_decimal(row.get(a_col)) or 0
                 
-                # --- NUEVOS CAMPOS ---
-                ex_date=ex_date,            # Fecha Ex-Dividendo
-                quantity=quantity,          # Cantidad de acciones
-                rate_per_share=rate_per_share, # Dividendo por acción
-                # ---------------------
+                # Creación del objeto
+                cj = CashJournal(
+                    account_id=acct_map.get(curr_code, acct_map["USD"]),
+                    asset_id=asset_id,
+                    date=d,
+                    type=final_type,
+                    amount=amount,
+                    currency=curr_code,
+                    description=desc,
+                    
+                    # --- NUEVOS CAMPOS ---
+                    ex_date=ex_date,            # Fecha Ex-Dividendo
+                    quantity=quantity,          # Cantidad de acciones
+                    rate_per_share=rate_per_share, # Dividendo por acción
+                    # ---------------------
+                    
+                    #reference_code=f"{final_type[:3]}_{uuid.uuid4().hex[:8]}"
+                )
+                db.add(cj)
+                total += 1
                 
-                #reference_code=f"{final_type[:3]}_{uuid.uuid4().hex[:8]}"
-            )
-            db.add(cj)
-            total += 1
-            inserted_records["CashJournal"].append({"Date": str(d), "Type": final_type, "Amount": float(amount)})
+            except Exception as e:
+                error_entry = {
+                    "File": fname,
+                    "CSVLine": i + 2,  # Línea exacta del CSV
+                    "ErrorType": "CASH_JOURNAL_INSERT_ERROR",
+                    "Reason": f"Error al insertar: {str(e)}",
+                    "RowData": row.to_dict()
+                }
+                failed_rows_log.append(error_entry)
+                log_error("CASH_JOURNAL_INSERT_ERROR", f"{fname} línea {i+2}: {e}", row.to_dict())
+                db.rollback()
+                continue
             
-        db.commit()
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            log_error("CASH_JOURNAL_COMMIT_ERROR", f"Error en commit final de {fname}: {e}")
     
     stats["DB_Inserted"] += total
     logger.info(f"✅ {total} movimientos de caja insertados.")
@@ -819,11 +833,12 @@ def import_corporate_actions(db, acct_map,folder_path):
         
         # --- DETECCIÓN DE ERROR DE FECHA ---
         if not d: 
-            skipped_log.append({
+            failed_rows_log.append({
                 "File": "Corporate_Actions_0.csv", 
-                "Row": i + 2, 
+                "CSVLine": i + 2,
+                "ErrorType": "DATE_PARSE_ERROR",
                 "Reason": "Fecha inválida", 
-                "Data": row.to_dict()
+                "RowData": row.to_dict()
             })
             continue
         # -----------------------------------
@@ -848,7 +863,6 @@ def import_corporate_actions(db, acct_map,folder_path):
         )
         db.add(ca)
         count += 1
-        inserted_records["CorporateActions"].append({"Date": str(d), "Type": row.get('Type')})
 
     db.commit()
     stats["DB_Inserted"] += count
@@ -906,9 +920,7 @@ def import_history(db, acct_map,folder_path):
                     )
                     db.add(ars)
                     count += 1
-                    inserted_records["History"].append({"Label": p_label, "Return": float(ret)})
 
-        # -----------------------------------------------------------
         # CASO 2: FORMATO VERTICAL (Month, Quarter, Year en filas)
         # -----------------------------------------------------------
         else:
@@ -930,17 +942,19 @@ def import_history(db, acct_map,folder_path):
                     # Nota: Si el archivo vertical tiene una fila "YTD", la saltamos aquí
                     # porque probablemente ya la capturamos en el archivo horizontal, 
                     # o puedes agregar lógica especial aquí si lo prefieres.
-                    skipped_log.append({
-                        "File": fname, "Row": i + 2, 
-                        "Reason": f"Registro Ignorado (Label: {label})", "Data": row.to_dict()
+                    failed_rows_log.append({
+                        "File": fname, "CSVLine": i + 2,
+                        "ErrorType": "VALIDATION_ERROR",
+                        "Reason": f"Registro Ignorado (Label: {label})", "RowData": row.to_dict()
                     })
                     continue
                 
                 ret = parse_decimal(row.get('AccountReturn'))
                 if ret is None:
-                    skipped_log.append({
-                        "File": fname, "Row": i + 2, 
-                        "Reason": "Valor de Retorno Nulo", "Data": row.to_dict()
+                    failed_rows_log.append({
+                        "File": fname, "CSVLine": i + 2,
+                        "ErrorType": "NULL_VALUE_ERROR",
+                        "Reason": "Valor de Retorno Nulo", "RowData": row.to_dict()
                     })
                     continue
 
@@ -970,7 +984,6 @@ def import_history(db, acct_map,folder_path):
                 )
                 db.add(ars)
                 count += 1
-                inserted_records["History"].append({"Label": label, "Return": float(ret)})
             
     db.commit()
     stats["DB_Inserted"] += count
@@ -1088,7 +1101,6 @@ def import_performance(db, acct_map,folder_path):
         
         db.add(pa)
         count += 1
-        inserted_records["Performance"].append({"Symbol": sym, "PnL": float(real_pnl) if real_pnl else 0})
 
     db.commit()
     stats["DB_Inserted"] += count
@@ -1116,7 +1128,13 @@ def import_positions(db, acct_map,folder_path):
             
         report_d = parse_date(raw_date)
         if not report_d:
-            skipped_log.append({"File": "Open_Positions", "Row": i+2, "Reason": "Fecha inválida", "Data": row.to_dict()})
+            failed_rows_log.append({
+                "File": "Open_Position_Summary_0.csv",
+                "CSVLine": i+2,
+                "ErrorType": "DATE_PARSE_ERROR",
+                "Reason": "Fecha inválida",
+                "RowData": row.to_dict()
+            })
             continue
 
         raw_sym = row.get('Symbol')
@@ -1157,7 +1175,13 @@ def import_positions(db, acct_map,folder_path):
 
         # Si después de todo no hay asset_id, saltamos (o creamos dummy si quisieras)
         if not asset_id:
-            skipped_log.append({"File": "Open_Positions", "Row": i+2, "Reason": f"Asset no encontrado: {sym}", "Data": row.to_dict()})
+            failed_rows_log.append({
+                "File": "Open_Position_Summary_0.csv",
+                "CSVLine": i+2,
+                "ErrorType": "ASSET_NOT_FOUND",
+                "Reason": f"Asset no encontrado: {sym}",
+                "RowData": row.to_dict()
+            })
             continue
 
         # 3. Mapeo de Datos
@@ -1275,7 +1299,6 @@ def import_income_projections(db, acct_map,folder_path):
         
         db.add(proj)
         count += 1
-        inserted_records["IncomeProjections"].append({"Symbol": sym, "Income": float(proj.estimated_annual_income or 0)})
 
     db.commit()
     stats["DB_Inserted"] += count
@@ -1348,27 +1371,37 @@ def run_all():
         print(f"❌ Usuarios con errores:   {error_count}")
         print(f"📄 Total Filas Leídas (CSV): {stats['CSV_Rows']}")
         print(f"💾 Total Insertado en DB:  {stats['DB_Inserted']}")
-        print(f"🗑️  Total Ignorado:        {len(skipped_log)}")
+        print(f"❌ Total Con Errores:      {len(failed_rows_log)}")
         print("="*60)
         
         # Mostrar resumen de errores estructurados
         print_error_summary()
         
-        if skipped_log:
-            print("\n🔍 DETALLE DE FILAS IGNORADAS (Muestra):")
+        if failed_rows_log:
+            print("\n🔍 DETALLE DE FILAS CON ERROR (Muestra):")
             # Mostramos solo los primeros 15 errores para no saturar
-            for item in skipped_log[:15]:
-                print(f"❌ [{item['File']} | Fila {item['Row']}] -> {item['Reason']}")
-                # print(f"   Data: {item['Data']}")
+            for item in failed_rows_log[:15]:
+                print(f"❌ [{item['File']} | Línea CSV: {item['CSVLine']}] -> {item['Reason']}")
                 print("-" * 30)
-            if len(skipped_log) > 15:
-                print(f"... y {len(skipped_log) - 15} más.")
+            if len(failed_rows_log) > 15:
+                print(f"... y {len(failed_rows_log) - 15} más.")
 
-        # Guardar JSON
-        with open(JSON_OUTPUT_FILE, 'w', encoding='utf-8') as f:
-            json.dump(inserted_records, f, indent=2, cls=DateTimeEncoder)
+        # Guardar JSON SOLO con errores detallados
+        error_records["Summary"] = {
+            "total_processed_users": processed_count,
+            "users_with_errors": error_count,
+            "total_csv_rows": stats['CSV_Rows'],
+            "total_inserted": stats['DB_Inserted'],
+            "total_errors": len(import_errors),
+            "total_failed_rows": len(failed_rows_log)
+        }
+        error_records["Errors"] = import_errors
+        error_records["FailedRows"] = failed_rows_log
         
-        print(f"\n📝 Detalle guardado en: {JSON_OUTPUT_FILE}")
+        with open(JSON_OUTPUT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(error_records, f, indent=2, cls=DateTimeEncoder)
+        
+        print(f"\n📝 Detalle completo (incluyendo errores) guardado en: {JSON_OUTPUT_FILE}")
         logger.info("🚀 --- PROCESO COMPLETADO EXITOSAMENTE ---")
 
     except Exception as e:

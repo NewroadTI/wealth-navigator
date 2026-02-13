@@ -31,6 +31,7 @@ from app.jobs.processors.open_positions import OpenPositionsProcessor
 from app.jobs.processors.cash_journal import CashJournalProcessor
 from app.jobs.processors.trades import TradesProcessor
 from app.jobs.processors.transfers import TransfersProcessor
+from app.jobs.processors.nlv_history import NLVHistoryProcessor
 
 
 class ETLOrchestrator:
@@ -149,6 +150,8 @@ class ETLOrchestrator:
                 result = self._process_cash_journal(file_path)
             elif report_type == "TRANSFERS":
                 result = self._process_transfers(file_path)
+            elif report_type == "NLV_HISTORY":
+                result = self._process_nlv_history(file_path)
             else:
                 logger.info(f"No processor implemented for {report_type}, skipping...")
                 result = {"status": "skipped", "reason": "No processor implemented"}
@@ -197,6 +200,11 @@ class ETLOrchestrator:
     def _process_transfers(self, file_path: Path) -> Dict[str, Any]:
         """Process transfers (ACATS) CSV."""
         processor = TransfersProcessor(api_client=self.api_client)
+        return processor.process_file(file_path)
+
+    def _process_nlv_history(self, file_path: Path) -> Dict[str, Any]:
+        """Process NLV_HISTORY CSV via API (same pattern as other processors)."""
+        processor = NLVHistoryProcessor(api_client=self.api_client)
         return processor.process_file(file_path)
     
     # ==========================================================================
